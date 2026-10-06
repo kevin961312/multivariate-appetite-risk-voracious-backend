@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Herramientas
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.import_linter_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Configuración local y secretos
+.env
+.env.*
+!.env.example
+
+# Plantilla de agentes de otro proyecto (solo referencia local, no se sube)
+plantilla-agentes/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Sistema / editores
+.DS_Store
+.idea/
+.vscode/
+.claude/settings.local.json
+
+# Salidas de la compuerta
+.gates/
+.gate.log
