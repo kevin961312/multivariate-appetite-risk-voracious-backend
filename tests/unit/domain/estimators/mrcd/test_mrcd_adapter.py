@@ -10,8 +10,10 @@ from support.golden import read_case_x
 from support.solo_test import small_data
 from voracious.domain.common import EstimationError, InvalidInputError
 from voracious.domain.estimators.mrcd import (
+    ESTIMATOR_NAME,
     MRCD_FIT_FAILED,
     PYMRCD_VERSION,
+    MRCDEstimator,
     MRCDParams,
     MRCDTarget,
     fit_mrcd,
@@ -95,3 +97,19 @@ def test_non_finite_rows_are_reported_in_ok() -> None:
 
 def test_pymrcd_version_is_exposed() -> None:
     assert pymrcd.__version__ == PYMRCD_VERSION
+
+
+def test_estimator_delegates_to_fit_mrcd_and_is_picklable() -> None:
+    import copy
+    import pickle
+
+    x = small_data()
+    params = MRCDParams(alpha=0.75)
+    estimator = MRCDEstimator(params)
+    assert estimator.name == ESTIMATOR_NAME == "mrcd"
+    fit = estimator.fit(x)
+    ref = fit_mrcd(x, params)
+    assert np.array_equal(fit.cov, ref.cov)
+    assert np.array_equal(fit.center, ref.center)
+    assert pickle.dumps(estimator)
+    assert copy.deepcopy(estimator) == estimator

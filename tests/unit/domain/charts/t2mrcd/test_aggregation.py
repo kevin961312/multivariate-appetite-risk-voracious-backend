@@ -1,25 +1,19 @@
 import numpy as np
 import pytest
 
-from support.solo_test import small_data
 from voracious.domain.charts.t2mrcd import (
     DEFAULT_ALPHA_LIMIT,
+    MC_ERROR_RESAMPLES,
     QUANTILE_METHOD,
-    T2MRCD_MRCD_ALPHA,
-    ReplicateContext,
-    calibrate_limits,
-    mean_of_replicate_quantiles,
-    replicate_tasks,
-    run_replicate,
+    PooledQuantile,
+    pooled_quantile,
 )
-from voracious.domain.common import SerialTaskMapper
-from voracious.domain.estimators.mrcd import MRCDParams
 
 
 def test_quantile_probability_is_one_minus_alpha_limit() -> None:
     # alpha_limit = 0.005 es una proporción: la probabilidad del cuantil es 0.995 (no 99.5).
     values = np.arange(1.0, 201.0)
-    got = mean_of_replicate_quantiles([values], DEFAULT_ALPHA_LIMIT)
+    got = pooled_quantile([values], DEFAULT_ALPHA_LIMIT)
     assert QUANTILE_METHOD == "linear"
     assert got == float(np.quantile(values, 0.995, method="linear"))
     assert got != float(np.quantile(values, 0.005, method="linear"))
@@ -27,32 +21,38 @@ def test_quantile_probability_is_one_minus_alpha_limit() -> None:
     assert got == pytest.approx(199.005, rel=0, abs=1e-12)
 
 
-def test_limit_is_mean_of_per_replicate_quantiles() -> None:
+def test_limit_is_quantile_of_the_pool() -> None:
+    # Paso 2b, Q1: pool; un único cuantil del conjunto de los T² de todas las réplicas.
     reps = [np.array([1.0, 2.0, 3.0, 4.0]), np.array([10.0, 20.0]), np.array([5.0])]
-    alpha = 0.1
-    expected = np.mean([np.quantile(r, 0.9, method="linear") for r in reps])
-    assert mean_of_replicate_quantiles(reps, alpha) == float(expected)
-    # Distinto del cuantil del pool (la opción (a), descartada).
-    assert mean_of_replicate_quantiles(reps, alpha) != float(
-        np.quantile(np.concatenate(reps), 0.9, method="linear")
-    )
+    pooled = float(np.quantile(np.concatenate(reps), 0.9, method="linear"))
+    assert pooled_quantile(reps, 0.1) == pooled
+    # Distinto del promedio de cuantiles por réplica (la agregación sustituida).
+    per_replicate = float(np.mean([np.quantile(r, 0.9, method="linear") for r in reps]))
+    assert pooled != per_replicate
 
 
-def test_calibrated_limits_are_mean_of_replicate_quantiles() -> None:
-    x = small_data(30, 4)
-    mrcd = MRCDParams(alpha=T2MRCD_MRCD_ALPHA)
-    limits = calibrate_limits(
-        x,
-        mrcd=mrcd,
-        n_replicates=4,
-        seed=5,
-        alpha=DEFAULT_ALPHA_LIMIT,
-        aggregation=mean_of_replicate_quantiles,
-        mapper=SerialTaskMapper(),
-    )
-    context = ReplicateContext(x_clean=x, mrcd=mrcd)
-    outcomes = [run_replicate(context, task) for task in replicate_tasks(5, 4)]
-    quantiles = [np.quantile(o.t2, 0.995, method="linear") for o in outcomes]
-    assert limits.limit == float(np.mean(quantiles))
-    assert limits.alpha_limit == DEFAULT_ALPHA_LIMIT
-    assert limits.n_clean == 30
+def test_production_aggregation_has_stable_name() -> None:
+    assert pooled_quantile.name == "pooled_quantile"
+    assert isinstance(pooled_quantile, PooledQuantile)
+
+
+def test_mc_error_is_cluster_bootstrap_sd() -> None:
+    rng = np.random.default_rng(0)
+    reps = [rng.chisquare(3, size=40) for _ in range(12)]
+    seed = np.random.SeedSequence(5)
+    got = pooled_quantile.mc_error(reps, 0.05, seed)
+    # Mismo cálculo a mano: remuestrear réplicas completas con reemplazo.
+    manual_rng = np.random.default_rng(np.random.SeedSequence(5))
+    limits = []
+    for _ in range(MC_ERROR_RESAMPLES):
+        picks = manual_rng.integers(0, len(reps), size=len(reps))
+        pool = np.concatenate([reps[i] for i in picks])
+        limits.append(np.quantile(pool, 0.95, method="linear"))
+    assert got == float(np.std(limits, ddof=1))
+    assert got > 0.0
+    assert pooled_quantile.mc_error(reps, 0.05, np.random.SeedSequence(5)) == got
+
+
+def test_mc_error_with_one_replicate_is_not_available() -> None:
+    # Con B = 1 no hay variabilidad entre réplicas que medir: None (no disponible), no 0.
+    assert pooled_quantile.mc_error([np.arange(10.0)], 0.1, np.random.SeedSequence(1)) is None

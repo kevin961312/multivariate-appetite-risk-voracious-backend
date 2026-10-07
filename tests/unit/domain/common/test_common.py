@@ -88,3 +88,33 @@ def test_charts_and_estimators_packages_are_empty(package: object) -> None:
     assert isinstance(body[0], ast.Expr)
     assert isinstance(body[0].value, ast.Constant)
     assert isinstance(body[0].value.value, str)
+
+
+def test_recalibration_vocabulary_is_stable() -> None:
+    from voracious.domain.common import RecalibrationDecision, RecalibrationOutcome, RowDisposition
+
+    assert [d.value for d in RecalibrationDecision] == [
+        "initial",
+        "extend",
+        "replace",
+        "insufficient",
+    ]
+    assert [d.value for d in RowDisposition] == [
+        "kept",
+        "excluded_assignable_cause",
+        "excluded_automatic",
+        "already_in_base",
+    ]
+    out = RecalibrationOutcome(RecalibrationDecision.INSUFFICIENT, None, {"r": 1})
+    assert out.model is None
+    assert pickle.dumps(out)
+    assert copy.deepcopy(out).report == {"r": 1}
+
+
+def test_solo_test_doubles_never_live_in_src() -> None:
+    # Los estimadores y muestreadores «SOLO TEST» solo existen en tests/support.
+    src = Path(__file__).resolve().parents[4] / "src"
+    for path in src.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for name in ("Classical", "NormalSampler", "solo_test", "SOLO_TEST"):
+            assert name not in text, f"{name} en {path}"

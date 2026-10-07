@@ -8,11 +8,12 @@ from voracious.domain.common import ControlChart
 
 __all__ = ["AnyChart", "ChartRegistry", "resolve_chart"]
 
-# ``Any`` justificado: el registro es heterogéneo (cada carta tiene sus propios parámetros, modelo
-# y resultado) y ``ParamsT`` es contravariante, así que no existe un supertipo común distinto de
-# ``Any``. Los registros guardan esos valores como ``object`` y solo la carta que los produjo los
-# vuelve a recibir (la clave ``chart_id`` del registro lo garantiza).
-AnyChart = ControlChart[Any, Any, Any]
+# ``Any`` justificado: el registro es heterogéneo (cada carta tiene sus propios parámetros, modelo,
+# resultado, parámetros e informe de recalibración) y los parámetros son contravariantes, así que
+# no existe un supertipo común distinto de ``Any``. Los registros guardan esos valores como
+# ``object`` y solo la carta que los produjo los vuelve a recibir (la clave ``chart_id`` del
+# registro lo garantiza).
+AnyChart = ControlChart[Any, Any, Any, Any, Any]
 """Una carta cualquiera del registro."""
 
 ChartRegistry = Mapping[str, AnyChart]

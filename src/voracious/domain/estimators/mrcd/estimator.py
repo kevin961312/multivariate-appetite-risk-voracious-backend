@@ -3,17 +3,30 @@
 Único módulo de ``voracious`` (junto con ``result.py`` del mismo paquete) que importa ``pymrcd``
 (contrato de import-linter). No hay *fallback*: si ``pymrcd`` lanza ``RError`` (lo mismo que haría
 ``rrcov``), el ajuste termina en ``EstimationError`` con código ``MRCD_FIT_FAILED``.
+
+``MRCDEstimator`` envuelve ``fit_mrcd`` con sus parámetros para cumplir el contrato común
+``LocationScatterEstimator`` (``domain/common/estimation.py``): así una carta reparte réplicas
+bootstrap sin conocer el estimador concreto.
 """
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Final
 
 import numpy as np
 import numpy.typing as npt
 
 import pymrcd
-from voracious.domain.common import EstimationError, as_matrix
+from voracious.domain.common import EstimationError, FloatMatrix, as_matrix
 from voracious.domain.estimators.mrcd.params import MRCDParams
 from voracious.domain.estimators.mrcd.result import MRCDFit
 
-__all__ = ["MRCD_FIT_FAILED", "PYMRCD_VERSION", "fit_mrcd"]
+if TYPE_CHECKING:
+    from voracious.domain.common.estimation import LocationScatterEstimator, LocationScatterFit
+
+__all__ = ["ESTIMATOR_NAME", "MRCD_FIT_FAILED", "PYMRCD_VERSION", "MRCDEstimator", "fit_mrcd"]
+
+ESTIMATOR_NAME: Final = "mrcd"
+"""Nombre estable del estimador (se guarda con los límites para auditar)."""
 
 MRCD_FIT_FAILED = "MRCD_FIT_FAILED"
 """Código de error de un ajuste MRCD fallido."""
@@ -70,3 +83,42 @@ def fit_mrcd(x: npt.ArrayLike, params: MRCDParams) -> MRCDFit:
         i_best=np.asarray(res.i_best, dtype=np.int64),
         n_csteps=np.asarray(res.n_csteps, dtype=np.int64),
     )
+
+
+@dataclass(frozen=True)
+class MRCDEstimator:
+    """Estimador MRCD con parámetros fijos (``LocationScatterEstimator``; *picklable*).
+
+    Attributes:
+        params: Parámetros de MRCD de cada ajuste.
+    """
+
+    params: MRCDParams
+
+    @property
+    def name(self) -> str:
+        """Nombre estable: ``"mrcd"``."""
+        return ESTIMATOR_NAME
+
+    def fit(self, x: FloatMatrix) -> MRCDFit:
+        """Ajusta MRCD delegando en ``fit_mrcd`` (sin cambios de método ni *fallback*).
+
+        Args:
+            x: Datos ``n x p``.
+
+        Returns:
+            El ajuste MRCD.
+
+        Raises:
+            InvalidInputError: Si ``x`` no es una matriz numérica de dos dimensiones.
+            EstimationError: ``MRCD_FIT_FAILED`` si ``rrcov`` fallaría.
+        """
+        return fit_mrcd(x, self.params)
+
+
+if TYPE_CHECKING:
+    # mypy verifica que el adaptador cumple los contratos comunes (ADR 0004, punto 4).
+    _estimator_conforms: LocationScatterEstimator = MRCDEstimator(MRCDParams())
+
+    def _fit_conforms(fit: MRCDFit) -> LocationScatterFit:
+        return fit

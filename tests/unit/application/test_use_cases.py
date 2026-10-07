@@ -136,7 +136,7 @@ def test_full_phase1_and_phase2_with_real_t2mrcd() -> None:
     assert done.status is JobStatus.SUCCEEDED
     assert isinstance(done.result, T2MRCDMonitoring)
     assert done.result.signal[2]
-    assert done.result.limit == record.model.limits.limit
+    assert done.result.limit == record.model.operative_limit == record.model.limits.phase1_limit
     assert [r.status for r in app.monitorings.history] == [
         JobStatus.QUEUED,
         JobStatus.RUNNING,

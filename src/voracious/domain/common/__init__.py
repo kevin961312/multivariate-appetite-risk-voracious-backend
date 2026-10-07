@@ -1,7 +1,8 @@
 """Piezas comunes a todas las cartas y estimadores, sin lógica estadística de ningún método.
 
-ADR 0004, punto 4: tipos, errores, el contrato ``ControlChart`` y el reparto de tareas
-(``TaskMapper``). Ningún módulo de aquí importa una carta ni un estimador.
+ADR 0004, punto 4: tipos, errores, el contrato ``ControlChart``, los contratos de un estimador de
+ubicación y dispersión, el vocabulario de la recalibración y el reparto de tareas (``TaskMapper``).
+Ningún módulo de aquí importa una carta ni un estimador.
 """
 
 from voracious.domain.common.chart import ControlChart
@@ -11,7 +12,13 @@ from voracious.domain.common.errors import (
     InvalidInputError,
     MethodDecisionPendingError,
 )
+from voracious.domain.common.estimation import LocationScatterEstimator, LocationScatterFit
 from voracious.domain.common.parallel import SerialTaskMapper, TaskMapper
+from voracious.domain.common.recalibration import (
+    RecalibrationDecision,
+    RecalibrationOutcome,
+    RowDisposition,
+)
 from voracious.domain.common.types import BoolVector, FloatMatrix, FloatVector, as_matrix
 
 __all__ = [
@@ -22,7 +29,12 @@ __all__ = [
     "FloatMatrix",
     "FloatVector",
     "InvalidInputError",
+    "LocationScatterEstimator",
+    "LocationScatterFit",
     "MethodDecisionPendingError",
+    "RecalibrationDecision",
+    "RecalibrationOutcome",
+    "RowDisposition",
     "SerialTaskMapper",
     "TaskMapper",
     "as_matrix",
