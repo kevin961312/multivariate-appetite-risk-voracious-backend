@@ -1,0 +1,3 @@
+Piloto 2: 9 configuraciones x 50 réplicas = 450 tareas, 8 procesos PSOCK
+Tiempo total: 1040.7 s; filas: 450; verificación (copia oficial == rrcov, variantes == atajos) en todas: TRUE
+EXIT=0

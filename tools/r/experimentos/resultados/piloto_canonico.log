@@ -1,0 +1,3 @@
+Piloto: 8 configuraciones x 50 réplicas = 400 tareas, 8 procesos PSOCK
+Tiempo total: 551.1 s; filas: 400; verificación copia oficial == rrcov en todas: TRUE
+EXIT=0

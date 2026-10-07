@@ -1,0 +1,29 @@
+Caso C7: n=100 p=20 h=50  sigma_1(data)=13.56  umbral complemento sqrt(eps)=2.02e-07 (max(n,p)eps=3.01e-13)
+
+         conjunto  r s r_mas_s s_umbral_eps s_umbral_sigma1Z sigmaZ_1 sigmaZ_s sigmaZ_s1 med_Qn_V med_Qn_W frac_dist_W
+          R1 tanh 20 0      20            0               20 3.44e-14       NA  3.44e-14    0.988       NA           0
+      R2 Spearman 20 0      20            0               20 3.91e-14       NA  3.91e-14    0.985       NA           0
+ R3 normal scores 20 0      20            0               20 4.08e-14       NA  4.08e-14    0.972       NA           0
+              SCM 20 0      20            0               20 2.75e-13       NA  2.75e-13    0.997       NA           0
+       covx BACON 20 0      20            0               20 6.85e-14       NA  6.85e-14    0.969       NA           0
+
+(b) Sensibilidad (umbral complemento sigma_1*sqrt(eps)*kappa2): conjuntos distintos frente a (kappa=1, kappa2=1)
+  kappa=0.1  kappa2=0.1  : 0
+  kappa=1    kappa2=0.1  : 0
+  kappa=10   kappa2=0.1  : 0
+  kappa=0.1  kappa2=1    : 0
+  kappa=1    kappa2=1    : 0
+  kappa=10   kappa2=1    : 0
+  kappa=0.1  kappa2=10   : 0
+  kappa=1    kappa2=10   : 0
+  kappa=10   kappa2=10   : 0
+  canonical2 vs oficial: 0 conjuntos distintos; canonical2 vs canonical: 0; conjunto 6 igual al oficial: TRUE
+
+(c) Perturbacion 1e-14 relativa (5 veces): conjuntos que cambian
+  pert 1: oficial {}; canonical {}; canonical2 {}; canonical2 umbral eps {}
+  pert 2: oficial {}; canonical {}; canonical2 {}; canonical2 umbral eps {4}
+  pert 3: oficial {}; canonical {}; canonical2 {}; canonical2 umbral eps {4}
+  pert 4: oficial {}; canonical {}; canonical2 {}; canonical2 umbral eps {}
+  pert 5: oficial {}; canonical {}; canonical2 {}; canonical2 umbral eps {4}
+
+(d) initHsets canonical2 identicos bit a bit a rrcov: TRUE; CovMrcd(initHsets=canonical2) == CovMrcd(x): TRUE
