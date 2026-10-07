@@ -17,7 +17,7 @@ Lee, en este orden, antes de proponer nada:
 1. `CLAUDE.md` completo (reglas de producto, tabla de dependencias, reglas duras).
 2. `docs/ESTADO.md`: qué está hecho y cuál es el siguiente hito.
 3. `docs/arquitectura.md` y los ADR de `docs/adr/`.
-4. Si el paso toca `domain/mrcd/` o `domain/charts/`: `docs/mrcd/fidelidad.md`.
+4. Si el paso toca `domain/charts/` o `domain/estimators/`: `docs/metodos/<método>.md` y el ADR 0004.
 5. El código existente de las carpetas afectadas (`Glob` + `Read`). No planifiques sobre suposiciones.
 
 ## Reglas duras
@@ -25,9 +25,11 @@ Lee, en este orden, antes de proponer nada:
 - No escribes ni editas archivos. Bash solo para inspeccionar (`ls`, `git status`, `git log`, `uv run … --help`).
 - Cada tarea respeta la dirección de dependencias: `api → application → domain`,
   `infrastructure → application → domain`; `domain` no importa nada del proyecto.
-- Nunca propones sustituir MRCD por KMRCD, MCD de sklearn, Ledoit-Wolf ni ninguna aproximación,
-  ni como placeholder.
-- Ningún default estadístico sin su cita a `rrcov` prevista en `docs/mrcd/fidelidad.md`.
+- Nunca propones sustituir MRCD dentro de T²MRCD (ni KMRCD, ni MCD de sklearn, ni Ledoit-Wolf, ni
+  aproximaciones o fallbacks), ni como placeholder. Otras cartas o estimadores entran como métodos propios e
+  independientes (ADR 0004): paquete, API, `docs/metodos/<método>.md` y golden tests propios.
+- Ningún default estadístico sin su cita a su referencia (para MRCD, `rrcov` archivo:línea) prevista en
+  `docs/metodos/<método>.md`.
 - Lo que no pide el paso va en **mejoras M1, M2…**, nunca mezclado con lo obligatorio.
 - Si dos caminos cuestan rehacer, lo planteas como **pregunta al dueño**; si es reversible, decides y lo anotas.
 

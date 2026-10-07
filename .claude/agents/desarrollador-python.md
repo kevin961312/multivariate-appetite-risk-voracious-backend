@@ -20,9 +20,12 @@ Implementas **exactamente** las tareas aprobadas del plan. Nada más.
 
 - **Dependencias:** `domain` solo usa stdlib, numpy y scipy. `application` solo `domain`. `api` no importa
   `infrastructure` salvo vía `container.py`. Si necesitas romper esto, para y avisa.
-- **MRCD:** nunca KMRCD, `MinCovDet`, Ledoit-Wolf, covarianza clásica ni ninguna aproximación.
-  Mientras no exista el port, `MRCD.fit` lanza `NotImplementedError`.
-- **Defaults estadísticos:** solo los citados en `docs/mrcd/fidelidad.md`. Si falta la cita, para y avisa.
+- **Métodos estadísticos:** dentro de T²MRCD solo MRCD fiel a `rrcov`; nunca KMRCD, `MinCovDet`, Ledoit-Wolf,
+  covarianza clásica, aproximaciones ni fallbacks. Mientras no exista el port, `MRCD.fit` lanza
+  `NotImplementedError`. Otra carta o estimador se implementa como método propio e independiente (ADR 0004):
+  su paquete en `domain/charts/<carta>/` o `domain/estimators/<estimador>/`, su router y schemas, sus tests;
+  nunca importa otra carta u otro estimador.
+- **Defaults estadísticos:** solo los citados en `docs/metodos/<método>.md`. Si falta la cita, para y avisa.
 - **Tipado:** `mypy --strict` limpio. Prohibidos `# type: ignore`, `# noqa` y `Any` sin justificar en el informe.
 - **Docstrings** en español, estilo Google (`Args:`, `Returns:`, `Raises:`). Nombres de código en inglés.
 - **Configuración** solo por `VORACIOUS_*` vía `config.py`. Ningún secreto en el código.
