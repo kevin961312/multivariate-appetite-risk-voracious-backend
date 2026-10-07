@@ -1,15 +1,16 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-07 (cierre del Paso 2 y decisiones P2–P6 de T²MRCD).
+Última actualización: 2026-10-07 (Paso 2b.1, dominio, implementado y pendiente de commit).
 
-**Siguiente hito:** Paso 3, adaptadores mínimos, `container.py`, tenant y rutas por carta. Con las decisiones
-P2–P6 cerradas el 2026-10-07, la Fase I de T²MRCD se ejecuta completa (ver «Decisiones abiertas»).
+**Siguiente hito:** commit del 2b.1 (tras el «sí» del dueño), luego 2b.2 (aplicación: ciclo de vida) y
+luego el Paso 3 (adaptadores, `container.py`, tenant y rutas, incluidas las del ciclo de vida).
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
 | 0 | Fundaciones del repo: docs, ADR, `CLAUDE.md`, equipo de agentes | **hecho** |
 | 1 | Esqueleto: `pyproject`/uv, ruff, mypy, pytest, import-linter (6 contratos), `config`, app factory, `/health`, `/ready`, structlog, `scripts/gate.sh` y hook pre-commit | **hecho** |
-| 2 | Dominio extensible, puertos y casos de uso (ver abajo) | **hecho** (veredicto LT-QA: LISTO CON DEUDA); pendiente de commit |
+| 2 | Dominio extensible, puertos y casos de uso (ver abajo) | **hecho** (veredicto LT-QA: LISTO CON DEUDA); commiteado (`b73dcf6`) |
+| 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, depuración, comparación S/μ. **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **2b.1 hecho, pendiente de commit** (2026-10-07); 2b.2 pendiente |
 | 3 | Adaptadores mínimos, `container.py`, tenant, rutas por carta Fase I/II, errores uniformes | pendiente |
 | 4 | Dockerfile, docker-compose (perfiles distribuidos comentados), CI | pendiente |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
@@ -27,9 +28,46 @@ ambas asíncronas ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). Por eso el plan 
   ya existen), los puertos de `application` (`ModelRepository`, `MonitoringRepository`, `JobQueue`/`JobRequest`,
   `IdGenerator`, `Clock`), los casos de uso `TrainModel`, `GetModel`, `MonitorObservations`, `GetMonitoring`
   y los jobs `RunTrainingJob`/`RunMonitoringJob`, y `docs/metodos/` completado.
-- **Paso 3:** rutas `/v1/charts/t2mrcd/models…` y `…/monitorings…`; test de que la Fase I termina en
-  `failed / T2MRCD_DECISION_PENDING` si un campo decisivo se pasa como `None`; posible tarea de recalibración a petición; aislamiento por tenant.
+- **Paso 2b (en curso):** ver arriba.
+- **Paso 3:** rutas `/v1/charts/t2mrcd/models…` y `…/monitorings…` más los endpoints del ciclo de vida (ADR 0005,
+  enmienda 2026-10-07); test de que la Fase I termina en `failed / T2MRCD_DECISION_PENDING` si un campo decisivo se
+  pasa como `None`; aislamiento por tenant.
 - **Paso 5:** golden tests por método (MRCD contra `rrcov`; T²MRCD contra su propia referencia).
+
+## Paso 2b: decisiones del dueño (2026-10-07)
+
+Diseño del dueño para Fase II y recalibración; detalle en el [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md),
+la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
+
+- **El backend es dueño del ciclo de vida** (versiones inmutables, observaciones, anotaciones, eventos,
+  propuesta/aprobación, avisos); el front solo muestra y pide.
+- **Límites:** remuestreo no paramétrico, nunca normal; Fase II por OOB (**revierte** la anulación del Paso 2);
+  **Q1 pool** en ambas fases (sustituye el promedio de cuantiles; motivo: α efectivo ≈ 0.018 y ≈ 0.035 frente a 0.005);
+  `phase2_alpha_limit` 0.005. Q2: v0 vigila con el límite de Fase I; las recalibradas con el de Fase II.
+- **Recalibración:** Q3 depuración humana + automática; Q4 Frobenius relativa, umbral 0.10 orientativo, reemplazar si
+  cualquier señal de cambio; Q5 máx. 5 vueltas; Q6 `effective_from` no retroactivo; Q7 con «requiere nueva base» se
+  sigue vigilando; Q8 hereda B, α y MRCD; Q9 «Fase II > Fase I» es diagnóstico; Q12 solo se anotan señales.
+  Mínimo 25 observaciones.
+- **Mejoras:** aprobadas M1 (estrategias por nombre, en 2b.2) y M6 (error Monte Carlo); M5 (optimizar `pymrcd`) antes de
+  producción; M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT) después. Ojo: la numeración M1–M6 de 2b no
+  coincide con la del Paso 2 (más abajo).
+- **Coste:** la v0 hasta `(1 + max_depuration_rounds)·B` ajustes MRCD; una recalibración hasta `(1 + rondas)·B`
+  más B en EXTEND (estimación previa del dueño: ≈ 300 ajustes, 20–70 min en 8 núcleos con `pymrcd` actual).
+- **Prueba de calidad de la tubería:** estimador clásico + muestreador de muestras independientes (normal, solo en
+  `tests/`) reproduce Beta (Fase I) y F (Fase II), n > p. No valida el OOB: con el clásico la Fase II sale ≈ +16 %
+  sobre la F (efecto .632), conservadora.
+
+### Decisiones nuevas del dueño (2026-10-07, 2b.1)
+
+- **Remuestreo solo sobre `best` (0.75)** para ambos límites: evita que una contaminación no detectada infle el
+  límite (enmascaramiento). Consecuencia medida: falsa alarma real ≈ 2.0–2.4 % (Fase I) y ≈ 1.6–2.2 % (Fase II)
+  frente al 0.5 % nominal (≈ 0.4 % con todas las filas); la depuración automática puede quitar 1–10 filas buenas.
+  Característica del diseño, no error.
+- **Umbral Frobenius parametrizable:** `relative_change_threshold` 0.10 y `threshold_decides = False` (informativo;
+  deciden las pruebas formales de S y μ). Motivo: con datos estables la Frobenius de MRCD sale ≈ 0.25–0.5. Sin
+  pruebas citadas, la recalibración responde `T2MRCD_DECISION_PENDING` salvo `force_replace`, en ambos modos.
+- **Error MC con B = 1:** `None` (no disponible).
+- **Pendiente 2b.2:** hash del contenido de la base al persistir.
 
 ## Paso 2: decisiones del dueño (2026-10-07)
 
@@ -38,9 +76,9 @@ ambas asíncronas ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). Por eso el plan 
   `details.pending` (enmienda del [ADR 0002](adr/0002-mrcd-sin-aproximaciones.md)).
 - **P2 (cerrada):** filas limpias = subconjunto `best` de MRCD con alpha 0.75 (`h = ceiling(0.75·n)`).
 - **P3 (cerrada):** B = `n_replicates`, default 100, citado (Heng, Shen y Lange, 2026, JCGS 35(1):27–39).
-- **P4 (cerrada):** `alpha_limit = 0.005` (cuantil 0.995), promedio de cuantiles por réplica, cuantil tipo 7.
-- **P5 (modificada):** remuestreo con reemplazo de tamaño `h`; **un único límite** para Fase I y Fase II
-  (se anula la parte *out-of-bag*); señal `t2 > límite` estricta
+- **P4 (cerrada):** `alpha_limit = 0.005` (cuantil 0.995), cuantil tipo 7. *Agregación: promedio de cuantiles por réplica, **sustituida por pool en el Paso 2b**.*
+- **P5 (modificada):** remuestreo con reemplazo de tamaño `h`; *un único límite para Fase I y Fase II
+  (anulación de la parte out-of-bag), **revertida en el Paso 2b**: dos límites*; señal `t2 > límite` estricta
   ([ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md)).
 - **P6 (cerrada):** `statistic_reference` = artículo T²MRCD del dueño, en proceso de publicación.
 - **Mejoras aplicadas:** M1 (el dominio no importa IO, procesos ni hilos), M2, M4 (`TaskMapper` con contexto
@@ -102,9 +140,9 @@ correrlo en un servidor con más núcleos.
 ## Decisiones abiertas
 
 - **Regla de cuantil** tipo 7 (`method="linear"`): elección técnica reversible; confirmar o cambiar.
-- **Recalibración a petición** (futura): qué datos (solo Fase II o histórico + Fase II), si entran las
-  observaciones con señal (recomendado: todas) y si es un modelo nuevo enlazado (recomendado) o una versión.
-  Ver [`metodos/t2mrcd.md`](metodos/t2mrcd.md).
+- **Pruebas formales de cambio en S y en μ** (remuestreo) de la recalibración: pendientes de cita; sin ellas la
+  recalibración termina en `failed / T2MRCD_DECISION_PENDING` salvo reemplazo forzado.
+- Cita del umbral 0.10 y de la revalidación de 6 meses (hoy documento del dueño, orientativos).
 - Cita del bootstrap de límites T² y de `alpha_limit = 0.005` (hoy decisiones del dueño).
 - Fuente de los golden de la carta T²MRCD.
 - Código de HTTP de `/ready` cuando un check falle (hoy `checks` va vacío): ver
@@ -115,9 +153,16 @@ correrlo en un servidor con más núcleos.
 ### Del Paso 2, para el Paso 3
 
 - **Cita final del artículo T²MRCD** (P6): sustituir `STATISTIC_REFERENCE` cuando se publique (regla dura 3).
-- **Recalibración a petición:** funcionalidad nueva, no implementada (Paso 3 o tarea propia).
-- **Persistencia de estrategias por nombre:** `clean_criterion` y `aggregation` son *callables* dentro de los
-  parámetros; un repositorio real no puede guardarlos tal cual.
+- **Recalibración y ciclo de vida:** dominio implementado (2b.1, pendiente de commit); aplicación (2b.2) y luego Paso 3.
+- **Citas de las pruebas formales de cambio en S y μ** (hoy sin cita; bloquean la recalibración sin `force_replace`).
+- **Reponderado tipo MCD** (añadir a `best` las observaciones con distancia robusta no extrema): estudio futuro para
+  acercar la falsa alarma real al 0.5 % nominal.
+- **Hash del contenido de la base** al persistir (2b.2): la comprobación por T² con `rtol` no prueba identidad.
+- **Persistencia de estrategias por nombre** (M1 de 2b, en 2b.2): `clean_criterion` y `aggregation` son *callables*
+  dentro de los parámetros; un repositorio real no puede guardarlos tal cual.
+- **Coste de la recalibración** (cientos de ajustes por las rondas de depuración): M5, optimizar `pymrcd`, **más
+  urgente**, antes de producción.
+- **Mejoras posteriores:** M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT).
 - **Fase I fuera del hilo de la API:** tarda minutos (ver ADR 0007); `InlineJobQueue` la ejecutaría dentro de la petición.
 - **`ProcessPoolTaskMapper`** en `infrastructure`, con BLAS a 1 hilo por proceso y una prueba de que los límites
   no cambian respecto al reparto en serie.

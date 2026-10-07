@@ -29,19 +29,29 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
   (semilla fija; casos n > p, p > n y contaminado) guardadas como fixtures; el port debe coincidir dentro
   de una tolerancia declarada. En el cascarón: script R, carpeta de fixtures y test `xfail(strict=True)`.
 - **Límites de control de T²MRCD**: ningún estimador da un límite y no hay artículo de Fase II, así que los
-  límites de **Fase I y Fase II se calibran por bootstrap** sobre las observaciones limpias del histórico
-  ([ADR 0007](docs/adr/0007-limites-t2mrcd-por-bootstrap.md)). Decidido (dueño, 2026-10-07): filas limpias =
-  subconjunto `best` de MRCD con `alpha = 0.75` (`h = ceiling(0.75·n)`); B = `n_replicates` (100 por defecto,
-  citado: Heng, Shen y Lange, 2026); remuestreo con reemplazo de tamaño `h`; `alpha_limit = 0.005` (cuantil
-  0.995) y límite = promedio de los cuantiles por réplica (tipo 7, elección técnica reversible); **un único
-  límite** para Fase I y Fase II. Pendiente solo: la cita final del artículo T² (P6, en proceso de publicación)
-  y la recalibración a petición (futura). Detalle en
-  [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté documentado allí queda como
-  **decisión abierta**.
+  límites se calibran por **bootstrap no paramétrico** sobre las observaciones limpias del histórico
+  ([ADR 0007](docs/adr/0007-limites-t2mrcd-por-bootstrap.md), con su enmienda del Paso 2b). Hay **dos límites**
+  que comparten réplicas: Fase I (T² de la muestra) y Fase II (T² de las filas **OOB** con el ajuste de cada
+  réplica). Ambos son el cuantil 1−α (tipo 7) del **pool** de T² de todas las réplicas, no el promedio de
+  cuantiles por réplica (que infla el α efectivo cuando m·α < 1). B = `n_replicates` (100 por defecto, con cita),
+  `alpha_limit` y `phase2_alpha_limit` = 0.005. **Límite operativo por régimen:** la v0 vigila con el de Fase I
+  (provisional y fijo); las versiones recalibradas, con el de Fase II. **Se remuestrea solo `best` (alpha
+  0.75)**: con todas las filas una contaminación no detectada inflaría el límite (enmascaramiento). **Falsa
+  alarma real conocida:** frente a observaciones nuevas en control es ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase
+  II frente al 0.5 % nominal, porque `best` es el 75 % central; es una característica del diseño, no un error
+  (estudio futuro: reponderado tipo MCD). El umbral Frobenius de la recalibración es parametrizable
+  (`relative_change_threshold` 0.10; `threshold_decides = False`: solo informativo, deciden las pruebas formales
+  de S y μ). El **ciclo de vida** (versiones inmutables
+  propuestas y aprobadas, registro de observaciones, anotaciones, eventos estructurales, recalibración y
+  revalidación) lo posee el backend: [ADR 0008](docs/adr/0008-ciclo-de-vida-de-la-carta.md) (dominio implementado en
+  2b.1; aplicación en 2b.2). Pendientes: pruebas formales de cambio en S y μ, cita del bootstrap y de los umbrales (0.10, 6 meses),
+  P6 (cita del artículo T²). Detalle en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté
+  documentado allí queda como **decisión abierta**.
 - **Sin placeholders estadísticos.** MRCD se ajusta con `pymrcd` (el port de `rrcov::CovMrcd`, ADR 0006).
   Con los defaults decididos la Fase I se ejecuta completa; si un campo decisivo se pasa explícitamente como
   `None`, la Fase I de T²MRCD termina en `failed / T2MRCD_DECISION_PENDING` con `details.pending` (lista de
-  campos pendientes), comprobado **antes** de ajustar nada. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
+  campos pendientes), comprobado **antes** de ajustar nada; la recalibración, mientras las pruebas formales de S y
+  μ no tengan cita, responde igual salvo `force_replace`. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
   `tests/support/`, nunca en `src/`. Nada de covarianza clásica «mientras tanto».
 
 ## 2. Arquitectura (hexagonal)
@@ -55,13 +65,18 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) |
 | Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` |
+| Versiones, observaciones, anotaciones, eventos y recalibraciones (previstos, 2b.2) | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria | Postgres (TimescaleDB) |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` | JWT/OIDC |
+
+Puertos previstos del ciclo de vida (Paso 2b.2, aún no existen): `ModelVersionRepository` (append-only, con
+CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository` y
+`RecalibrationRepository`; adaptador en memoria hoy, Postgres después.
 
 Puertos auxiliares: `IdGenerator` y `Clock` (application) y `TaskMapper` (reparto de tareas independientes, como
 las réplicas bootstrap; vive en `domain/common/parallel.py` y su adaptador con procesos irá en `infrastructure`).
 El `JobQueue` recibe un `JobRequest` con solo identificadores.
 
-API por carta, asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona.md),
+API por carta (más endpoints del ciclo de vida previstos para el Paso 3, ADR 0005 enmendado), asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona.md),
 [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)): `POST /v1/charts/<carta>/models` → `202` + `model_id`;
 `GET /v1/charts/<carta>/models/{id}`; `POST …/models/{id}/monitorings` → `202` + `monitoring_id`;
 `GET …/monitorings/{id}`. Estados `queued | running | succeeded | failed`.

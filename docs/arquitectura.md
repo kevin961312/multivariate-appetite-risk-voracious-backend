@@ -131,6 +131,7 @@ adaptadores de la columna «hoy» son **objetivo del Paso 3**.
 | Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio); procesos en el Paso 3 | `ProcessPoolTaskMapper`, luego Celery/Dask | _por definir_ |
 | Identificadores y reloj | `IdGenerator`, `Clock` | _Paso 3_ | — | — |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` | `VORACIOUS_STORAGE=local` |
+| Versiones, observaciones, anotaciones, eventos estructurales y recalibraciones (**previstos**, Paso 2b.2) | `ModelVersionRepository` (append-only, CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | _Paso 2b.2/3_ | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` (sin auth real) | JWT/OIDC | — |
 
 Decisiones de diseño de los puertos y registros:
@@ -173,8 +174,34 @@ Fase II ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). **Objetivo del Paso 3**; `
 - Errores con formato uniforme `{code, message, details}`.
 - Toda ruta de negocio exige tenant; un tenant nunca ve recursos de otro.
 - Con los defaults de T²MRCD (P2–P6 cerradas) la Fase I se ejecuta completa; si un campo decisivo se pasa como
-  `None`, termina en `failed` con `T2MRCD_DECISION_PENDING` y `details.pending`. Fase I y Fase II comparten un único límite. Catálogo completo de códigos en la enmienda del
+  `None`, termina en `failed` con `T2MRCD_DECISION_PENDING` y `details.pending`. Fase I y Fase II tienen límites distintos que comparten réplicas (ADR 0007, enmienda del Paso 2b). Catálogo completo de códigos en la enmienda del
   [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
+
+### Ciclo de vida de la carta (objetivo, Paso 2b y 3)
+
+Decidido en el [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md): el backend posee versiones, observaciones,
+anotaciones, eventos estructurales, propuesta/aprobación y avisos; el front solo muestra y pide. Endpoints
+previstos en el [ADR 0005](adr/0005-api-fase-i-fase-ii.md) (enmienda 2026-10-07). Flujo:
+
+```
+ Fase I (v0, límites I y II) ─▶ vigilancia con límite de Fase I (provisional y fijo)
+        │                                  │ registra cada observación (fecha, lote, T², límite, versión)
+        │                                  ▼ anota señales
+        │                        recalibración a petición (202) ─▶ versión propuesta + reporte antes/después
+        │                                                            │ aprobar (effective_from no retroactivo) / rechazar
+        ▼                                                            ▼
+   evento estructural ─▶ «requiere nueva base»            versión vigente (límite de Fase II)
+```
+
+**Estado de la carta** (`GET …/status`), el primero que aplique, por precedencia:
+
+1. `requires_new_base`: hay un evento estructural sin base nueva posterior; se sigue vigilando con la versión vigente.
+2. `proposal_pending`: hay una propuesta sin aprobar ni rechazar.
+3. `revalidation_due`: venció la revalidación periódica (6 meses u N observaciones).
+4. `startup` (vigilando con v0) o `active` (con una versión recalibrada vigente).
+
+Las versiones son inmutables y append-only; solo cambia su estado, con comparar-y-cambiar (CAS) para impedir dos
+aprobaciones concurrentes. Cada observación se puntúa con la versión vigente en su fecha.
 
 ### Salud (existe desde el Paso 1)
 

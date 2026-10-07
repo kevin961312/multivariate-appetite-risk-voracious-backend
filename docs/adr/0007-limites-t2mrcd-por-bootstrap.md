@@ -1,6 +1,6 @@
 # ADR 0007 — Límites de control de T²MRCD por bootstrap
 
-- **Estado:** Aceptado. Enmendado el 2026-10-07 (mismo día, antes del primer commit): P2, P3, P4 y P6 cerradas y parte *out-of-bag* anulada (ver «Historial»)
+- **Estado:** Aceptado. Enmendado el 2026-10-07 (mismo día, antes del primer commit): P2, P3, P4 y P6 cerradas y parte *out-of-bag* anulada (ver «Historial»). **Enmendado de nuevo el 2026-10-07 (Paso 2b): los puntos 3 y 4 de la decisión y la fila OOB de las alternativas quedan superseridos por la «Enmienda 2026-10-07 (Paso 2b)»**
 - **Fecha:** 2026-10-07
 - **Relacionado:** [ADR 0004](0004-cartas-y-estimadores-extensibles.md) (contrato de carta),
   [ADR 0005](0005-api-fase-i-fase-ii.md) (códigos de error), [`../metodos/t2mrcd.md`](../metodos/t2mrcd.md).
@@ -85,3 +85,47 @@ Detalles de implementación que se deciden aquí por su efecto en la reproducibi
 - **2026-10-07 (enmienda, mismo día):** el dueño cierra P2 (alpha 0.75), P3 (cita), P4 (0.005, promedio de
   cuantiles) y P6; el remuestreo pasa a tamaño `h`; se **anula la parte *out-of-bag***: un único límite para
   ambas fases.
+
+## Enmienda 2026-10-07 (Paso 2b): dos límites, agregación pool y límite operativo por régimen
+
+Decisión del dueño. Sustituye los puntos 3 y 4 de la «Decisión» y la fila «Límite de Fase II con las filas
+*out-of-bag*» de las alternativas (el texto anterior se conserva como historial). Ciclo de vida completo en el
+[ADR 0008](0008-ciclo-de-vida-de-la-carta.md).
+
+- **Vuelve el límite de Fase II por OOB.** En cada réplica: muestra con reemplazo de tamaño `h` de las filas
+  limpias, reajuste de MRCD sobre la muestra y T² de las filas que no entraron (OOB) con ese ajuste. Es
+  remuestreo no paramétrico: no se asume normalidad (MRCD es robusto y la distribución del T² es desconocida).
+  Por qué se revierte la anulación: el límite de Fase I (T² de la propia muestra) está sesgado a la baja para
+  observaciones nuevas, que es lo que puntúa la Fase II; las OOB sí imitan datos no vistos por el ajuste.
+- **Dos límites por modelo:** `phase1_limit` (T² de las muestras) y `phase2_limit` (T² de las OOB). Ambos salen de
+  las **mismas réplicas**, así que no cuesta ningún ajuste adicional.
+- **Agregación pool (Q1, sustituye P4 opción b).** En cada fase se juntan los T² de **todas** las réplicas y se
+  toma un único cuantil 1−α, tipo 7. Motivo: con m valores por réplica y m·α < 1 el cuantil por réplica queda
+  acotado por el máximo de esa réplica y el promedio de cuantiles tiene un α efectivo mayor que el pedido:
+  ≈ 0.018 en Fase I con m = 75 (n = 100, h = 75) y ≈ 0.035 en Fase II con m ≈ 28, frente a 0.005. Con el pool el
+  cuantil se calcula sobre B·m valores y el α pedido sí es alcanzable.
+- **Parámetros:** `alpha_limit` (Fase I) y `phase2_alpha_limit` (Fase II), ambos default 0.005, configurables.
+- **Límite operativo por régimen (Q2).** La versión v0 vigila con el límite de Fase I, provisional y fijo (no hay
+  datos propios de Fase II). Las versiones recalibradas vigilan con el límite de Fase II. Una observación se
+  puntúa con el límite de la versión vigente en su fecha y se guarda cuál usó.
+- **Señal:** sigue siendo `t2 > límite`, estricta.
+- **Diagnóstico, no invariante (Q9):** que el límite de Fase II resulte mayor que el de Fase I se informa, pero
+  no se exige.
+- **Prueba de calidad de la tubería:** con estimador clásico y un muestreador de muestras independientes (normal,
+  solo en `tests/`) los límites simulados coinciden con Beta (Fase I) y F (Fase II) para n > p. No valida el
+  bootstrap OOB: con el clásico, el OOB da una Fase II ≈ +16 % sobre la F (efecto .632, ≈ 63 % de filas
+  distintas por réplica), conservador.
+- **Remuestreo solo sobre `best` (dueño, 2026-10-07):** para ambos límites. Con todas las filas, una contaminación
+  no detectada inflaría el límite (enmascaramiento); `best` es la mejor estimación. Consecuencia medida (n = 200,
+  p = 3, normal limpia, B = 50): falsa alarma real ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase II frente al 0.5 %
+  nominal (≈ 0.4 % con todas las filas), pues `best` es el 75 % central y las nuevas incluyen las colas; la
+  depuración automática puede quitar 1–10 filas buenas. Es una característica del diseño. Estudio futuro:
+  reponderado tipo MCD.
+- **Semillas por huecos fijos** (`seeds.py`), no `spawn(B)`: cambiar B, rondas o remuestreos de una prueba no
+  desplaza las demás semillas. Esto sustituye lo escrito en «Detalles de implementación» sobre `spawn(B)`.
+- **M6:** el reporte incluye el error Monte Carlo del límite.
+- **Persistencia:** `BootstrapLimits` deja de ser un único `limit`; guarda `phase1_limit`, `phase2_limit` y su
+  procedencia. El modelo añade `limit_regime` y `operative_limit`. Implementado en el dominio (2b.1).
+
+Pendiente (heredado): cita bibliográfica del bootstrap OOB y de `alpha_limit = 0.005`; regla de cuantil tipo 7.
+- **2026-10-07 (Paso 2b):** vuelve el límite de Fase II por OOB, agregación pool en ambas fases y límite operativo por régimen (ver enmienda arriba).

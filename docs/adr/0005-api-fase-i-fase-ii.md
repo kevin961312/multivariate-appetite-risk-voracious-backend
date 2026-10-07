@@ -81,3 +81,38 @@ minutos de cómputo ni pisa un resultado. Limitación conocida: la transición `
 
 **`JobRequest` solo lleva identificadores.** Los datos viven en el repositorio, de modo que el mensaje es
 pequeño y serializable por cualquier cola.
+
+## Enmienda 2026-10-07 (Paso 2b): endpoints del ciclo de vida
+
+Ciclo de vida en el [ADR 0008](0008-ciclo-de-vida-de-la-carta.md). El backend es dueño del ciclo; el front solo
+muestra y pide. **Endpoints previstos del Paso 3** (no existen aún); todos bajo `/v1/charts/<carta>/models/{model_id}`,
+con tenant y el contrato asíncrono `202` + polling cuando el trabajo es largo:
+
+| Método y ruta | Respuesta |
+| --- | --- |
+| `GET …/versions`, `GET …/versions/{version_id}` | lista y detalle de versiones (inmutables) con estado `proposed \| approved \| rejected \| superseded`, límites y reporte antes/después |
+| `POST …/versions/{version_id}/approve`, `POST …/versions/{version_id}/reject` | aprueba (con `effective_from` no retroactivo) o rechaza una **propuesta** |
+| `GET …/status` | estado de la carta: `requires_new_base > proposal_pending > revalidation_due > startup/active`, versión vigente y avisos |
+| `POST …/monitorings` (ampliado) | ahora cada observación lleva `observed_at` y `batch_label`; `202 {monitoring_id}` |
+| `GET …/observations?from=&to=&signals_only=` | observaciones registradas (fecha, lote, valores, T², límite usado, versión) por rango |
+| `PUT …/observations/{observation_id}/annotation` | anota una señal: causa asignable, cuál, acción (solo observaciones con señal) |
+| `POST …/structural-events` | registra un evento estructural y marca «requiere nueva base» |
+| `POST …/recalibrations` | `202 {recalibration_id}` (base + rango de fechas + criterios de depuración); produce una **propuesta** |
+| `GET …/recalibrations/{recalibration_id}` | estado; si `succeeded`, el reporte y la versión propuesta |
+
+**Códigos nuevos** (formato `{code, message, details}`; el mapeo a HTTP es del Paso 3):
+
+| Código | Cuándo |
+| --- | --- |
+| `VERSION_NOT_FOUND` | Versión inexistente, de otro modelo o de otro tenant |
+| `VERSION_NOT_PROPOSED` | Se aprueba o rechaza una versión que no está en estado propuesta |
+| `PROPOSAL_PENDING` | Ya hay una propuesta sin resolver |
+| `RECALIBRATION_IN_PROGRESS` | Ya hay una recalibración en curso para el modelo |
+| `RECALIBRATION_NOT_FOUND` | Recalibración inexistente o ajena |
+| `OBSERVATION_NOT_FOUND` | Observación inexistente o ajena |
+| `NOT_A_SIGNAL` | Se anota una observación sin señal (Q12) |
+| `RANGE_BEFORE_STRUCTURAL_EVENT` | El rango pedido incluye datos anteriores al último evento estructural |
+| `RECALIBRATION_INSUFFICIENT_OBSERVATIONS` | Tras filtrar y depurar quedan menos observaciones que el mínimo (25 por defecto) |
+| `EFFECTIVE_FROM_NOT_AFTER_SCORED` | `effective_from` no es posterior a la última observación ya puntuada (Q6) |
+| `OBSERVATION_BEFORE_FIRST_VERSION` | `observed_at` anterior a la primera versión vigente |
+| `BOOTSTRAP_OOB_EMPTY` | Una réplica no tiene filas OOB (ver ADR 0007, enmienda) |
