@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5.3",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "pymrcd",
     "scipy>=1.18.1",
     "structlog>=26.1.0",
     "uvicorn>=0.54.0",
@@ -26,15 +27,14 @@ dev = [
     "httpx>=0.28.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
-    "pymrcd",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
 ]
 
 # --- workspace de uv ------------------------------------------------------
-# pymrcd: librería del port MRCD (ADR 0006). Por ahora solo en el grupo dev; entra en
-# [project].dependencies en el Paso 2.
+# pymrcd: librería del port MRCD (ADR 0006), dependencia de runtime de voracious; solo la importa
+# domain/estimators/mrcd/ (contrato de import-linter).
 [tool.uv.workspace]
 members = ["packages/pymrcd"]
 
@@ -70,6 +70,8 @@ warn_unreachable = true
 # --- pytest ----------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# tests/support: dobles en memoria y valores «solo test» compartidos por los tests (nunca en src/).
+pythonpath = ["tests"]
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 xfail_strict = true
 
@@ -108,6 +110,8 @@ name = "domain no importa configuración, frameworks ni IO"
 type = "forbidden"
 source_modules = ["voracious.domain"]
 # Se amplía con sqlalchemy, redis, celery, boto3... cuando entren como dependencias.
+# M1 (Paso 2): también IO, red, procesos e hilos de la stdlib; el reparto en procesos es un
+# adaptador (TaskMapper) de infrastructure.
 forbidden_modules = [
     "voracious.config",
     "voracious.container",
@@ -118,6 +122,13 @@ forbidden_modules = [
     "structlog",
     "httpx",
     "uvicorn",
+    "multiprocessing",
+    "concurrent",
+    "threading",
+    "socket",
+    "io",
+    "pathlib",
+    "os",
 ]
 
 [[tool.importlinter.contracts]]
@@ -181,3 +192,43 @@ forbidden_modules = [
     "pydantic",
     "structlog",
 ]
+
+# --- Paso 2: independencia de cartas y estimadores (ADR 0004, punto 4) --------
+[[tool.importlinter.contracts]]
+name = "Las cartas no se importan entre sí (ADR 0004)"
+type = "independence"
+modules = ["voracious.domain.charts.*"]
+
+[[tool.importlinter.contracts]]
+name = "Los estimadores no se importan entre sí (ADR 0004)"
+type = "independence"
+modules = ["voracious.domain.estimators.*"]
+
+[[tool.importlinter.contracts]]
+name = "Un estimador no conoce ninguna carta (ADR 0004)"
+type = "forbidden"
+source_modules = ["voracious.domain.estimators"]
+forbidden_modules = ["voracious.domain.charts"]
+
+[[tool.importlinter.contracts]]
+name = "domain.common no importa cartas ni estimadores (ADR 0004)"
+type = "forbidden"
+source_modules = ["voracious.domain.common"]
+forbidden_modules = ["voracious.domain.charts", "voracious.domain.estimators"]
+
+[[tool.importlinter.contracts]]
+name = "Solo domain.estimators.mrcd importa pymrcd (ADR 0006)"
+type = "forbidden"
+source_modules = [
+    "voracious.api",
+    "voracious.workers",
+    "voracious.container",
+    "voracious.infrastructure",
+    "voracious.application",
+    "voracious.config",
+    "voracious.domain.charts",
+    "voracious.domain.common",
+]
+forbidden_modules = ["pymrcd"]
+# Indirecto permitido: p. ej. charts.t2mrcd -> estimators.mrcd -> pymrcd es el camino legítimo.
+allow_indirect_imports = true
