@@ -1,0 +1,13 @@
+fecha: 2026-10-06 21:53:24
+R: R version 4.5.2 (2025-10-31)
+rrcov: 1.7.7 (/Users/KEPINEDA/Documents/multivariate-appetite-risk-voracious-backend/referencias/R-lib/rrcov)
+robustbase: 0.99.6
+EnvStats: 3.1.0
+BLAS: /System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib
+LAPACK: 3.12.1
+plataforma: aarch64-apple-darwin20
+piloto: TRUE; R_CAL=5 R_EVAL(n=50)=5 R_EVAL(n>=100)=5 R_PERT=2 R_PERT_C2=1 B=200; UCL que decide: best
+semilla base: 20263000; alpha MRCD: 0.75; alpha PFA: 0.05
+md5 tools/r/experimentos/mc_canonico2.R: b5619ad209bef5dcc86a400ee1f8ab75
+md5 tools/r/experimentos/r6pack_canonico.R: 5e55bd43b08cfc5e778e43c4c91e180c
+md5 referencias/rrcov-1.7-7/R/detmrcd.R: d56485337b83f927bba70002357be341
