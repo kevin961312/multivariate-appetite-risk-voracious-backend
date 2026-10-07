@@ -6,9 +6,14 @@ readme = "README.md"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
+# Cotas superiores deliberadas (ADR 0006): pymrcd llama por puntero a las cápsulas internas de
+# Cython de scipy (`scipy.linalg.cython_blas.__pyx_capi__`, `_blasptr.py`), cuya firma no es API
+# pública y puede cambiar en una versión menor; y la fidelidad bit a bit con R se ha validado con
+# estas versiones concretas de scipy/numpy (BLAS/LAPACK enlazados, orden de operaciones). Subir una
+# cota exige volver a pasar los golden.
 dependencies = [
-    "numpy>=2.5.3",
-    "scipy>=1.18.1",
+    "numpy>=2.5.3,<3",
+    "scipy>=1.18.1,<1.19",
 ]
 
 [build-system]

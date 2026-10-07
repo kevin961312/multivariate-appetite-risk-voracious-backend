@@ -456,8 +456,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "numpy", specifier = ">=2.5.3" },
-    { name = "scipy", specifier = ">=1.18.1" },
+    { name = "numpy", specifier = ">=2.5.3,<3" },
+    { name = "scipy", specifier = ">=1.18.1,<1.19" },
 ]
 
 [[package]]
