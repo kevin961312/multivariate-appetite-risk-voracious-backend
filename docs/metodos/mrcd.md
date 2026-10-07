@@ -5,42 +5,46 @@ Tipo: **estimador** (`domain/estimators/mrcd/`). Lo usa la carta [T²MRCD](t2mrc
 Cada decisión del port a Python cita su origen en el código fuente de `rrcov`. Sin cita no hay default
 ([CLAUDE.md](../../CLAUDE.md), regla dura 3).
 
-- **Versión de referencia de `rrcov`:** _pendiente (se fija en el Paso 2 al leer el código)_
+- **Versión de referencia:** `rrcov` 1.7-7 oficial de CRAN (con `robustbase` 0.99-6, R 4.5.2) en la plataforma
+  macOS arm64 / Accelerate / Rlapack 3.12.1; ver [ADR 0006](../adr/0006-libreria-pymrcd.md).
+- **Especificación completa** (pasos, trampas, tolerancias): [`mrcd-especificacion.md`](mrcd-especificacion.md).
+  Este documento resume parámetros y validaciones; no repite los pasos.
 - **Artículo:** Boudt, K., Rousseeuw, P. J., Vanduffel, S., & Verdonck, T. (2020). *The minimum regularized
   covariance determinant estimator.* Statistics and Computing, 30, 113–128.
 - Los límites de control y la estadística T² no son de este documento: ver [`t2mrcd.md`](t2mrcd.md).
+- Implementación: `pymrcd.cov_mrcd` (`packages/pymrcd/`). La integración en `domain/estimators/mrcd/` es el
+  Paso 2 (objetivo, no existe aún).
 
 ## Parámetros
 
-| Parámetro | Default en `rrcov` | Origen (archivo:línea) | Python (`MRCDParams`) | Validación |
+Copia de la §2 de la especificación (archivos de `rrcov` 1.7-7).
+
+| Parámetro | Default en `rrcov` | Origen (archivo:línea) | `pymrcd.cov_mrcd` | Validación |
 | --- | --- | --- | --- | --- |
-| `alpha` | _pendiente_ | _pendiente_ | _pendiente_ | `0.5 ≤ alpha ≤ 1` |
-| `h` | _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ |
-| `maxcsteps` | _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ |
-| `rho` | _pendiente_ | _pendiente_ | _pendiente_ | _pendiente_ |
-| `target` | _pendiente_ | _pendiente_ | _pendiente_ | `identity` \| `equicorrelation` |
-| `maxcond` | _pendiente_ | _pendiente_ | _pendiente_ | `maxcond > 1` |
+| `alpha` | `0.5` | `CovControl.R:22`; `AllClasses.R:138` | `alpha=0.5` | `0.5 ≤ alpha ≤ 1` (`detmrcd.R:400-401`) |
+| `h` | `NULL` | `CovControl.R:23` | `h=None`; si se da, `alpha = h/n` (`detmrcd.R:396`) | la de `alpha` sobre `h/n` |
+| `maxcsteps` | `200` | `CovControl.R:24` | `maxcsteps=200` | ninguna en rrcov |
+| `rho` | `NULL` (selección automática, `detmrcd.R:465`) | `CovControl.R:25` | `rho=None` | ninguna en rrcov |
+| `target` | `"identity"` | `CovControl.R:26,:34` | `target="identity"` | `identity` \| `equicorrelation`; otro valor es error en el port (R lo trata como equicorrelación, `CovMrcd.R:29`): diferencia de API, P8 |
+| `maxcond` | `50` | `CovControl.R:27` | `maxcond=50` | **ninguna**: ni rrcov ni el port validan `maxcond` (fidelidad) |
+| `minscale` | `0.001` | `detmrcd.R:27` | no expuesto (igual que `CovMrcd`) | — |
+
+Otras diferencias de API del port (base 0, `init_hsets` validado como enteros, entrada 0-d rechazada, mensaje
+de `n = 0`): ver `mrcd-especificacion.md` §12, «Decisiones del dueño».
 
 ## Pasos del algoritmo
 
-| Paso | Origen (archivo:línea) | Python | Estado |
-| --- | --- | --- | --- |
-| Estandarización inicial | _pendiente_ | _pendiente_ | pendiente |
-| Subconjuntos iniciales deterministas | _pendiente_ | _pendiente_ | pendiente |
-| Matriz objetivo (`target`) | _pendiente_ | _pendiente_ | pendiente |
-| Elección de `rho` por número de condición | _pendiente_ | _pendiente_ | pendiente |
-| C-steps | _pendiente_ | _pendiente_ | pendiente |
-| Factor de consistencia | _pendiente_ | _pendiente_ | pendiente |
-| Distancias de Mahalanobis | _pendiente_ | _pendiente_ | pendiente |
+Ver [`mrcd-especificacion.md`](mrcd-especificacion.md) §3 (cada paso con su archivo:línea de `rrcov`) y §3.12
+(replicación bit a bit: BLAS, LAPACK, FMA, nmath).
 
 ## Tests golden
 
-| Caso | n | p | Contaminación | Semilla | Tolerancia | Estado |
-| --- | --- | --- | --- | --- | --- | --- |
-| n > p | _pendiente_ | _pendiente_ | no | _pendiente_ | _pendiente_ | pendiente (Paso 5) |
-| p > n | _pendiente_ | _pendiente_ | no | _pendiente_ | _pendiente_ | pendiente (Paso 5) |
-| contaminado | _pendiente_ | _pendiente_ | sí | _pendiente_ | _pendiente_ | pendiente (Paso 5) |
+Fixtures versionados en `packages/pymrcd/tests/golden/fixtures/` (14 casos: C1–C11 y variantes `_eq`; C11, 60×40,
+cubre el régimen ceil(n/2) ≤ p < n). Los 14 casos, con su (n, p), Σ, contaminación, target y semilla, están en la tabla «Casos» de
+`packages/pymrcd/tests/golden/fixtures/README.md`; las tolerancias por cantidad, en `mrcd-especificacion.md`
+§11, y el protocolo (i)–(iii), en el ADR 0006 y su enmienda.
 
 ## Decisiones abiertas
 
-- Versión de `rrcov` de referencia y todos los defaults marcados _pendiente_ (se fijan al leer el código, Paso 2).
+- Ninguna sobre defaults de `CovMrcd`: todos citan `rrcov` 1.7-7. Las decisiones D9 y D10 están cerradas
+  (`mrcd-especificacion.md` §12).

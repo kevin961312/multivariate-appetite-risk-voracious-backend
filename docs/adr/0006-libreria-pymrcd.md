@@ -85,3 +85,35 @@ Dos hechos condicionan el diseño:
 | **Implementar desde el artículo sin leer el código** | No garantiza coincidir con `rrcov` en defaults ni en detalles numéricos. |
 | **Repo separado desde el inicio** | Más mantenimiento (versionado, CI, publicación) sin necesidad hoy; se puede extraer después porque `pymrcd` ya no depende de `voracious`. |
 | **Meterlo en `domain/`** | Mezcla la licencia GPL con el código del backend y impide probarlo por separado. |
+
+## Enmienda 2026-10-06
+
+Este ADR aún no se había publicado como inmutable; la enmienda precisa tres puntos sin cambiar la decisión.
+
+**(a) Decisiones D9 y D10 y «nunca se relaja una tolerancia».**
+- **D9:** `eigen` (`dsyevr`) y también `dgeev` se llaman a través de Accelerate (scipy), no del Rlapack de
+  referencia de R. La divergencia se acepta con tolerancia clase B también en la plataforma de referencia; el
+  signo de los autovectores se informa pero no hace fallar el test. Motivo: Accelerate vs Rlapack.
+- **D10:** `qchisq`/`pgamma`/`qgamma` se portan de nmath con las FMA del binario; `.MCDcons` coincide bit a bit
+  en la plataforma de referencia.
+- No contradicen el punto 6 («nunca se relaja una tolerancia»). D9 se tomó **después de observar** la
+  divergencia sistemática de Accelerate frente a Rlapack (sonda S12 del bloque 1), pero como decisión del dueño,
+  registrada y **anterior a los tests vigentes** (`docs/metodos/mrcd-especificacion.md` §11 y §12); no se ajustó
+  para hacer pasar ningún caso concreto. D10 endurece la tolerancia (de rtol 1e-14 a bit a bit).
+
+**(b) Uso de `ctypes`.** El runtime sigue siendo «solo numpy/scipy» porque no añade dependencias, pero usa
+`ctypes` (stdlib) en dos sitios: sobre las cápsulas de `scipy.linalg.cython_blas.__pyx_capi__` para llamar BLAS
+en sitio con la `lda` real (es un detalle interno de Cython, **no API pública** de scipy), y sobre `lgamma` de la
+libm del sistema (`math.lgamma` de CPython es otra implementación).
+- Mitigaciones: verificación de firmas LP64 al importar; asserts de límites; scipy acotado `<1.19` y numpy
+  `<3`; error explícito si no hay libm. Aplicado en `packages/pymrcd/pyproject.toml`
+  (`numpy>=2.5.3,<3`, `scipy>=1.18.1,<1.19`) y cubierto por `tests/test_salvaguardas.py`.
+- Riesgo de portabilidad: Windows no está soportado; fuera de macOS el `lgamma` es el de otra libm (clase L de
+  §11 de la especificación).
+
+**(c) Protocolo nivel (iii) por régimen (n, p)**, que precisa el punto 6.3:
+- p ≥ n: solo el conjunto 6 exacto.
+- ceil(n/2) ≤ p < n: 1–4 y 6 exactos; el 5 es R1.
+- p < ceil(n/2): los 6.
+- Con D9, un conjunto exigido que difiera por `eigen` se registra con la diferencia de `P` medida, sin relajar
+  tolerancias. Se añade el golden **C11 (60×40)** para el régimen intermedio.

@@ -1,5 +1,25 @@
 # MRCD — especificación exacta del port de `rrcov::CovMrcd` (F1b)
 
+## Registro de cambios
+
+- **2026-10-06** — Correcciones tras el bloque 1 del convertidor, que refutó supuestos de la sonda S3. Evidencia:
+  sondas **S11–S14** (anexo A) y el código que ya coincide con R en `packages/pymrcd/src/pymrcd/`.
+  1. **FMA.** El R del oráculo (`clang -O2`, arm64) fusiona `a*b + c` en `fmadd` en `cov.c`, `zeroin.c`,
+     `qnorm.c` y `simple_matprod`/`simple_crossprod` (`array.c`); `cov_na_1` vectoriza en bloques de 8 sin FMA
+     y la cola con FMA. La afirmación de §3.12.4 («secuencial sin FMA coincide bit a bit») era **falsa**.
+     Nueva §3.12.8 y trampa T26.
+  2. **`eigen`.** `scipy.linalg.lapack.dsyevr` es el de Accelerate, no el Rlapack 3.12.1 de R: no coincide bit a
+     bit (S12). Se acepta con tolerancia B (decisión del dueño). Corregidos §3.12.6, §6, T3, T13, T22, §11.
+  3. **Alineación.** `dgemv('T')` de Accelerate da bits distintos según la alineación del operando; R lo tiene a
+     `48 mod 64` bytes (S13). §3.12.6 y T27.
+  4. **LAPACK.** `scipy.linalg.lapack.dpotrf/dpotri/dgetrf` son de Accelerate; hace falta el port de
+     referencia de `dlapack.f` sobre el BLAS de scipy (`_rlapack.py`) (S14). §3.12.6 y T28.
+  5. **R1.** §6 y la fila S3b alineadas con el hallazgo final: con p ≥ n dependen del redondeo los conjuntos 1–5;
+     el 5 ya desde p ≥ ceil(n/2); solo el 6 es estable.
+  6. **§12.** P1–P8 marcadas como resueltas; nuevas decisiones: `eigen` con tolerancia B y port de
+     `qchisq`/`pgamma` de nmath para `.MCDcons` (corrige §3.6, T21 y §11).
+  7. **Fixtures.** Constan dos errores del contrato de exportación de R (§10).
+
 Documento de trabajo del agente **analista-port**. Es la referencia que siguen `convertidor-python` (port),
 `ingeniero-r` (oráculo e intermedios) y `validador-estadistico`. **La referencia es el código**: cada
 afirmación lleva `archivo:línea`. Donde algo se comprobó ejecutando R, se indica como **[sonda S#]** (anexo A).
@@ -236,6 +256,10 @@ P = r_eigen_sym(U).vectors                                     # :101
 `scfac = 1/(pg/a)`. **Medido [S5]:** diferencia relativa máxima con R `6.5e-15` (q: `1.8e-15`, pgamma: `6.5e-15`)
 en una rejilla p ∈ {1…1000}, n ∈ {20,51,100,1000}, α ∈ {0.5,0.75,0.9}. Exactitud bit a bit exigiría portar
 `nmath/qchisq.c`, `qgamma.c`, `pgamma.c` (pregunta P3).
+**Actualización 2026-10-06:** el dueño decidió portar `qchisq`/`pgamma` de nmath (§12, D10); la vía scipy
+queda solo como oráculo independiente en tests. Las contracciones `a*b + c` → `fmadd` de `qgamma.c`/`pgamma.c`
+(≈100) **ya están localizadas** por desensamblado de `libR.dylib` (§3.12.8) y reproducidas en
+`packages/pymrcd/src/pymrcd/_nmath.py`.
 
 ### 3.7 Selección de `rho` (`detmrcd.R:462-539`)
 
@@ -261,7 +285,8 @@ except: grid = [1e-6] + list(min(0.001 + arange(990)*0.001, 0.99)) + [0.999999] 
   `f.upper=f(upper)` (`:57`, forzadas en `:66-67`); **error** (⇒ rejilla) si alguna es NA/NaN (`:66-67`) o si
   `!isTRUE(sign(f.lower)*sign(f.upper) <= 0)` (`:138-141`); `extendInt="no"` ⇒ sin extensión (`:71`, `:79-80`);
   pasa `truncate(f) = max(min(f, DBL_MAX), -DBL_MAX)` (`:75-78`) a `R_zeroin2` con `tol=2^-13`, `maxiter=1000`
-  (`:154-156`). Port **iteración por iteración** de `R_zeroin2` (`zeroin.c:89-194`), con la envoltura `fcn2`
+  (`:154-156`). Port **iteración por iteración** de `R_zeroin2` (`zeroin.c:89-194`), **con las tres contracciones
+  FMA del binario** (§3.12.8), con la envoltura `fcn2`
   (`optimize.c:292-329`: valor no finito ⇒ `-DBL_MAX` si `-Inf`, si no `+DBL_MAX`). No convergencia ⇒ solo
   *warning* (`nlm.R:159-165`), se usa la raíz. `f(root)` se evalúa (`nlm.R:168`) sin efecto.
 - Rejilla: `seq(0.001, 0.99, by=0.001)` = `from + (0:n)*by` con `n = as.integer((to-from)/by + 1e-10) = 989`,
@@ -465,7 +490,16 @@ C_ij = seqsum((X[:, i] - m_i) * (X[:, j] - m_j)) / (N - 1)              # :333 /
 cor:  s_i = sqrt(C_ii); R_ij = clamp(C_ij / (s_i * s_j), -1, 1); R_ii = 1   # :355-366 / :286-298, CLAMP :59
       si s_i == 0 o s_j == 0 ⇒ NA + warning (:358-360, :811) ⇒ eigen() falla después (T20)
 ```
-**[S3]** la versión secuencial sin FMA reproduce `cov()` de R **bit a bit**.
+~~**[S3]** la versión secuencial sin FMA reproduce `cov()` de R **bit a bit**.~~ **Falso (corregido
+2026-10-06).** La acumulación `sum += (x_k − m_i)*(y_k − m_j)` (`cov.c:333` en `cov_na_1`, `:265` en
+`cov_complete1`) está compilada con FMA en el oráculo, con un patrón distinto en cada rama (§3.12.8):
+- `cov_complete1` (`use="complete.obs"`, conjunto 3): `fmadd` en **todos** los `k`.
+- `cov_na_1` (`use="everything"`, conjuntos 1, 2, 5 y `.TargetCorr`): con `n ≥ 8`, los primeros
+  `8·floor(n/8)` términos con producto redondeado y suma aparte (sin FMA, en orden de `k`), y la cola con `fmadd`.
+
+La fórmula de medias (dos pasadas) no cambia. **[S11]** (n=37, p=9): secuencial sin FMA difiere de R en 28/81
+entradas; FMA en todo `k` difiere de `cov(use="everything")` en 39/81 pero coincide con `use="complete.obs"`;
+`r_cov` de `_rbase.py` (bloques de 8 + cola FMA) coincide en 0/81 diferencias en ambas ramas.
 
 #### 3.12.5 `doScale` con escala 0: `non0Q` (`rb/detmcd.R:268-283`) y `quantile` tipo 7
 
@@ -485,14 +519,32 @@ valores iguales (p. ej. retornos nulos); **[S6]** 60 % de ceros en una columna: 
 | --- | --- | --- |
 | `A %*% B` (matriz·matriz) | `dgemm('N','N')` sobre memoria columna (`array.c:839-841`) | `scipy.linalg.blas.dgemm(1.0, F(A), F(B))` con operandos en orden Fortran y `t(·)` **materializada** |
 | `A %*% v` | `dgemv('N')` (`array.c:831-833`) | `scipy.linalg.blas.dgemv(1.0, F(A), v)` |
-| `v %*% B` | `dgemv('T')` sobre `B` (`array.c:834-838`) | `dgemv(1.0, F(B), v, trans=1)` |
-| cualquier operando con NaN/Inf | `simple_matprod` (`array.c:734-740`, `:806-811`) | triple bucle con acumulación secuencial |
+| `v %*% B` | `dgemv('T')` sobre `B` (`array.c:834-838`) | `dgemv(1.0, F(B), v, trans=1)` con `F(B)` **alineada como en R** (ver nota de alineación) |
+| cualquier operando con NaN/Inf | `simple_matprod` (`array.c:719-740`, `:806-811`) | triple bucle con acumulación secuencial **con FMA** (`sum += x*y` es `fmadd`, `array.c:728`; §3.12.8) |
 | `crossprod(X)` | `dsyrk('U','T')` + espejo (`array.c:983-1020`) | `scipy.linalg.blas.dsyrk(1.0, F(X), trans=1, lower=0)` + copiar triángulo superior al inferior |
-| `eigen(A, symmetric=TRUE)` | `dsyevr(jobz='V', range='A', uplo='L', abstol=0)` con consulta previa de `lwork`/`liwork` óptimos (`Lapack.c:166-237`); orden decreciente (`eigen.R:59-62`) | `scipy.linalg.lapack.dsyevr(A, compute_v=1, range='A', lower=1, abstol=0.0, lwork=…, liwork=…)` con `lwork`/`liwork` de `dsyevr_lwork`; invertir orden de valores y columnas |
+| `eigen(A, symmetric=TRUE)` | `dsyevr(jobz='V', range='A', uplo='L', abstol=0)` de **Rlapack 3.12.1** con consulta previa de `lwork`/`liwork` óptimos (`Lapack.c:166-237`); orden decreciente (`eigen.R:59-62`) | `scipy.linalg.lapack.dsyevr(A, compute_v=1, range='A', lower=1, abstol=0.0, lwork=…, liwork=…)` con `lwork`/`liwork` de `dsyevr_lwork`; invertir orden de valores y columnas. **No es bit a bit**: es el `dsyevr` de Accelerate (S12); **aceptado con tolerancia B** (§11, decisión D9) |
 | `eigen(A)` sin `symmetric` | `isSymmetric.matrix` (`eigen.R:22-43`, `all.equal.R:99-174`) ⇒ casi siempre `La_rs` con `jobz='V'` (T13) | idem fila anterior, previa réplica del test de simetría |
-| `chol(A)` | `dpotrf('U')` (`Lapack.c:1090-1104`); error si no DP | `scipy.linalg.lapack.dpotrf(A, lower=0)`; `info>0` ⇒ error |
-| `chol2inv(R)` | `dpotri('U')` + espejo superior→inferior (`Lapack.c:1162-1178`) | `dpotri(c, lower=0)` + espejo |
-| `determinant(A)$modulus` | `dgetrf`, `Σ log|U_ii|` secuencial (`Lapack.c:1415-1436`) | `scipy.linalg.lapack.dgetrf` + `math.log` y suma secuencial |
+| `chol(A)` | `dpotrf('U')` de Rlapack (`Lapack.c:1090-1104`); error si no DP | **port de referencia** `DPOTRF('U')` + `DPOTRF2` de `dlapack.f` sobre el BLAS de scipy (`_rlapack.py:dpotrf_upper`); `info>0` ⇒ error. `scipy.linalg.lapack.dpotrf` **no sirve** (Accelerate, S14) |
+| `chol2inv(R)` | `dpotri('U')` de Rlapack + espejo superior→inferior (`Lapack.c:1162-1178`) | **port de referencia** `DPOTRI` = `DTRTRI` + `DLAUUM` de `dlapack.f` (`_rlapack.py:dpotri_upper`) + espejo |
+| `determinant(A)$modulus` | `dgetrf` de Rlapack, `Σ log|U_ii|` secuencial (`Lapack.c:1415-1436`) | **port de referencia** `DGETRF`/`DGETRF2` (+ `DLASWP`) de `dlapack.f` (`_rlapack.py:dgetrf`) + `math.log` y suma secuencial |
+
+**LAPACK (corregido 2026-10-06, T28).** R no llama al LAPACK del sistema: usa su `libRlapack` (Fortran de
+referencia 3.12.1, `referencias/R-4.5.2/src/modules/lapack/dlapack.f`), que llama al BLAS del sistema (Accelerate).
+`scipy.linalg.lapack` es el LAPACK de Accelerate, con otros algoritmos internos. Como toda la aritmética de
+`DPOTRF`, `DPOTRI` y `DGETRF` de referencia está en llamadas BLAS (`dtrsm`, `dsyrk`, `dgemm`, `dtrmm`, `dtrmv`,
+`dgemv`, `ddot`, `dscal`) o en escalares exactos (`sqrt`, `1/x`, intercambios), su traducción literal sobre
+`scipy.linalg.blas` (mismo Accelerate) reproduce los bits de R. Bloques de `ILAENV` de referencia: 64 para
+`DPOTRF`, `DTRTRI`, `DLAUUM`, `DGETRF` (`dlapack.f:165090-165303`; `_rlapack.py:_NB`). `DSYEVR` no se porta
+(decisión D9): tolerancia B.
+
+**Alineación de memoria (corregido 2026-10-06, T27).** El `dgemv('T')` de Accelerate da bits distintos según
+la dirección de inicio del operando. En el oráculo, un vector de R de más de 120 `double` se reserva con `malloc`
+(región *small* de macOS) y sus datos empiezan tras la cabecera de 48 bytes (`SEXPREC_ALIGN`,
+`[tar]Defn.h:219-224`, `:418`) ⇒ **datos a `48 mod 64` bytes** (medido con `.Internal(inspect())`). El helper
+`_fortran` de `_rlinalg.py` copia los operandos de más de 120 elementos con esa alineación; los más pequeños
+(pools propios de R, región *tiny*) no tienen alineación fija y se dejan con la de numpy. **[S13]** `v %*% B`,
+`B` 200×40: con los datos a `48 mod 64` 0/40 diferencias con R; con cualquier otro desplazamiento múltiplo de 8,
+22–28/40. Se aplica a todos los operandos BLAS por coherencia; solo está medido para `dgemv('T')`.
 
 **[S7]** `mE %*% t(mE)` con `p=5, h=15`: R **no** es simétrica exacta; numpy `mE @ mE.T` usa `syrk` (simétrica,
 ≠ R); `mE @ copia(mE.T)` tampoco coincide; `dgemm(1.0, F(mE), F(t(mE)))` de scipy **coincide bit a bit**.
@@ -505,8 +557,37 @@ valores iguales (p. ej. retornos nulos); **[S6]** 60 % de ceros en una columna: 
   coinciden aquí, pero su implementación SIMD depende de la CPU: se exige `math.*`.
 - `sqrt`, `+ − × ÷`: IEEE correctamente redondeados ⇒ numpy vale.
 - `qnorm` (`qnorm.c:47-…`, AS241 de Wichura): **portar literalmente** `qnorm5`. **[S8]** `scipy.special.ndtri`
-  difiere en 676/999 puntos `(i-1/3)/(n+1/3)` (≤ 6.4e-16 relativo).
+  difiere en 676/999 puntos `(i-1/3)/(n+1/3)` (≤ 6.4e-16 relativo). El port literal debe incluir las
+  contracciones FMA del binario (§3.12.8): sin ellas tampoco coincide.
 - `x^y` ⇒ `r_pow` (§3.2); `x^2` ⇒ `x*x`; `x^(-1)` ⇒ `math.pow(x, -1.0)`.
+
+#### 3.12.8 Contracción FMA en el binario del oráculo (añadido 2026-10-06)
+
+El R del oráculo (`aarch64-apple-darwin20`, `clang -O2`) se compiló con contracción de coma flotante: `clang`
+fusiona `x*y + z` en `fmadd`/`fmsub`/`fmla` (**un** redondeo). El código fuente no lo muestra; se determinó
+desensamblando `stats.so` y `libR.dylib` (lo documenta el convertidor en las cabeceras de `_fma.py`, `_rbase.py`
+y `_rzeroin.py`) y se confirma por coincidencia bit a bit con R. Python no fusiona nunca (ni numpy), así que
+cada contracción se reproduce con `fma(a,b,c) = RN(a·b+c)` exacto: `_fma.py` (Boldo–Melquiond 2008 con
+redondeo a impar; racional exacto en exponentes extremos).
+
+| Código de R | Expresión contraída | Patrón | Port |
+| --- | --- | --- | --- |
+| `cov.c:333` (`cov_na_1`, `use="everything"`) | `sum += (xx[k]-xxm)*(yy[k]-yym)` | vectorizado: con `n ≥ 8`, bloques de 8 con `fmul` + `fadd` secuencial en orden de `k` (sin FMA) para `k < 8·floor(n/8)`; la cola con `fmadd`. Con `n < 8`, todo `fmadd` | `_rbase.py:_cov_core(vectorized=True)` |
+| `cov.c:265` (`cov_complete1`, `use="complete.obs"`) | idem | `fmadd` en todo `k` (el `if(ind[k])` impide vectorizar) | `_cov_core(vectorized=False)` |
+| `zeroin.c:134` | `tol_act = 2*EPSILON*fabs(b) + tol/2` | `fma(|b|, 2·eps, tol/2)` | `_rzeroin.py:133` |
+| `zeroin.c:159` | `cb*q*(q-t1) - (b-a)*(t1-1.0)` | `fma(cb·q, q−t1, −((b−a)·(t1−1)))`, luego `t2·(…)` | `_rzeroin.py:150` |
+| `zeroin.c:167` | `0.75*cb*q - fabs(tol_act*q)/2` | `fma(0.75·cb, q, −(|tol_act·q|/2))` | `_rzeroin.py:158` |
+| `qnorm.c:82-90`, `:107-118`, `:127-138` (AS 241) | polinomios de Horner `(…*r + c_k)` y `r = .180625 - q*q` | cada paso de Horner `fma(acc, r, c_k)`; `r = fma(−q, q, .180625)` | `_rbase.py:_horner_fma`, `r_qnorm` |
+| `qnorm.c:151-157` (`r > 27`) | `… + 2*log1p(…)` | `fma(log1p(…), 2, s2 − log(2π·x2))` | `_rbase.py:_qnorm_far_tail` |
+| `array.c:728` (`simple_matprod`), `:751` (`simple_crossprod`) | `sum += x*y` | `fmadd` en todo `j` | `_rlinalg.py:_simple_matprod` |
+
+Sin FMA (verificado por coincidencia): medias de dos pasadas y sumas (`summary.c`, `array.c:2001-2098`, `cov.c`
+`MEAN`), `mahalanobis` (producto y `rowSums` son operaciones R separadas), `qn0` (restas y comparaciones). Lo que
+corre dentro de BLAS/LAPACK (Accelerate o Rlapack Fortran) se replica llamando a las mismas rutinas, no se
+analiza aquí. `qchisq`/`pgamma`/`qgamma` de nmath (D10): sus ≈100 contracciones se localizaron desensamblando
+`libR.dylib` (las `static` `pgamma_smallx`, `pd_upper_series`, `dpois_wrap`, `dpnorm` y `ppois_asymp` están
+integradas en `_Rf_pgamma_raw`) y se reproducen con `fma` en `packages/pymrcd/src/pymrcd/_nmath.py`. En otra plataforma u otro compilador (p. ej. x86-64 sin FMA por defecto) el
+patrón cambia: es parte de la plataforma de referencia (P6).
 
 ---
 
@@ -516,7 +597,7 @@ valores iguales (p. ej. retornos nulos); **[S6]** 60 % de ceros en una columna: 
 | --- | --- | --- | --- |
 | T1 | **Qn devuelve a veces un valor redondeado a float32** (rama `found`) | `qn_sn.c:195`, `:215`, `:224`, `:260-261` | Port literal con `f32()` en las tres comparaciones/asignaciones; oráculo M2 acepta `{d, f32(d)}` [S1] |
 | T2 | **`Qn(-v) ≠ Qn(v)` y `Qn(v+c) ≠ Qn(v)-shift` bit a bit** (no es invariante a signo ni a traslación por T1) | `qn_sn.c:191-227` | Respetar orientación `Y_i − Y_j` con `i>j` (`detmrcd.R:94`), centrar antes de Qn donde R centra (`rb/detmcd.R:249-253`) y **no** centrar donde R no centra (`detmrcd.R:418`). **[S9]** 86/2000 casos `Qn(x)≠Qn(-x)`; 611/2000 con traslación |
-| T3 | **El signo de los autovectores importa** (vía T2: `lambda = Qn(data %*% P)`) | `detmrcd.R:70` | Usar exactamente `dsyevr` con los mismos argumentos que R (§3.12.6). **[S10]** cambiar signos de columnas de `P` cambia `lambda` en 4/20 casos (rel. ≤ 3.8e-8) |
+| T3 | **El signo de los autovectores importa** (vía T2: `lambda = Qn(data %*% P)`) | `detmrcd.R:70` | Usar `dsyevr` con los mismos argumentos que R (§3.12.6). **[S10]** cambiar signos de columnas de `P` cambia `lambda` en 4/20 casos (rel. ≤ 3.8e-8). **2026-10-06:** el `dsyevr` de scipy (Accelerate) puede devolver otro signo que Rlapack (S12); aceptado con tolerancia B (D9). En tests por etapa, `initset` recibe la `P` de R |
 | T4 | Dos medianas distintas: `median()` (media de dos pasadas) vs `colMedians` (`(a+b)/2`) | `median.R:32` + `[tar]summary.c:479-518`; `rowMedians_TYPE-template.h:138` | `r_median` para `vmx`, `doScale`, `cutoffrho`; `r_colmedians` solo en `estloc` (`detmrcd.R:73`) |
 | T5 | Sumas secuenciales (no por pares) en `rowMeans`, `rowSums`, `mean`, `cov/cor` | `array.c:2024-2098`; `[tar]summary.c:483-506`; `cov.c:201-219`, `:333` | `seqsum` / `np.cumsum`; nunca `np.sum`/`np.mean`/`np.cov`/`np.corrcoef` |
 | T6 | Orden de las columnas de `hsets.init` = orden de distancia (no ordenado) y fija el orden de suma de `rowMeans` | `detmrcd.R:75`, `:459`, `:350`, `:467` | Conservar el orden de R al exportar/importar `initHsets` |
@@ -526,19 +607,22 @@ valores iguales (p. ej. retornos nulos); **[S6]** 60 % de ceros en una columna: 
 | T10 | Divisores distintos: `h` en `.RCOV`, `h-1` en selección de rho y en el final | `detmrcd.R:274`, `:280`, `:470`, `:579`, `:590` | Replicar literalmente |
 | T11 | Umbral SMW distinto: `p > h` en C-steps, `p > n` en el final | `detmrcd.R:272-278` (n local = h), `:588` | Replicar literalmente |
 | T12 | `tanh`, `sin`, `log`, `pow` de libm | `detmrcd.R:132`, `:218`; `Lapack.c:1434`; `[tar]arithmetic.c:225` | `math.*` por elemento [S8] |
-| T13 | `eigen()` sin `symmetric=` en `:473`: rama `isSymmetric` ⇒ `La_rs` con **`jobz='V'`** (aunque solo se usen valores) | `detmrcd.R:473`, `eigen.R:57-62`, `Lapack.c:183` | `dsyevr` con vectores (`compute_v=1`), `lower=1`. **[S4]** valores `jobz='N'` ≠ `jobz='V'` (rel. 1.0e-15…3.2e-15); `mS` de `dgemm` puede no ser simétrica exacta pero pasa `isSymmetric` (tol `100·eps`). Si el test fallara, R usaría `La_rg` (`dgeev`, `eigen.R:63-66`): portar también esa rama |
-| T14 | `uniroot` = `R_zeroin2` con `tol=2^-13`; errores ⇒ rejilla | `nlm.R:55-170`, `zeroin.c:89-194`, `detmrcd.R:495-514` | Port literal (brentq no sirve: otra interpolación y criterio) |
+| T13 | `eigen()` sin `symmetric=` en `:473`: rama `isSymmetric` ⇒ `La_rs` con **`jobz='V'`** (aunque solo se usen valores) | `detmrcd.R:473`, `eigen.R:57-62`, `Lapack.c:183` | `dsyevr` con vectores (`compute_v=1`), `lower=1` (de Accelerate: no bit a bit, D9). **[S4]** valores `jobz='N'` ≠ `jobz='V'` (rel. 1.0e-15…3.2e-15); `mS` de `dgemm` puede no ser simétrica exacta pero pasa `isSymmetric` (tol `100·eps`). Si el test fallara, R usaría `La_rg` (`dgeev`, `eigen.R:63-66`): portar también esa rama |
+| T14 | `uniroot` = `R_zeroin2` con `tol=2^-13`; errores ⇒ rejilla | `nlm.R:55-170`, `zeroin.c:89-194`, `detmrcd.R:495-514` | Port literal **con 3 FMA** (`zeroin.c:134`, `:159`, `:167`; §3.12.8) (brentq no sirve: otra interpolación y criterio) |
 | T15 | `vdst = diag(t(D) %*% (mIS %*% D))` calcula el producto **n×n completo** | `detmrcd.R:360`, `:371` | Fiel: dos `dgemm` y diagonal (bit a bit con mismo BLAS). `einsum` cambia el orden de la reducción de longitud p (pregunta P5) |
 | T16 | `rho` de la rejilla: `seq` = `from+(0:n)*by` y `pmin(·, to)`; `min(grid[og == min(og)])` con igualdad exacta | `seq.R:88-96`, `detmrcd.R:503-506` | Replicar [S4] |
 | T17 | Con `rho` dado, el conjunto 1 se procesa dos veces; `iBest` puede repetir `1` | `detmrcd.R:536-539`, `:547`, `:551` | Replicar. **[S6]** `iBest = 1 1 2 3 4 5 6` |
 | T18 | Sin convergencia en `maxcsteps`, `index` nuevo con `mu`/`cov` viejos; el final usa ese `mu` | `detmrcd.R:365-382`, `:578` | Replicar literalmente |
 | T19 | `obj = det^(1/p)`: `det` puede subdesbordar a 0 (p grande) ⇒ todos empatan ⇒ gana `initV` e `iBest` acumula | `detmrcd.R:412`, `:564-572`, `det.R:25-29` | Calcular `det` como `sign·exp(modulus)` y luego `r_pow`; nunca en log |
 | T20 | Columna constante ⇒ `cor` con NA ⇒ `eigen` lanza error y `CovMrcd` falla | `cov.c:358-360`, `eigen.R:55` | Lanzar error equivalente, sin *fallback*. **[S6]** `"infinite or missing values in 'x'"` |
-| T21 | `scfac` vía scipy difiere ≤ 6.5e-15 relativo de nmath | `covMcd.R:602-607` | Aceptado con tolerancia (§11) o portar nmath (P3) |
-| T22 | `dsyevr` depende de `lwork` (bloqueo de `dsytrd`) | `Lapack.c:203-218` | Consultar `lwork` óptimo como R (§3.12.6) |
+| T21 | `scfac` vía scipy difiere ≤ 6.5e-15 relativo de nmath | `covMcd.R:602-607` | **Superada 2026-10-06:** se porta nmath (D10); scipy queda como oráculo independiente |
+| T22 | `dsyevr` depende de `lwork` (bloqueo de `dsytrd`) | `Lapack.c:203-218` | Consultar `lwork` óptimo como R (§3.12.6). Necesario pero no suficiente: el `dsyevr` de Accelerate no es el de Rlapack (T28, D9) |
 | T23 | `mah` final se calcula sobre la `x` filtrada original, no sobre la reconstruida | `CovMrcd.R:46` vs `detmrcd.R:610`, `:618` | Usar `x` filtrada |
 | T24 | `target` ≠ `"identity"` cualquier cadena ⇒ equicorrelación en `CovMrcd` | `CovMrcd.R:29` | La API del port valida `{identity, equicorrelation}`; documentado como validación, no cambia números |
 | T25 | `alpha*n` y `ceiling`; `h/n` como `double` | `detmrcd.R:397`, `:460` | Mismo IEEE en Python |
+| T26 | **Contracción FMA** del binario de R (`clang -O2`, arm64): `a*b+c` con un solo redondeo | `cov.c:265`, `:333`; `zeroin.c:134`, `:159`, `:167`; `qnorm.c:82-138`, `:151-157`; `array.c:728`, `:751` | `fma` exacto (`_fma.py`) en cada contracción; `cov_na_1` en bloques de 8 sin FMA + cola FMA (§3.12.8). **[S11]** secuencial sin FMA: 28/81 entradas de `cov` distintas |
+| T27 | `dgemv('T')` de Accelerate depende de la **alineación** del operando | `array.c:834-838`; `[tar]Defn.h:219-224` | Copiar operandos de > 120 `double` con datos a `48 mod 64` bytes (`_rlinalg.py:_fortran`). **[S13]** |
+| T28 | `scipy.linalg.lapack` es el LAPACK de **Accelerate**, no el Rlapack 3.12.1 de R | `Lapack.c` → `dlapack.f` | `dpotrf`, `dpotri`, `dgetrf`: port literal de `dlapack.f` sobre `scipy.linalg.blas` (`_rlapack.py`). `dsyevr`: tolerancia B (D9). **[S14]** |
 
 **Base 1 → base 0:** índices de observaciones (`hsets`, `index`, `best`, `Hinit`, `ind5`) se guardan en R en base 1;
 el port trabaja en base 0 y **exporta en base 1** para comparar. `x[ , ]` sin `drop` en `:161`, `:180`.
@@ -564,7 +648,13 @@ El plan supone que con p > n solo los conjuntos 1 y 4 dependen del redondeo. **N
    `n=30,p=60` y `n=20,p=100`: **conjuntos 1–5 distintos en 5/5**, el 6 (OGK) idéntico.
 3. **[S3b]** Con perturbación de `1e-16·max|M|` (por debajo de 1 ulp en muchas entradas) y `CovMrcd` completo:
    con p > n cambian 1–4 conjuntos, **cambia `rho`** (p. ej. `0.1044` → `0.1031`) y `cov` difiere hasta `0.80`
-   en valor absoluto aunque `best` coincida; con `n=60, p=40` nada cambia a esa escala.
+   en valor absoluto aunque `best` coincida; con `n=60, p=40` nada cambia a esa escala. S3b es una **cota
+   inferior** (pocas semillas, una escala): que en una corrida cambien 1–4 conjuntos, o ninguno con `n=60, p=40`,
+   no clasifica a los demás como estables. La clasificación vale por el argumento estructural del punto 1 y por S2.
+3b. **Hallazgo final (2026-10-06):** con **p ≥ n** dependen del redondeo los conjuntos **1 a 5**; el **5** ya
+   desde **p ≥ ceil(n/2)** (aunque n > p); solo el **6** (OGK: `U` por Qn de pares, sin espacio nulo forzado)
+   es estable. Matiz: con p = n exacto, `SCM` puede tener rango completo y el conjunto 4 no tiene espacio nulo
+   estructural; se trata como R1 igualmente (criterio conservador, coherente con D1).
 4. Además del espacio nulo, T3: el signo de cada autovector cambia `lambda` vía Qn (todo p).
 
 Consecuencia para el protocolo aprobado:
@@ -574,7 +664,35 @@ Consecuencia para el protocolo aprobado:
   (`:518-519`), **`rho`, `best`, `cov`, `icov`, `center`, `mah` y `crit` desde cero no son comparables con p ≥
   ceil(n/2)** cuando algún conjunto R1 difiera. Pregunta P1.
 - Lo anterior vale aunque Python y R usen el mismo BLAS: R usa Rlapack de referencia y scipy el LAPACK de
-  Accelerate. **[S3]** En `cor` 12×12, valores propios bit a bit iguales, vectores a ≤1.7e-16 y mismos signos.
+  Accelerate. ~~**[S3]** En `cor` 12×12, valores propios bit a bit iguales, vectores a ≤1.7e-16 y mismos
+  signos.~~ **Corregido 2026-10-06:** ese caso era favorable y no generaliza. **[S12]** `eigen(cor(X))`
+  con p = 5, 12, 30 coincide en valores; con p = 60 difieren 42/60 valores (≤ 10 ulp del propio valor,
+  ≤ 5.2·eps·λmax) y 9 vectores cambian de signo (≤ 2.6e-14 módulo signo); con p = 120, 95/120 valores y 17
+  signos. El convertidor midió 1–4 ulp y cambios de signo en los fixtures del bloque 1. Como el `eigen` del
+  port no es bit a bit (D9), en el protocolo (iii) **incluso con n > p** cualquiera de los 6 conjuntos (también
+  el 6, cuya `P6` sale de `eigen(U)`) puede diferir de R vía T3 (signo o último bit de `P` ⇒ `lambda` ⇒ orden de
+  `dist`). Es la divergencia de un autovector **bien condicionado**, no la del espacio nulo: en S10 el cambio de
+  signo alteró `lambda` en 4/20 casos pero el orden final en 0/20, así que se espera rara; si aparece, se registra
+  con la diferencia de `P` medida y no se relaja ninguna tolerancia. La prueba estricta de extremo a extremo
+  sigue siendo (ii), con `initHsets` de R.
+
+**Caso límite conocido: C5 (AR(1) 50×200).** En C5 `rho_1 ≈ rho_2 ≈ cutoff` con un margen de ~1.1e-15
+relativo, del orden del ruido que D9 introduce en `eigen` (3e-16–6e-16). Los conjuntos 1 y 2 son **el mismo
+subconjunto en distinto orden**: permutarlo no cambia `cov`, pero sí `iBest` y `n.csteps`. Por eso el nivel (ii)
+no puede exigir esas dos salidas por igualdad cuando el margen está por debajo del ruido; comprueba, en cambio,
+que el margen de cada decisión de `rho` frente al cutoff supera una cota clase B de **1e-12 relativo** y, si no
+la supera, lo registra como caso límite en lugar de relajar una tolerancia (declarado antes de comparar).
+
+**Protocolo (iii) por régimen (n, p), ampliación de ADR 0006 (Enmienda 2026-10-06).**
+
+| Régimen | Conjuntos exigidos exactos desde cero | R1 |
+| --- | --- | --- |
+| p ≥ n | solo el 6 | 1–5 |
+| ceil(n/2) ≤ p < n | 1–4 y 6 | 5 |
+| p < ceil(n/2) | los 6 | ninguno |
+
+Con D9, un conjunto exigido que difiera por `eigen` se registra con la diferencia de `P` medida. Para el
+régimen intermedio se añade el golden **C11 (60×40)**.
 
 ## 7. OGK con Qn para todo p: vectorización sin cambiar el método
 
@@ -672,11 +790,23 @@ oficiales. Serialización sin pérdida (17 cifras significativas, ADR 0006; o `%
 | `out.*` (`center`, `cov`, `icov`, `rho`, `target`, `cnp2`, `crit`, `best`, `mah`, `quan`, `alpha`, `n.obs`) | — | `CovMrcd.R:66-81` (objeto S4) |
 | `out.iBest`, `out.n.csteps`, `out.initHsets` | — | `rrcov:::.detmrcd(…, save.hsets=TRUE)` (`detmrcd.R:621-634`) |
 
+**Errores del contrato de fixtures detectados en el bloque 1 (2026-10-06; los corrige `ingeniero-r`).** Para que
+conste, porque invalidan comparaciones hechas con esos fixtures antes de la corrección:
+- `eigen_auto`: el fixture exportaba como entrada `S` pero los valores esperados se calculaban con
+  `eigen(1.3*S)`. Regla: la entrada exportada debe ser **exactamente** el objeto pasado a la función (aquí
+  `scfac * mS`, `detmrcd.R:473`), no uno del que se derive.
+- `determinant/general`: exportaba `abs(det)^(1/7)` en vez de `det^(1/p)` (`detmrcd.R:412`: `det(x)^(1/p)`, con
+  `det` con signo y `p` la dimensión de la matriz). Regla: la expresión del fixture se copia textual de la línea
+  citada.
+
 ## 11. Tolerancias propuestas
 
 Tres clases. **E** (exacto, `rtol=atol=0`): operaciones escalares IEEE sin BLAS/LAPACK ni libm transcendental,
-reproducibles en cualquier plataforma si el port sigue §3. **L**: dependen de libm. **B**: dependen de
-BLAS/LAPACK (bit a bit en el Mac del oráculo si se usan los helpers §3.12.6; en Linux/OpenBLAS no).
+reproducibles en cualquier plataforma si el port sigue §3 (incluidas las FMA de §3.12.8, que son exactas). **L**:
+dependen de libm. **B**: dependen de BLAS/LAPACK (bit a bit en el Mac del oráculo si se usan los helpers §3.12.6
+con la alineación de T27 y el LAPACK portado de T28; en Linux/OpenBLAS no). **Excepción (2026-10-06, D9):**
+`eigen` (`dsyevr` de Accelerate, no de Rlapack) es B **también en el oráculo**: valores y vectores se comparan
+siempre con tolerancia.
 
 | Cantidad | Clase | Tolerancia en tests por etapa (entradas de R) | Extremo a extremo | Justificación |
 | --- | --- | --- | --- | --- |
@@ -686,12 +816,12 @@ BLAS/LAPACK (bit a bit en el Mac del oráculo si se usan los helpers §3.12.6; e
 | `lambda` de `initset` | E dada su entrada | exacto | **rtol 2^-23** (≈1.19e-7) si la proyección `data %*% P` no es bit a bit | T1/T2: Qn salta entre `d` y `f32(d)` ante cambios de 1 ulp; no es relajar el port sino la propiedad de qn0 |
 | `mU`, `x` de `doScale`, `x.nrmd`, `znorm`, rangos | E | **exacto** (endurece 1e-13) | exacto | resta/división/sqrt IEEE |
 | `y1`, `cortmp_sin`, `y3` | L | rtol 1e-15 (`math.*`, AS241 portado) | idem | ≤ 4 ulp entre libm |
-| `R1`, `R2`, `R3`, `covx`, `constcor` | E (L si entra `y1`) | **exacto** sobre entradas de R (endurece 1e-12) | rtol 1e-12, atol 1e-14 | fórmula secuencial [S3] |
+| `R1`, `R2`, `R3`, `covx`, `constcor` | E (L si entra `y1`) | **exacto** sobre entradas de R (endurece 1e-12) | rtol 1e-12, atol 1e-14 | fórmula secuencial con el patrón FMA de cada rama (§3.12.4, §3.12.8) [S11] |
 | `SCM` | B | rtol 1e-12, atol 1e-14 | idem | `dsyrk`; bit a bit con mismo BLAS |
 | productos `dgemm` (`proj`, `sqrtcov`, `mS`, `W`, `G`…) | B | rtol 1e-12, atol `1e-14·max|ref|` | idem | error de `dgemm` ≤ k·eps·(|A||B|) |
-| autovalores | B | atol `10·p·eps·λmax` (≤ 1e-10·λmax para p ≤ 4.5e4; endurece) | idem | `dsyevr` es estable hacia atrás: `O(p·eps·‖A‖)` |
-| autovectores | B | solo autoespacios con gap relativo > 1e-8, módulo signo, `‖v−v_R‖ ≤ 10·p·eps·λmax/gap`; **además** comparar signos (T3) | idem | sensibilidad eps/gap |
-| `scfac` | — | rtol 1e-14 | idem | medido 6.5e-15 [S5]; exacto si se porta nmath (P3) |
+| autovalores | B (también en el oráculo, D9) | atol `10·p·eps·λmax` (≤ 1e-10·λmax para p ≤ 4.5e4; endurece) | idem | `dsyevr` es estable hacia atrás: `O(p·eps·‖A‖)`. **[S12]** Accelerate vs Rlapack ≤ 5.2·eps·λmax (p ≤ 120) |
+| autovectores | B (también en el oráculo, D9) | solo autoespacios con gap relativo > 1e-8, módulo signo, `‖v−v_R‖ ≤ 10·p·eps·λmax/gap`; el **signo** se informa (T3) pero no hace fallar el test (D9); la etapa siguiente (`initset`) se prueba con la `P` de R | idem | sensibilidad eps/gap; Accelerate y Rlapack pueden elegir signos distintos [S12] |
+| `scfac` | L (tras D10) | **exacto en la plataforma de referencia** (nmath portado con las FMA de §3.12.8 y la libm del Mac, D10); **fuera de ella, rtol 1e-14** (otra libm en `lgamma`/`log`/`exp`, otro patrón FMA) | idem | scipy: medido 6.5e-15 [S5]; nmath portado: mismas operaciones y libm que R, de ahí la exactitud solo en la referencia |
 | `e1`, `ep` | B | atol `10·p·eps·λmax` | idem | autovalores |
 | `rho_k`, `rho` (uniroot o rejilla) | E dada `(e1,ep)` | **exacto** (endurece 1e-12) | atol 1e-12 | `R_zeroin2` es escalar puro |
 | `rcov`, `inv_rcov`, `vdst` de C-step | B | rtol 1e-12, atol `1e-14·max|ref|`; `vdst` rtol 1e-12 | idem | dgemm/dpotrf/dpotri con cond ≤ `maxcond` en espacio estandarizado |
@@ -707,27 +837,39 @@ error relativo a `max|ref|` además del absoluto.
 
 ## 12. Preguntas abiertas
 
-- **P1 (R1).** ¿Se acepta que en el protocolo (iii) con p ≥ n solo el conjunto 6 se exija exacto y que `rho`,
+**Estado 2026-10-06:** P1–P8 están **resueltas** (ver «Decisiones del dueño (2026-10-06)» al final); P3 queda revisada por D10. No hay preguntas
+abiertas. Se añaden las decisiones D9 y D10, tomadas tras el bloque 1.
+
+- **P1 (R1). [Resuelta]** ¿Se acepta que en el protocolo (iii) con p ≥ n solo el conjunto 6 se exija exacto y que `rho`,
   `best` y las salidas continuas desde cero no se comparen (solo se registra la divergencia R1), y que con
   ceil(n/2) ≤ p < n el conjunto 5 sea R1? La prueba estricta de extremo a extremo queda en (ii) con `initHsets`
   de R.
-- **P2 (BLAS).** ¿Se aprueba que el port use helpers sobre `scipy.linalg.blas`/`lapack` (`dgemm`, `dgemv`,
+- **P2 (BLAS). [Resuelta; ampliada por T27/T28: alineación y LAPACK de referencia portado]** ¿Se aprueba que el port use helpers sobre `scipy.linalg.blas`/`lapack` (`dgemm`, `dgemv`,
   `dsyrk`, `dsyevr`, `dpotrf`, `dpotri`, `dgetrf`) con operandos Fortran, en lugar de `@`/`np.linalg`? Sin eso
   no hay coincidencia bit a bit ni siquiera en el Mac del oráculo [S7].
-- **P3 (nmath).** ¿`scfac` vía scipy (≤ 6.5e-15 relativo) o portar `qchisq`/`pgamma` de nmath para exactitud? Lo
+- **P3 (nmath). [Resuelta; revisada por D10: se porta nmath]** ¿`scfac` vía scipy (≤ 6.5e-15 relativo) o portar `qchisq`/`pgamma` de nmath para exactitud? Lo
   mismo para `qnorm`: aquí se exige portar AS241 (pequeño), porque `ndtri` difiere en 2/3 de los puntos.
-- **P4 (rendimiento).** El runtime de `pymrcd` es solo numpy y scipy (ADR 0006). ¿Se admite Numba/Cython para
+- **P4 (rendimiento). [Resuelta]** El runtime de `pymrcd` es solo numpy y scipy (ADR 0006). ¿Se admite Numba/Cython para
   `qn0` por lotes, o se queda la vectorización en numpy de §7?
-- **P5 (`vdst`).** El cálculo fiel es O(n²p) y O(n²) de memoria (n=10 000 ⇒ 800 MB). ¿Se mantiene fiel o se
+- **P5 (`vdst`). [Resuelta: fiel, producto completo]** El cálculo fiel es O(n²p) y O(n²) de memoria (n=10 000 ⇒ 800 MB). ¿Se mantiene fiel o se
   aprueba `einsum` (cambia el orden de una suma de longitud p y puede alterar empates en la frontera h)?
-- **P6 (plataforma del oráculo).** Los fixtures se generan en arm64/Accelerate/Rlapack con `long double = double`.
+- **P6 (plataforma del oráculo). [Resuelta: macOS arm64 / Accelerate / Rlapack 3.12.1; incluye el patrón FMA de §3.12.8]** Los fixtures se generan en arm64/Accelerate/Rlapack con `long double = double`.
   En x86-64 Linux, R usaría `long double` de 80 bits en `mean`, `rowMeans`, `cov` y daría otros bits. ¿Se fija
   esta plataforma como oráculo oficial (recomendado) y se anota en `docs/metodos/mrcd.md`?
-- **P7 (errores de R).** Columna constante (T20), `p=1` con `target="equicorrelation"` (`mean` de vacío ⇒ NaN ⇒
+- **P7 (errores de R). [Resuelta: error equivalente, sin *fallback*]** Columna constante (T20), `p=1` con `target="equicorrelation"` (`mean` de vacío ⇒ NaN ⇒
   `if(NA)` en `detmrcd.R:222`, y `eigenEQ` con `2:1` en `:238`) y `dpotrf` no definida positiva hacen fallar a R.
   Propuesta: el port lanza un error tipado equivalente, sin *fallback*. Confirmar.
-- **P8.** Validación de `target` (T24): el port rechaza valores fuera de `{identity, equicorrelation}` donde R los
+- **P8. [Resuelta: error en el port, diferencia de API documentada]** Validación de `target` (T24): el port rechaza valores fuera de `{identity, equicorrelation}` donde R los
   trataría como equicorrelación. Confirmar que se documenta como diferencia de API.
+- **D9 (decisión del dueño, 2026-10-06). `eigen` con tolerancia B.** No se porta `DSYEVR` de Rlapack: el port
+  usa `scipy.linalg.lapack.dsyevr` (Accelerate) con los mismos argumentos que R (§3.12.6) y se acepta que
+  difiera en 1–4 ulp en autovalores (hasta ~10 ulp del valor en p ≥ 60, S12) y en el signo de autovectores.
+  Valores y vectores se comparan con las tolerancias B de §11 también en la plataforma de referencia; el signo
+  se informa sin hacer fallar el test, y las etapas siguientes se prueban con la `P` de R. Efecto en (iii): §6.
+- **D10 (decisión del dueño, 2026-10-06). `.MCDcons` con nmath portado.** Se portan `qchisq` (vía `qgamma`) y
+  `pgamma` de `referencias/R-4.5.2/src/nmath/` para `scfac` (`covMcd.R:602-607`), con sus contracciones FMA
+  (§3.12.8, ya localizadas en `libR.dylib`). Sustituye a la vía scipy de P3 (que queda como oráculo independiente en
+  tests); tolerancia de `scfac`: exacta (§11).
 
 ---
 
@@ -739,8 +881,8 @@ error relativo a `max|ref|` además del absoluto.
 | S1 | `qn0` vs oráculo O(n²), 3000 casos, n ∈ {2..30, 50, 100, 101, 200} | 2736 exacto `d`, 264 `f32(d)`, 0 otros |
 | S1b | `Qn = (2.21914·raw)/fc` (n>12) y `·TAB` (n≤12); `median` par con dos pasadas | idénticos; `0.40000000000000002` |
 | S2 | Sensibilidad de `hsets` a perturbación `1e-14·max` en `eigen` | ver §6 |
-| S3 | numpy/scipy vs R en el Mac: `matmul` 40×12·12×9, `cov` secuencial, `eigh(evr)` | bit a bit; vectores ≤ 1.7e-16, sin cambio de signo |
-| S3b | `CovMrcd` con `initHsets` perturbados `1e-16·max` | p>n: cambian 1–4 conjuntos, `rho` y `cov` (hasta 0.80); n=60,p=40: idénticos |
+| S3 | numpy/scipy vs R en el Mac: `matmul` 40×12·12×9, `cov` secuencial, `eigh(evr)` | ~~bit a bit; vectores ≤ 1.7e-16, sin cambio de signo~~ **Refutada 2026-10-06** en `cov` (sin FMA no coincide, S11) y `eigen` (no generaliza, S12); `dgemm` Fortran sigue valiendo (S7) |
+| S3b | `CovMrcd` con `initHsets` perturbados `1e-16·max` | p>n: cambian 1–4 conjuntos, `rho` y `cov` (hasta 0.80); n=60,p=40: idénticos. **Cota inferior**: la clasificación final es la de §6 punto 3b (p ≥ n: conjuntos 1–5 R1; el 5 desde p ≥ ceil(n/2); solo el 6 estable) |
 | S4 | `eigen(scfac·mS)`: simetría exacta, `isSymmetric`, `jobz V` vs `N`; rejilla `seq` | `dgemm` no simétrica exacta (p=5,h=15) pero `isSymmetric=TRUE`; V≠N (1.0e-15…3.2e-15); rejilla idéntica |
 | S5 | `.MCDcons` R vs scipy | rel. máx 6.5e-15 |
 | S6 | Casos de control | `iBest`, `n.csteps` con 0 en `initV`; `rho` dado ⇒ `iBest=1 1 2 3 4 5 6`; columna constante ⇒ error; 60 % ceros ⇒ OK; iid n=100,p=5 ⇒ `rho=1e-6`; n=40,p=600 ⇒ 6.9 s |
@@ -748,6 +890,10 @@ error relativo a `max|ref|` además del absoluto.
 | S8 | libm y `qnorm` | `np.tanh` 1995/10000 distintos, `math.tanh` 0; `ndtri` 676/999 distintos |
 | S9 | Invariancias de Qn | `Qn(x)≠Qn(-x)` 86/2000; permutación 0/2000; traslación 611/2000 |
 | S10 | `initset` con signos de `P` invertidos | `lambda` distinto en 4/20 (rel. ≤ 3.8e-8); orden final igual en 20/20 |
+| S11 | `cov` (n=37, p=9, `rnorm`, seed 11) con y sin FMA vs R | secuencial sin FMA: 28/81 distintas; FMA en todo `k`: 39/81 distintas de `use="everything"`, 0 de `"complete.obs"`; `_rbase.r_cov` (bloques de 8 + cola FMA): 0/81 en ambas; `r_cor`: 0/81 |
+| S12 | `eigen(cor(X), symmetric=TRUE)` de R vs `_rlinalg.r_eigen_sym` (scipy `dsyevr`, Accelerate), p ∈ {5,12,30,60,120} | p ≤ 30: idénticos en valores; p=60: 42/60 valores distintos (≤ 10 ulp del valor, ≤ 5.2·eps·λmax), 9 signos, vectores ≤ 2.6e-14 módulo signo; p=120: 95/120, ≤ 1.4·eps·λmax, 17 signos, ≤ 3.4e-14 |
+| S13 | `v %*% B` (B 200×40) vs `blas.dgemv(trans=1)` con datos a `0,8,…,56 mod 64` bytes | solo `48 mod 64` coincide (0/40); otros 22–28/40 distintos; `_rlinalg.r_vecmat` 0/40 |
+| S14 | LAPACK con `S = crossprod(Z)/300`, 80×80: `chol`, `chol2inv`, `determinant` | `scipy.linalg.lapack.dpotrf`: 2253/6400 distintas; port `_rlapack.dpotrf_upper`: 0. `dgetrf` de scipy: `modulus` distinto; port: idéntico. `dpotri` de scipy coincidió en este caso, pero no se acepta (otro algoritmo; el convertidor midió 1–2 ulp en fixtures); port: 0 |
 
 ---
 
@@ -772,5 +918,13 @@ Cierran las preguntas abiertas de §12. Protocolo y plataforma: ver [ADR 0006](.
   error equivalente, sin *fallback*.
 - **P8. `target`** distinto de `identity`/`equicorrelation`: error en el port (R lo trata como equicorrelación).
   Diferencia de API documentada.
+- **Diferencias de API del port respecto de `rrcov` oficial** (validaciones del port; no cambian números cuando
+  R termina con resultado):
+  - `target` fuera de `{identity, equicorrelation}`: error (P8, T24); R lo trata como equicorrelación.
+  - `n = 0` tras el filtro de filas no finitas: el port lanza `"All observations have missing values!"`; el R
+    oficial termina con `"provide better scale; must be all positive"`. Mismo fallo, otro mensaje.
+  - `init_hsets` se valida como enteros; R no lo hace.
+  - Entrada 0-d (escalar) rechazada; R la convierte en una matriz 1×1.
+  - Índices en **base 0** (`best`, `i_best`, `init_hsets`); en R son base 1.
 - **Casos aceptados.** C9/C10 desplazan +5 en todas las coordenadas las primeras `ceiling(frac·n)` filas
   (20 % y 10 %); C7 con Σ = I.

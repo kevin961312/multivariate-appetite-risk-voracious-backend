@@ -1,6 +1,6 @@
 # Pre-registro: Monte Carlo de la carta T²MRCD con `rrcov` oficial frente a `canonical2`
 
-- **Fecha:** 2026-10-07 · **Rama:** `experimento/mrcd-canonico` · **Estado:** PROTOCOLO PENDIENTE DE APROBACIÓN.
+- **Fecha:** 2026-10-06 · **Rama:** `experimento/mrcd-canonico` · **Estado:** PROTOCOLO PENDIENTE DE APROBACIÓN.
   La corrida completa **no se ha lanzado**. Solo se ha hecho la prueba de tiempos (`--piloto`, §10).
 - **Continúa** los pilotos [1](2026-10-06-mrcd-canonico-piloto.md) y [2](2026-10-06-mrcd-canonico-piloto2.md), cuya
   recomendación (piloto 2, §7) fue pasar a un Monte Carlo de la carta.
@@ -366,7 +366,7 @@ práctica. Por tanto, **un resultado INCONCLUSO es posible aunque las cartas sea
   - disc(off′, off) = 0.06–0.19 de las observaciones.
   - disc(c2, off) = 0.13–0.22.
 
-## Decisiones del dueño (2026-10-07, antes de la corrida completa)
+## Decisiones del dueño (2026-10-06, antes de la corrida completa)
 
 - **S1:** el límite de control se calcula **como en el código de la tesis** (`--ucl=best`: cuantil empírico de los T² del subconjunto `best`). La versión del artículo (`todas`) se calcula y se reporta como **secundaria**; no entra en la regla de decisión.
 - **S2:** `alpha = 0.75`, como en la tesis.
@@ -374,6 +374,13 @@ práctica. Por tanto, **un resultado INCONCLUSO es posible aunque las cartas sea
 - **Umbrales de `canonical2`:** fijados como en el piloto 2 (V_r: λ_i > λ_1·max(n,p)·eps; complemento: σ_j > σ_1(data)·√eps).
 - El resto de supuestos (S3–S9) se aceptan tal como están escritos.
 
-## Estado (2026-10-07)
+## Estado (2026-10-06)
 
 Corrida completa **detenida por decisión del dueño** a los pocos minutos de empezar; no hay resultados. Protocolo y script quedan listos por si se retoma.
+
+## Nota de trazabilidad
+
+Este archivo se renombró de `2026-10-07-mc-canonico2-protocolo.md` a `2026-10-06-mc-canonico2-protocolo.md`
+y se corrigieron fechas por errata: la fecha real es 2026-10-06. El contenido del pre-registro no cambió. El
+comentario de cabecera de `tools/r/experimentos/mc_canonico2.R` conserva el nombre antiguo del protocolo a
+propósito, para no alterar su MD5 pre-registrado.
