@@ -2,6 +2,22 @@
 
 ## Registro de cambios
 
+- **2026-10-07** — M5, tarea T6: §3.12.9 alineada con el código implementado. (1) módulo real `pymrcd._qn_ext`
+  (no `_qnc`) y API con búfer de salida `out`; (2) hilos por defecto resueltos en C; (3) fallo de `pthread_create`
+  ⇒ `OSError` (decisión del dueño; sustituye a e.8); (4) `R_qsort`/`rPsort`/`whimed_i` se prueban contra la
+  transliteración literal en `tests/` (más contraste con R ad hoc, 0 diferencias), los fixtures R de esas primitivas
+  son deuda; (5) A1 «CI con sanitizers» es deuda (corrida manual del validador: 200 000 vectores sin avisos); (6) el
+  test de `U` con p > 60 compara un bloque de 60 columnas; (7) riesgo residual de `CFLAGS` externas. Resultados M5
+  y P1=A en el apartado «Estado de la implementación» de §3.12.9.
+- **2026-10-07** — M5, tarea T1: especificación de `qn0` en C. Nueva **§3.12.9** (tabla original → port,
+  opciones de compilación sin FMA, análisis de `±0`, prueba de `j ≤ n`, hilos, tolerancias y ahorros) y §7
+  acotada (la extensión C aprobada es la única excepción a «sin Numba/Cython»). Evidencia: sondas S15–S19 (en
+  §3.12.9). Hallazgos: (1) el binario del oráculo no tiene FMA en `_qn0`, `_Qn0`, `_whimed_i`, `_R_qsort` ni
+  `_Rf_rPsort`, pero `clang` contrae por defecto `k_L` y `(s*s − d*d)/4`: `-ffp-contract=off` es obligatorio;
+  (2) la versión numpy actual da el **signo de cero** distinto al de R en ≈19 % de los casos con `±0` (nunca el
+  valor) y de forma **no determinista** (`np.sort(axis=0)`); no afecta a ninguna salida de `cov_mrcd`; (3) con el
+  `k` por defecto `1 ≤ j ≤ n` en la rama «no encontrado» (demostrado; `j = n` se alcanza) y la acotación de
+  `qn_sn.c:280-290` es inalcanzable. Se extrajeron `sort.c`, `qsort.c` y `qsort-body.c` del tarball de R.
 - **2026-10-06** — Correcciones tras el bloque 1 del convertidor, que refutó supuestos de la sonda S3. Evidencia:
   sondas **S11–S14** (anexo A) y el código que ya coincide con R en `packages/pymrcd/src/pymrcd/`.
   1. **FMA.** El R del oráculo (`clang -O2`, arm64) fusiona `a*b + c` en `fmadd` en `cov.c`, `zeroin.c`,
@@ -589,6 +605,314 @@ analiza aquí. `qchisq`/`pgamma`/`qgamma` de nmath (D10): sus ≈100 contraccion
 integradas en `_Rf_pgamma_raw`) y se reproducen con `fma` en `packages/pymrcd/src/pymrcd/_nmath.py`. En otra plataforma u otro compilador (p. ej. x86-64 sin FMA por defecto) el
 patrón cambia: es parte de la plataforma de referencia (P6).
 
+#### 3.12.9 `qn0` en C (M5, tarea T1; añadido 2026-10-07)
+
+Alcance: especificación de la extensión C de `pymrcd` que sustituye a la implementación numpy de `qn0`
+(`packages/pymrcd/src/pymrcd/qn.py:197-289`) y construye los pares de OGK
+(`packages/pymrcd/src/pymrcd/ogk.py:24-58`). Decisiones del dueño (2026-10-07): port **literal** de `qn0` +
+`whimed_i` + `R_qsort` + `rPsort` a C; CPython C-API con protocolo de búfer; `pthreads` con paralelismo **entre
+columnas**; `setuptools`; **sin respaldo Python** (P1=A); todos los núcleos por defecto; M1: los pares
+`Y_i ± Y_j` se construyen en C por hilo; P5: si el C literal da un signo de cero distinto al de la versión Python
+actual, manda el C (igual a R). Aquí no hay código: solo el contrato que debe cumplir `convertidor-python`.
+
+**Fuentes leídas** (rutas completas; las tres de R se extrajeron hoy de `referencias/R-4.5.2.tar.gz`, que no se
+versiona):
+
+| Abreviatura | Ruta | MD5 |
+| --- | --- | --- |
+| `qn_sn.c` | `referencias/robustbase-0.99-6/src/qn_sn.c` | — |
+| `wgt_himed.c`, `wgt_himed_templ.h` | `referencias/robustbase-0.99-6/src/` | — |
+| `qnsn.R` | `referencias/robustbase-0.99-6/R/qnsn.R` | — |
+| `sort.c` | `referencias/R-4.5.2/src/main/sort.c` | `fb06d6d29e508700a0c48e56fe8b4931` |
+| `qsort.c` | `referencias/R-4.5.2/src/main/qsort.c` | `aed8963a407b216482687faf796a5693` |
+| `qsort-body.c` | `referencias/R-4.5.2/src/main/qsort-body.c` | `e9ad0818f8128f7b4bbe5fabb0d05e45` |
+| `choose.c` | `referencias/R-4.5.2/src/nmath/choose.c` | — |
+| `[tar]Utils.h`, `[tar]Arith.h` | `R-4.5.2/src/include/R_ext/` dentro del tarball | — |
+
+Cadena de llamadas portada: `Qn` (`qnsn.R:48-49`, `.C(Qn0, …)`) → `Qn0` (`qn_sn.c:98-104`) → `qn0`
+(`qn_sn.c:118-296`) → `R_qsort` (`qn_sn.c:158`; definido en `qsort.c:164-167` con el cuerpo `qsort-body.c:27-169`,
+`INTt = size_t` por `qsort-body.c:37-39` porque `qsort_Index` está indefinido desde `qsort.c:162`), `whimed_i`
+(`qn_sn.c:199`; instanciado en `wgt_himed.c:37-38` con `wgt_himed_templ.h:15-20`: pesos `int`, sumas `int64_t`;
+cuerpo `wgt_himed_templ.h:27-122`) y `rPsort` (`qn_sn.c:291` y `wgt_himed_templ.h:63`; macro `rPsort` →
+`Rf_rPsort` en `[tar]Utils.h:46`; `sort.c:724-727` → `rPsort2` `sort.c:692-698` → `psort_body` `sort.c:668-681`
+con `rcmp` `sort.c:45-54`).
+
+##### a) Tabla original → port
+
+| Original | Port C | Desviación de API y justificación |
+| --- | --- | --- |
+| `qnsn.R:27` (`anyNA ⇒ NA`), `:29` (`n==0 ⇒ NA`, `n==1 ⇒ 0`) | Sigue en el envoltorio Python (`qn.py:313-322`). El escaneo NaN/Inf de las columnas con `n ≥ 2` se hace **en C, fusionado con la copia** `x → y` (ahorro A3) | Lógica de R, no de `qn0`. Semántica idéntica a la actual: columna con NaN ⇒ `NaN`; algún `±Inf` en columna sin NaN ⇒ `ValueError("Qn con valores infinitos no está soportado por el port")` (desviación ya vigente, `qn.py:308-325`) |
+| `qnsn.R:21`, `:44`, `:49`: `k = choose(n %/% 2 + 1, 2)` como `double`; `Qn0` lo pasa a `int64_t` (`qn_sn.c:101-102`) | `k = (int64_t)hq*(hq-1)/2`, `hq = n/2 + 1` | Mismo entero: `choose.c:126-136` con `k=2` calcula `n·((n−1)/2)` (exacto, < 2^53 para `n < 2^31`) y lo redondea con `R_forceint`; para `hq ≤ 3` usa la simetría `:128-129` (1 y 3). Sin `R_alloc` de `ik` (`:101`) |
+| `qn_sn.c:98-104` (`Qn0`, interfaz `.C`, `Sint`) | No se porta; la entrada es la función CPython (§ «API») | Interfaz de R. `n` llega como `Py_ssize_t`: se rechaza `n > INT_MAX` (R lo rechaza en `qnsn.R:30-31`) |
+| `qn_sn.c:118` firma `qn0(const double x[], int n, const int64_t k[], int len_k, double *res)` | Misma firma + puntero al espacio de trabajo del hilo | Se conserva el bucle `len_k` (`:165-294`) literal; se llama siempre con `len_k = 1` |
+| `qn_sn.c:133-142` (9 × `R_alloc` de tamaño `n`) | `malloc` **una vez por hilo**, de tamaño `n` (todas las columnas de una llamada tienen la misma `n`) | `R_alloc` exige el intérprete de R. Reutilizar es neutro: `qn0` escribe cada celda antes de leerla (prueba en A1) |
+| `qn_sn.c:144-155` (`nn2`, `n2`, `k_L`, `h`) | Literal, con los mismos tipos (`int64_t`, `int`) y la misma expresión de `k_L` (`double` truncado por la conversión a `int64_t`, `fcvtzs` en el binario) | Se calculan una vez por llamada (ahorro A5). **La expresión de `k_L` la contrae `clang` por defecto** (sonda S19): exige `-ffp-contract=off` |
+| `qn_sn.c:156-158` (copia + `R_qsort(y, 1, n)`) | Literal. En OGK, la «copia» es la construcción del par: `y[r] = Y[r,i] + Y[r,j]` o `Y[r,i] − Y[r,j]` (ahorro A2) | Ninguna. `R_qsort` es obligatorio: decide la posición de `±0` (apartado c) |
+| `qn_sn.c:160-162`, `:168-170`, `:201-212`, `:219-221`, `:235-237`, `:242-256`, `:263-275`, `:282-289` (`#ifdef DEBUG_*`, `REprintf`) | Se omiten | Código de depuración, compilado fuera en R (`DEBUG_qn` no definido) |
+| `qn_sn.c:172` `Rboolean found = FALSE` | `bool found = false` (`<stdbool.h>`) | Tipo equivalente |
+| `qn_sn.c:173` `double trial = R_NaReal` | `double trial = NAN` | `R_NaReal` es el NA de R (NaN con carga 1954, `[tar]Arith.h:48`, `:58`). Su valor inicial **nunca sale**: `trial` solo se devuelve con `found` (`:260-261`), que exige haber asignado `trial` en `:199` |
+| `qn_sn.c:176-185` (`left`, `right` iniciales) | Literal | — |
+| `qn_sn.c:187-258` (bucle principal) | Literal, mismas comparaciones y mismo orden | Opcionales neutros: A6 (sumas fusionadas) y A7 (intercambio de punteros) |
+| `qn_sn.c:195`, `:215`, `:224` `(float)(…)` | Literal: conversión `double → float → double` | Obligatorio (T1). En el binario: pares `fcvt s,d` / `fcvt d,s` y `fcmp` en `double` (S18) |
+| `qn_sn.c:199` `whimed_i(work, weight, j, a_cand, a_srt, p)` (usa `p` como `w_cand`) | Literal, **con el mismo alias de `p`** | — |
+| `wgt_himed_templ.h:56` `return NA_REAL` (`n == 0`) | `return NAN` | Inalcanzable con `k` por defecto: dentro del bucle `j ≥ 1` (apartado d, lema 5) |
+| `wgt_himed_templ.h:27-122` (resto) | Literal: `int` para pesos, `int64_t` para sumas, `rPsort` sobre la copia `a_srt` (`:61-63`), selección de candidatos **en el orden original de `a`** (`:86-99`), y copia de vuelta a `a`/`w` (`:116-119`) | Prohibido sustituirlo por «ordenar + `cumsum`» (lo hace `qn.py:134-157`): da el mismo valor pero no el mismo **signo de cero** (apartado c) |
+| `qn_sn.c:260-261` (rama `found`) | Literal | — |
+| `qn_sn.c:266-272` (`work` de la rama «no encontrado», sin `float`) | Literal, en el mismo búfer `work` de tamaño `n` | Demostrado `j ≤ n` (apartado d); además comprobación defensiva por elemento que **lanza error** si `j == n` antes de escribir (nunca se activa) |
+| `qn_sn.c:278-290` (`knew -= nl+1` y acotación) | Literal | Para `k` por defecto la acotación es inalcanzable (apartado d, lema 6); se conserva |
+| `qn_sn.c:291-292` `rPsort(work, j, (int)knew)` | Literal | — |
+| `sort.c:724-727` `rPsort` → `sort.c:692-698` `rPsort2(x, 0, n-1, k)` | Literal; `R_xlen_t` → `ptrdiff_t` | `R_xlen_t` es `ptrdiff_t` en 64 bits |
+| `sort.c:668-681` `psort_body` (`bool nalast=true`) | Literal | — |
+| `sort.c:45-54` `rcmp` (`ISNAN`) | Literal con `isnan` | `ISNAN` es la macro de R sobre `isnan`. Ningún NaN llega (columnas con NaN se excluyen antes) |
+| `qsort.c:164-167` + `qsort-body.c:27-169` (`R_qsort`, Singleton CACM #347 con Peto) | Literal **con sus `goto`** (`L10`, `L20`, `L80`, `L100`), `size_t` para índices, `double R = 0.375` (`:47`), `--v` base 1 (`:55`), pilas `il[40]`/`iu[40]` (`:41`) | Ninguna. No se «arregla» el centinela de la inserción (`:156-162`, sin cota inferior): es correcto porque `:139` evita el tramo izquierdo |
+| `detmrcd.R:89-95` (pares de OGK, `scalefn(sYi + sYj)^2 - scalefn(sYi - sYj)^2) / 4`) | En C, por par `(i > j)` y por hilo: construir `Y_i + Y_j` en `y`, `qn0`; construir `Y_i − Y_j` en `y`, `qn0`; `s = 2.21914·q₊`, `d = 2.21914·q₋`, luego `·TAB[n−2]` o `/fc`; `U[i,j] = (s*s − d*d)/4`; espejo `U[j,i]` (`:97`); diagonal 1 (`:87`) | **Decisión: `(s*s − d*d)/4` va a C.** Es bit a bit idéntico a numpy (`ogk.py:56`) porque son las mismas operaciones IEEE binary64 elementales (`×`, `×`, `−`, `/4`), con los mismos operandos y en el mismo orden, **siempre que no haya contracción**: `clang` por defecto la convierte en `fnmul` + `fmadd` (S19), por eso `-ffp-contract=off` es obligatorio. `x/4` y `x·0.25` coinciden (potencia de dos, mismo real exacto). `2.21914`, `TAB[n−2]` (`qnsn.R:58-63`) y `fc = Qn.finite.c(n)` (`qnsn.R:13-16`) se calculan **en Python** con el código actual (`qn.py:31-68`) y se pasan como `double`: mismo valor, sin duplicar constantes. `^2` es `x*x` (`R_POW`, §3.12.1) |
+
+**API implementada** (módulo privado `pymrcd._qn_ext`, tipos en `_qn_ext.pyi`; la carga y el `ImportError` sin
+respaldo, en `pymrcd/_cext.py`). Las funciones **escriben en un búfer de salida `out`** que pasa el llamador
+(sin asignar ni devolver arreglos), de ahí que los tipos sean `Buffer` y no `ndarray`:
+- `qn0_columns(x, out, k, n_threads, poison=False)`: `qn0` crudo por columna de `x` (`n × m`, `float64`, cualquier
+  *stride*, sin copiar) en `out` (`m`). Requiere `n ≥ 2` (el envoltorio Python resuelve `n ≤ 1`).
+- `ogk_u(y, out, constant, factor, small_n, n_threads, poison=False)`: triángulos de `U` de `detmrcd.R:87-97` en
+  `out` (`p × p`); `constant` es 2.21914, `factor` el de `Qn.finite.c`/`TAB`, y `small_n` indica si `factor`
+  multiplica (`n ≤ 12`) o divide. `p < 2` y `n ≤ 1` los resuelve el envoltorio. `poison` es un gancho de prueba
+  (llena el espacio de trabajo antes de cada columna, ahorro A1).
+- `n_threads = 0` ⇒ valor por defecto, **resuelto en C**: `PYMRCD_NUM_THREADS` si está definida (entero entre 1 y
+  4096; otro valor, `ValueError`) y, si no, los CPU visibles por afinidad (`sched_getaffinity` en Linux) o los
+  CPU en línea (`sysconf`). Motivo de resolverlo en C: importar `os` en `pymrcd` rompería el contrato 2 de
+  `import-linter` por el camino `domain → pymrcd → os`. Siempre acotado por el número de columnas o pares.
+  `default_threads()` y `build_info()` exponen el valor resuelto y las salvaguardas de compilación.
+- Ganchos privados para pruebas: `_r_qsort`, `_rpsort`, `_whimed_i`, `_k_l`.
+
+##### b) Cero FMA en el oráculo y opciones obligatorias
+
+**Evidencia (sonda S18, 2026-10-07).**
+
+```
+SO=/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/robustbase/libs/robustbase.so
+LIB=/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libR.dylib
+md5 $SO $LIB        # 990b0a43016a97ce3a0210e39f692281, 04289a93151a21dda0dd368e137ecae9
+otool -tV $SO > rb.s; otool -tV $LIB > libR.s
+fn(){ awk -v s="^$1:" 'BEGIN{p=0} $0~s{p=1;print;next} p&&/^_[A-Za-z0-9_]+:$/{exit} p{print}' $2; }
+fn _qn0 rb.s | grep -cE '\b(fmadd|fmsub|fnmadd|fnmsub|fmla|fmls)\b'      # idem para cada símbolo
+```
+
+| Símbolo | Binario | Líneas | FMA | Otras instrucciones de coma flotante relevantes |
+| --- | --- | --- | --- | --- |
+| `_Qn0` | `robustbase.so` | 65 | 0 | conversión `k` → `int64` |
+| `_qn0` | `robustbase.so` | 721 | 0 | `k_L` con `fmul`/`fadd` separados y `fcvtzs`; 3 pares `fcvt s,d`/`fcvt d,s` (`:195`, `:215`, `:224`) con `fcmp` en `double`; llama a `_R_qsort`, `_whimed_i` y `_Rf_rPsort` |
+| `_whimed_i` | `robustbase.so` | 305 | 0 | sin aritmética de coma flotante (solo comparaciones); llama a `_Rf_rPsort` |
+| `_R_qsort` | `libR.dylib` | 129 | 0 | `R += ±δ` con `fcsel` + `fadd`; `ij` con `ucvtf` + `fmul` + `fcvtzu` (`qsort-body.c:65`, `:69`) |
+| `_Rf_rPsort` | `libR.dylib` | 65 | 0 | `rPsort2`, `psort_body` y `rcmp` integrados (sin `bl`) |
+
+Confirma el hallazgo del orquestador: la cadena `qn0` de R no tiene contracciones, así que el port **no** lleva
+`fma` (a diferencia de §3.12.8) y su resultado es independiente de la plataforma (no hay libm ni BLAS).
+
+**Sonda S19 (riesgo concreto).** Apple clang 17.0.0 (`arm64-apple-darwin25.1.0`), `-O2` sin más opciones,
+compila `k_L` (`qn_sn.c:154`) con **3 `fmadd`** y `(s*s - d*d)/4` como `fnmul` + `fmadd`; con
+`-ffp-contract=off -fno-fast-math`, 0 FMA en `-O2` y `-O3`. Las `CFLAGS` de CPython del entorno
+(`sysconfig`: `-O3 … -arch arm64`) **no** desactivan la contracción. GCC contrae por defecto en modo GNU
+(`-ffp-contract=fast`) e ignora `#pragma STDC FP_CONTRACT`.
+
+**Obligatorio en la compilación y en el código:**
+1. `extra_compile_args` de `setuptools`: `-std=c11 -ffp-contract=off -fno-fast-math -pthread` (al final, para
+   que prevalezcan sobre las `CFLAGS` de CPython). Prohibidos `-Ofast`, `-ffast-math`, `-ffinite-math-only`,
+   `-fno-signed-zeros`, `-fassociative-math`, `-freciprocal-math`. MSVC (no soportado hoy): `/fp:strict`.
+2. En el fuente: `#pragma STDC FP_CONTRACT OFF` (y `#pragma clang fp contract(off)` bajo `__clang__`) como
+   segunda barrera; `#if FLT_EVAL_METHOD != 0 → #error` (x87 de 32 bits rompería el redondeo de `(float)`);
+   `#if defined(__FAST_MATH__) || (defined(__FINITE_MATH_ONLY__) && __FINITE_MATH_ONLY__) → #error`;
+   `_Static_assert(sizeof(double) == 8 && sizeof(float) == 4)`.
+3. Entorno de coma flotante en tiempo de ejecución (cada hilo, al empezar): `fegetround() == FE_TONEAREST` y
+   sin *flush-to-zero* (comprobación con un subnormal: `DBL_MIN/2 != 0`, sobre `volatile`); si falla, error. Los
+   pares de OGK y `y[i] − y[m]` pueden ser subnormales (S15 usa `1e-300`) y otra extensión cargada en el proceso
+   puede activar FTZ (p. ej. bibliotecas enlazadas con `crtfastmath.o` en Linux).
+4. Compuerta posterior a la compilación (en la plataforma de referencia): desensamblar la extensión
+   (`otool -tV` en macOS; `objdump -d` en Linux) y exigir **0** de `fmadd|fmsub|fnmadd|fnmsub|fmla|fmls`
+   (arm64) o `vfmadd|vfmsub|vfnmadd|vfnmsub` (x86-64) **en todo el binario**, y presencia de los pares
+   `fcvt s,d`/`fcvt d,s` en `qn0`.
+5. No hay reducciones de coma flotante en el código portado (las sumas `sump`, `sumq`, `w_tot`, `wleft`… son
+   enteras), así que la autovectorización de `-O2/-O3` no puede reasociar nada. La conversión `(float)` de un
+   `double` fuera de rango es indefinida en C11 (6.3.1.5) pero en arm64/x86-64 (`fcvt`/`cvtsd2ss`) da `±Inf`
+   según IEEE 754, igual que el binario de R y que `np.float32`; las entradas con `±Inf` se rechazan antes y las
+   diferencias de valores finitos solo desbordan a `±Inf` en `float` si superan `FLT_MAX`, caso que R trata igual.
+
+##### c) Análisis de `±0`
+
+Las comparaciones de `qn0` y sus primitivas (`<`, `>`, `<=` en `qn_sn.c:192`, `:215`, `:224`, `:238`, `:245`;
+`wgt_himed_templ.h:68-73`, `:87`, `:95`; `rcmp` `sort.c:51-53`; `qsort-body.c:74`, `:82`, `:87`, `:96`, `:102`,
+`:152`, `:162`) tratan `−0 == +0`. Por tanto el **flujo de control** y el **valor numérico** del resultado son
+independientes de dónde estén los `±0`; lo único que puede cambiar es el **signo de un resultado cero**.
+
+Dónde aparece `−0`:
+- **En `x` (entrada de `qn0`)**, en la ruta `cov_mrcd`: (1) `vsd` (`detmrcd.R:418`) sobre los datos crudos: solo si
+  los datos traen `−0.0`; (2) `doScale` (`rb/detmcd.R:249`, `:253`): `x − med` es `−0` solo con `x = −0` y
+  `med = +0` (en redondeo al más cercano `a − a = +0`); (3) `initset` (`detmrcd.R:70`): `data %*% P` sale de
+  `dgemm`; un `−0` exigiría que todos los productos fuesen `−0` y depende de cómo acumule el BLAS (no
+  especificado: riesgo de plataforma, irrelevante por el punto siguiente); (4) OGK (`detmrcd.R:94`): `Y_i + Y_j`
+  es `−0` solo si ambos son `−0`; `Y_i − Y_j` solo si `Y_i = −0` e `Y_j = +0` (`Y = xc/scale` con `scale > 0`
+  conserva el signo).
+- **En `y`**: el mismo multiconjunto que `x`; la posición de cada `±0` dentro del bloque de ceros la decide la
+  permutación de `R_qsort` (determinista, sin aleatoriedad: `qsort-body.c:47`, `:65`, `:69`).
+- **En `work`** (`qn_sn.c:195`, `:269`): `y[i] − y[n−jj]` es `−0` si y solo si `y[i] = −0` e `y[n−jj] = +0`
+  (con `n−jj < i`, es decir, `+0` colocado antes que `−0` en `y`); `(float)` conserva el signo.
+- **En `trial`** (`:199`): `whimed_i` devuelve `a_srt[n2]` tras `rPsort` (`wgt_himed_templ.h:63-64`); entre
+  empates, la posición (y por tanto el signo) depende de `rPsort` y del orden en que `:86-99` copia candidatos.
+- **En el resultado**: `trial` (`:261`) o `work[knew]` (`:292`). Luego `2.21914·(−0) = −0` y `·TAB`, `/fc` lo
+  conservan: `Qn` de R **puede devolver `−0`** (S15: 2715 de 20000 casos).
+
+**Efecto en `cov_mrcd`: ninguno.** `vsd < minscale` (`detmrcd.R:419`) convierte `±0` en `minscale`; en
+`doScale`, `scale < 0` es falso para `−0` y `scale == 0` lo envía a `non0Q` (`rb/detmcd.R:266-283`), que lo
+sustituye; en OGK, `^2` da `+0` (`detmrcd.R:94`) y `U` nunca es `−0` (`t1 − t2` con `t1 == t2` es `+0`). El signo
+solo es visible en `Qn` como API y en el intermedio `vsd_raw` (`detmrcd.py:398`).
+
+**La versión Python actual diverge** (S15, S16): `np.sort` (`qn.py:212`), el `argsort` estable de
+`_whimed_columns` (`qn.py:150`) y `lexsort` en `_kth_exact` (`qn.py:188`) colocan los `±0` de otra forma. Medido:
+3809 y 3778 de 20000 casos con signo de cero distinto al de R (dos corridas del mismo archivo), **0** con valor
+distinto; y `np.sort(axis=0)` sobre `±0` (numpy 2.5.3, arm64) **no es determinista** entre llamadas del mismo
+proceso (20 de 20 resultados distintos). Una transliteración literal en Python de `R_qsort` + `whimed_i` +
+`rPsort` + `qn0` (sonda en el *scratchpad*, no versionada) coincide con R en **0 de 20000** bits distintos. Por P5
+la referencia es el C literal; el port C además elimina ese no determinismo.
+
+Consecuencia normativa: **nada** de `R_qsort`, `whimed_i` ni `rPsort` puede sustituirse por otra ordenación o
+selección «equivalente» (p. ej. `qsort` de libc, `np.sort`, ordenar + `cumsum`), aunque dé el mismo valor.
+
+##### d) `j ≤ n` en la rama «no encontrado» (`qn_sn.c:266-272`)
+
+Notación (base 0 para `i`, base 1 para `jj`, como en C): `D_i(jj) = (float)(y[i] − y[n−jj])`, no decreciente en
+`jj` (`y` ordenado; la resta redondeada y `(float)` son monótonas). `c_i = right[i] − left[i] + 1`. `hq = n/2 + 1`
+(`:155`), `k = C(hq, 2)` (por defecto, `qnsn.R:21`).
+
+1. **Invariantes.** `nl = Σ_{i=0}^{n−1}(left[i] − 1)` siempre (inicio `:145`, `:167`, `:176-177`; actualización
+   `:245-248` con `sumq = Σ(q[i] − 1)`, `:233`). `nr ≥ Σ right[i]`, con igualdad desde la primera actualización de
+   `right` (`:238-241`, `sump = Σ p[i]`); antes, `nr = n² ≥ Σ right[i]` porque `right[i] ≤ n` (`:178-185`).
+2. **`trial ≥ 0` y cada actualización de `right` tiene `trial > 0`.** `left[i] ≥ n − i + 1` siempre: al inicio por
+   `:177`; tras `:247`, `q[i] = 1 + #{jj : D_i(jj) ≤ trial}` (`:222-227`) y los `jj ≤ n − i` dan `y[i] − y[m]` con
+   `m ≥ i`, `≤ 0 ≤ trial`. Así todo candidato (`jj ≥ left[i]`) tiene `m = n − jj ≤ i − 1` y diferencia `≥ 0`, y
+   `trial`, que es uno de ellos, es `≥ 0`. Si `trial ≤ 0`, `sump = #{D < trial} ≤ #{(i,m): y[i] < y[m]} ≤ n(n−1)/2 <
+   nn2 < knew`, luego `:238` no se cumple.
+3. **Cotas estrictas.** Todo candidato vivo cumple `trial_L < D < trial_R`, con `trial_L` el último que movió
+   `left` (`jj ≥ q_L[i]` ⇒ `D > trial_L`) y `trial_R` el último que movió `right` (`jj ≤ p_R[i]` ⇒ `D < trial_R`).
+   El nuevo `trial` es uno de ellos, así que siempre `trial_L < trial_R`.
+4. **`c_0 = 0` y `c_i ≥ 0` para `i ≥ 1`.** Fila 0: `right[0] = n` (inicio; y `p[0] = n` porque todas las
+   diferencias `y[0] − y[m] ≤ 0 < trial_R`), `left[0] = n + 1` (inicio; y `q[0] = n + 1` porque `trial_L ≥ 0`).
+   Filas `i ≥ 1`: (a) ambos iniciales: `c_i = i` o `c_i = hq`; (b) `right = p_R`, `left` inicial o `q_L`: `c_i =
+   #{jj : trial_L < D_i(jj) < trial_R} ≥ 0` (o `p_R[i] − (n − i) ≥ 0` si `left` es inicial, por el lema 2);
+   (c) `right` inicial reducido (`i > hq`, `:183`) y `left = q_L`: `c_i = hq − #{m < i : D ≤ trial_L}`. Si fuese
+   negativo, la fila `i` tendría `≥ hq + 1` diferencias `≤ trial_L`; por monotonía, los `C(hq+2, 2)` pares del
+   bloque `{i−hq−1, …, i}` también, pero `:245` exige `knew > sumq` ⇔ `#{pares m < i con D ≤ trial_L} < k =
+   C(hq, 2) < C(hq+2, 2)`. Contradicción. **Este caso usa el `k` por defecto**; con otro `k` (no usado en
+   `cov_mrcd`) no está demostrado, y es justo lo que anuncia el comentario de `:280`.
+5. **`j ≤ n`.** Al salir sin `found` (`:187`), `nr − nl ≤ n`. Por 1 y 4: `j = Σ_{i≥1} max(c_i, 0) = Σ_i c_i =
+   Σ right − nl ≤ nr − nl ≤ n`. Si el bucle no se ejecuta (`n(n−1)/2 ≤ n` ⇔ `n ≤ 3`): `j = 1` (`n = 2`) o
+   `j = 3` (`n = 3`). Además `j ≥ 1`: si `right` se actualizó, `j = nr − nl ≥ 1` (`nr ≥ knew > nl`); si no, los
+   `C(hq+1, 2) = k + hq` pares del bloque `{0, …, hq}` están en la banda y como mucho `k − 1` son `≤ trial_L`. El
+   mismo argumento da `j ≥ 1` dentro del bucle, así que `whimed_i` nunca recibe `n = 0` (`NA_REAL` inalcanzable).
+6. **La acotación `:280-290` es inalcanzable con `k` por defecto.** `knew > nl` siempre. Si `right` se actualizó,
+   `knew ≤ nr = nl + j`. Si no, `knew ≤ Σ right[i]`: con `n = 2m`, `Σ right = n² − (m−2)(m−1)/2` y la desigualdad
+   equivale a `2m² − 2 ≥ 0`; con `n = 2m+1`, a `(3m² + 3m)/2 ≥ m(m+1)/2`. Luego `0 ≤ knew − nl − 1 ≤ j − 1`.
+7. **Otros índices.** Bucle de `p`: `j < n` está en la condición (`:215`). Bucle de `q` (`:224`, sin cota): para la
+   fila `i` se detiene como tarde en `m = n − j + 1 = i` (`y[i] − y[i] = +0`, `> trial` falso por el lema 2) y `j`
+   solo decrece, así que `m ≤ n − 1`. `R_qsort` usa centinelas (`qsort-body.c:96`, `:102`, `:156-162`) válidos sin
+   NaN (excluidos antes).
+
+**Comprobación empírica** (S15 + S17, transliteración instrumentada): 26000 casos, `max j/n = 1.0` (**`j = n` se
+alcanza**: el búfer de tamaño `n` es justo, sin holgura), acotación activada 0 veces, 1075 casos «no encontrado»
+sin ninguna actualización de `right`.
+
+**Requisito:** búfer `work` de tamaño `n`, como R, más la comprobación defensiva de la tabla (a) que lanza
+`RuntimeError` en lugar de escribir fuera; no se amplía el búfer (cambiaría el comportamiento si la prueba fallase:
+se prefiere fallar).
+
+##### e) Hilos: invariantes y determinismo
+
+1. Cada columna (o par de OGK) es una función pura de sus datos y de `n`: sin estado global ni `static`
+   (verificado: `R_qsort` solo usa locales, `qsort-body.c:41-48`; `psort_body`, `sort.c:669-670`; `whimed_i`,
+   `wgt_himed_templ.h:44-47`). El port no puede añadir estado compartido.
+2. Espacio de trabajo **privado por hilo**, reservado entero antes de crear hilos; un fallo de `malloc` ⇒
+   `MemoryError` antes de calcular nada; ninguna reserva dentro de los hilos.
+3. Cada posición de salida (`res[c]` o `U[i,j]`/`U[j,i]`) la escribe **un solo** hilo; no hay reducciones entre
+   hilos.
+4. El reparto (bloques fijos o contador atómico C11) no altera ningún valor por 1-3: el resultado es idéntico bit a
+   bit para cualquier `n_threads` y cualquier planificación.
+5. GIL liberado durante el cálculo (`Py_BEGIN_ALLOW_THREADS`) con los `Py_buffer` retenidos; la entrada es de solo
+   lectura y la salida un arreglo nuevo (sin alias). Contrato: nadie muta la entrada durante la llamada (en
+   `pymrcd` son arreglos internos).
+6. Errores (Inf, `j == n`, entorno FP del punto b.3) en marcas por hilo con el **menor índice de columna**; se
+   informan tras el `join`, con mensaje determinista.
+7. Todos los hilos se unen antes de volver (sin hilos vivos si `TaskMapper` hace `fork` después).
+8. Si `pthread_create` falla, se unen los hilos ya creados y se lanza `OSError` (con `errno`); no hay cálculo
+   parcial. **Decisión del dueño (2026-10-07)**: sustituye a la propuesta original de «terminar en el hilo
+   llamador», para no ocultar un fallo del sistema ni tener una ruta de ejecución más que probar.
+9. Riesgo solo de rendimiento: dentro del *bootstrap* con procesos (`TaskMapper`) habrá procesos × hilos; el
+   parámetro `n_threads` debe poder fijarse desde arriba. No afecta a los bits.
+
+##### f) Tolerancias declaradas antes de comparar
+
+Comparación **por bits** (`view(np.uint64)`, que distingue `±0`; no `np.array_equal`, que los iguala); los NaN
+solo por posición (su carga no sale de `cov_mrcd`, que falla antes).
+
+| Comparación | Datos | Tolerancia |
+| --- | --- | --- |
+| `qn0` C vs `.C(Qn0, …)` de R (crudo) | fixtures nuevos: S15 (±0), S17 (genéricos), y casos con `n ∈ 2..12`, `n` grande (≥ 1000), escalas `1e-300`/`1e300` | **exacta en bits, incluido el signo del cero**; también fuera de la plataforma de referencia (sin libm ni BLAS; condiciones de b) |
+| `Qn` C (vía envoltorio) vs `robustbase::Qn` | idem | exacta en bits |
+| `R_qsort` C vs `.Internal(qsort(x, FALSE))` (`sort.R:152`); `rPsort` C vs `.Internal(psort(x, k))` (`sort.c:763-764`, `:744`); `whimed_i` C vs `.C(wgt_himed_i, …)` (`wgt_himed.c:45-58`) | vectores con `±0`, empates y longitudes `1..200`; ganchos de prueba privados del módulo | exacta en bits **de todo el arreglo resultante** (posición de cada `±0`), no solo del valor seleccionado. **Implementado de otro modo:** los tests comparan contra la transliteración literal en Python (`tests/r_sort_literal.py`), no contra fixtures de R; el contraste directo con R lo hicieron ad hoc el validador y el convertidor (0 diferencias), pero **no está versionado** (deuda) |
+| `qn0` C vs oráculo Python actual (el `qn.py` de hoy, movido a `tests/support/` como oráculo) | aleatorios y fixtures existentes | exacta en bits **salvo** `a == 0 and b == 0` con signo distinto (P5; S15); en ese caso manda la comparación con R |
+| `U` de OGK C vs `ogk.py:24-58` actual | fixtures C1–C11 (incluye `p > n`) y `n=40, p=600` | **exacta en bits sin excepción** (`U` nunca es `−0`, apartado c). **Implementado:** con `p > 60` el test compara un bloque de 60 columnas; la `U` completa quedó cubierta por la instantánea bit a bit (2933 claves) que no se versionó (deuda) |
+| `r6.U` C vs R (§10) | fixtures | exacta en bits (clase E, como hoy) |
+| `cov_mrcd` antes ↔ después | todos los fixtures golden, más datos con empates, con `−0.0` y con `p ≫ n`; «antes» capturado con el commit `54ede77` en la misma máquina y guardado (`.npz`) | **exacta en bits en todas las salidas y en los intermedios**, salvo el signo de los ceros de `vsd_raw` (P5); justificación en c |
+| Independencia de hilos | `n_threads ∈ {1, 2, 3, 7, núcleos}` y orden de columnas invertido | exacta en bits |
+
+##### g) Ahorros de cálculo (sin cambiar ningún bit)
+
+| Id | Dónde | Qué se ahorra | Por qué no cambia el resultado | Cómo se prueba |
+| --- | --- | --- | --- | --- |
+| A1 | `qn_sn.c:133-142`; temporales de `qn.py:197-289` | 9 reservas por llamada → 9 por hilo y llamada | `qn0` escribe antes de leer: `y` (`:156-157`), `left`/`right` (`:176-185`), `work`/`weight` hasta `j` (`:191-198`, `:266-272`), `p`/`q` completos (`:213-227`), `a_srt` (`wgt_himed_templ.h:61-62`), `a_cand`/`w_cand` hasta `kcand` (`:86-99`) | compilación con `-fsanitize=address,undefined` en un trabajo de CI (**deuda: no hay trabajo de CI; solo una corrida manual del validador, 200 000 vectores sin avisos**); modo de depuración que llena el espacio con NaN de carga distinta antes de cada columna y exige los mismos bits; orden de columnas invertido |
+| A2 | `ogk.py:44-56` | las copias `arr[:, bi]`, `arr[:, bj]`, `yi + yj`, `yi − yj`, `concatenate` (5 matrices `n × lote`) y la copia `x → y` de `qn0` | la construcción del par **es** la copia de `:156-157`: una sola suma/resta IEEE por elemento, igual que numpy; la copia es la identidad de bits | `U` C vs `ogk.py` actual, bit a bit |
+| A3 | `qn.py:323-329` | `np.isnan(arr)`, `arr[:, ~has_nan]`, `np.isinf`, `arr[:, ok]` (dos pasadas y dos copias) | se comprueba lo mismo, en la pasada de copia; solo lectura | columnas con NaN, con Inf, con ambos; mismo tipo y mensaje de error |
+| A4 | `qn.py:281-288` (`np.asarray`, lotes `_CHUNK_ELEMENTS`) | copia de entrada y lotes | lectura por *strides* del búfer; la copia a `y` es necesaria de todos modos | entradas C-contiguas, F-contiguas y con `strides` arbitrarios: mismos bits |
+| A5 | `qn_sn.c:144-155` | `nn2`, `n2`, `k_L`, `h`, `k` una vez por llamada en vez de por columna | funciones puras de `n` con la misma expresión (y sin contracción, b) | cubierto por las comparaciones de f |
+| A6 | `qn_sn.c:228-234` | una pasada de `n` por iteración: `sump`, `sumq` acumulados dentro de `:213-218` y `:222-227` | sumas **enteras** `int64_t` (exactas, conmutativas; `≤ n² < 2^63`) | f |
+| A7 | `qn_sn.c:239-240`, `:246-247` | copias de `n` enteros por iteración: intercambio de punteros `right ↔ p`, `left ↔ q` | tras el intercambio, `p` y `q` apuntan a datos obsoletos que se sobrescriben enteros antes de leerse: `whimed_i` usa `p` solo como borrador (`:199`), luego `:213-218` y `:222-227` rellenan `p` y `q` completos; la rama final solo lee `left`/`right`; con `len_k > 1` se reinicializan en `:176-185` | f (ahorro menor; opcional) |
+
+**Llamadas a `Qn` repetidas en la ruta `cov_mrcd` (pedido c): no hay en posición general.** Inventario:
+`vsd` sobre `x` crudo (`detmrcd.R:418`, `p` llamadas); `doScale` de `r6pack` sobre `x_j − median(x_j)` con `x = mU`
+o `mW` (`detmrcd.R:124`, `p`); `initset` sobre `proj_k − median` para seis `P` distintas (`detmrcd.R:70`, `6p`);
+OGK sobre `p(p−1)` pares distintos (`detmrcd.R:94`). Ningún par de llamadas recibe los mismos bits: `mU =
+(x − vmx)/vsd` no es `x`, y `Qn` no es equivariante bit a bit ante traslación ni escala (T2, S9), así que no se
+puede derivar una escala de otra. Único caso degenerado: `p = 1` (las seis `P` valen `[1]` y `initset` repite el
+mismo `Qn` seis veces); no se propone memorizar (ahorro de `5` llamadas de longitud `n` frente al coste de
+comparar entradas), y fuera de `qn0` excede esta tarea.
+
+**Dentro de `qn0` (pedido d), lo que no se toca:** el `(float)` repetido en `:195`, `:215` y `:224` (son pares
+distintos en cada barrido; precalcular las `n²` diferencias cuesta `O(n²)` de memoria); el barrido lineal de `p`/`q`
+(ya es `O(n)` por iteración; la búsqueda binaria de `qn.py:86-131` era solo para vectorizar en numpy); la copia
+`a → a_srt` de cada ronda de `whimed_i` (`rPsort` permuta y el orden de `a` decide los candidatos y el signo del
+cero); y `R_qsort` en lugar de otra ordenación (apartado c).
+
+**Estado de la implementación (M5, 2026-10-07).**
+- **Decisiones del dueño:** P1 = A (sin respaldo Python: el `Qn` de numpy vive solo en `tests/` como oráculo); P4 =
+  M1 (pares de OGK y `(s*s − d*d)/4` en C); P5 (ante `±0` la referencia es R); ahorros A1–A7 sin cambiar bits.
+- **Evidencia de fidelidad** (todo exacto en bits, incluido el signo del cero): `Qn` igual a R en 252 fixtures
+  antiguos, 188 nuevos, 26 000 sondas y 6 000 vectores del validador; `U` de OGK igual al bucle de R en 6
+  configuraciones × 1, 3 y 8 hilos; instantánea de `cov_mrcd` de 2933 claves (14 golden + 2 sintéticos) con 0
+  diferencias antes/después. 0 instrucciones FMA en el binario (11 pares `fcvt`; `scripts/check_pymrcd_fma.sh`).
+- **Defensa contra `CFLAGS` externas:** `-fno-signed-zeros`, `-fassociative-math` y `-freciprocal-math` en el
+  entorno no están prohibidos por el código, solo contrarrestados por `-fno-fast-math` al final de las opciones
+  (§b.1). Riesgo bajo; no hay comprobación en tiempo de compilación.
+- **Rendimiento** (Mac M2, 8 núcleos): ver `docs/ESTADO.md`. El criterio «≥ 10× con un hilo» **no** se cumple
+  (4.1×): `qn0` literal cuesta ≈ 66–70 µs por columna con `n = 200`, frente a ≈ 77–82 µs de `.C(Qn0)` de R; más
+  velocidad exigiría cambiar el algoritmo, lo que este apartado prohíbe.
+
+**Sondas de esta sección** (2026-10-07; R 4.5.2, robustbase 0.99-6, numpy 2.5.3, arm64):
+- **S15** (`±0`): 20000 vectores, `n ∈ 2..40`, semilla `20261007` (`numpy.random.default_rng`), fracción de ceros
+  `U(0.3, 0.95)` con signo aleatorio y el resto `{−3..3}·{1, 0.5, 1e-300}`. R `.C(Qn0)`: 18630 ceros, 2715 de ellos
+  `−0`. Transliteración literal: 0 bits distintos. `pymrcd` actual: 3809 / 3778 bits distintos (dos corridas), 0
+  valores distintos.
+- **S16** (no determinismo de numpy): matriz `40 × 3000` de `±0` con 5 filas a 1; 20 llamadas a `qn0_columns`
+  ⇒ 20 resultados distintos; `np.sort(axis=0)` ⇒ 20 distintos; `np.sort` 1-D de 5000 `±0` ⇒ estable (1).
+- **S17** (genéricos): 6000 vectores, `n ∈ 2..200`, semilla 7; normal, enteros `−5..5`, Cauchy redondeada a 0.1 y
+  mezcla 60/40 con ruido `1e-3`. Literal y `pymrcd` actual: 0 bits distintos frente a R.
+- **S18**: desensamblado (tabla de b). **S19**: contracción por defecto de `clang` (texto de b).
+
 ---
 
 ## 4. Trampas de exactitud
@@ -717,7 +1041,13 @@ columnas independientes**; dentro de cada columna se ejecuta la misma secuencia 
 3. `U[i,j] = (s*s − d*d)/4` con `s, d` ya multiplicados por la constante y corregidos (`Qn` completo, §3.12.1).
 4. Con la implementación por lotes también se calculan `vsd` (`:418`), `doScale` (`:124`) y los 6 `lambda`.
 
-Numba/Cython no están permitidos hoy en el runtime de `pymrcd` (solo numpy y scipy, ADR 0006): pregunta P4.
+**Acotado 2026-10-07 (M5, decisión del dueño):** el runtime de `pymrcd` sigue sin Numba ni Cython (ADR 0006,
+P4), con **una única excepción aprobada**: la extensión C propia de `qn0` y de los pares de OGK (§3.12.9), port
+literal de `qn_sn.c` + `wgt_himed_templ.h` + `R_qsort` + `rPsort`, con la C-API de CPython y sin dependencias de
+runtime nuevas. Desde ese cambio, los puntos 1-2 de esta sección describen el **oráculo** numpy (pasa a
+`tests/support/`, sin respaldo en `src/`, P1=A) y no la implementación; el punto 3 se hace en C (§3.12.9 a). Las
+equivalencias de 2 valen para el **valor**, no para el signo de un cero (§3.12.9 c). ADR 0006 y P4 deben
+recoger la excepción (tarea del documentador).
 
 ## 8. Código muerto en la versión oficial (verificado; documentar, no portar)
 
@@ -849,7 +1179,7 @@ abiertas. Se añaden las decisiones D9 y D10, tomadas tras el bloque 1.
   no hay coincidencia bit a bit ni siquiera en el Mac del oráculo [S7].
 - **P3 (nmath). [Resuelta; revisada por D10: se porta nmath]** ¿`scfac` vía scipy (≤ 6.5e-15 relativo) o portar `qchisq`/`pgamma` de nmath para exactitud? Lo
   mismo para `qnorm`: aquí se exige portar AS241 (pequeño), porque `ndtri` difiere en 2/3 de los puntos.
-- **P4 (rendimiento). [Resuelta]** El runtime de `pymrcd` es solo numpy y scipy (ADR 0006). ¿Se admite Numba/Cython para
+- **P4 (rendimiento). [Resuelta; acotada 2026-10-07 por la extensión C de §3.12.9, ADR 0006 enmienda 2026-10-07]** El runtime de `pymrcd` es solo numpy y scipy (ADR 0006). ¿Se admite Numba/Cython para
   `qn0` por lotes, o se queda la vectorización en numpy de §7?
 - **P5 (`vdst`). [Resuelta: fiel, producto completo]** El cálculo fiel es O(n²p) y O(n²) de memoria (n=10 000 ⇒ 800 MB). ¿Se mantiene fiel o se
   aprueba `einsum` (cambia el orden de una suma de longitud p y puede alterar empates en la frontera h)?
@@ -908,7 +1238,7 @@ Cierran las preguntas abiertas de §12. Protocolo y plataforma: ver [ADR 0006](.
   `@`/`np.linalg`, para replicar las llamadas de R (S7). Sigue siendo solo numpy/scipy.
 - **P3. `.MCDcons`.** Con scipy, rtol 1e-14 (S5 midió 6.5e-15); `qnorm` portado (AS241), porque `ndtri` difiere
   en 676/999 puntos (S8).
-- **P4. Rendimiento.** Sin Numba ni Cython por ahora; Qn vectorizado en numpy según §7.
+- **P4. Rendimiento.** Sin Numba ni Cython; Qn vectorizado en numpy según §7. **Acotada el 2026-10-07:** única excepción aprobada, la extensión C de §3.12.9 (ADR 0006, enmienda 2026-10-07); P1 = A, sin respaldo Python.
 - **P5. `vdst` fiel** (producto completo). Si en producción n es muy grande, se revisa la memoria por bloques
   **sin cambiar el orden de operaciones**.
 - **P6. Plataforma de referencia:** macOS arm64, R 4.5.2, BLAS Accelerate (vecLib), LAPACK Rlapack 3.12.1.

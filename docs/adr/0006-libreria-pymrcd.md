@@ -1,6 +1,6 @@
 # ADR 0006 — MRCD como librería propia `pymrcd`
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado — enmendado el 2026-10-06 y el 2026-10-07 (extensión C; el punto 7 queda acotado)
 - **Fecha:** 2026-10-06
 - **Concreta:** [ADR 0002](0002-mrcd-sin-aproximaciones.md) (el port propio de `rrcov::CovMrcd`) y respeta
   [ADR 0004](0004-cartas-y-estimadores-extensibles.md) (estimadores independientes).
@@ -117,3 +117,57 @@ libm del sistema (`math.lgamma` de CPython es otra implementación).
 - p < ceil(n/2): los 6.
 - Con D9, un conjunto exigido que difiera por `eigen` se registra con la diferencia de `P` medida, sin relajar
   tolerancias. Se añade el golden **C11 (60×40)** para el régimen intermedio.
+
+## Enmienda 2026-10-07: extensión C para `Qn` y OGK (M5)
+
+Decisión del dueño. Precisa los puntos 1, 5 y 7 sin cambiar el método.
+
+**Por qué.** `Qn` (`qn0`) es el cuello de botella de MRCD: se evalúa por columna en la estandarización, en los
+seis subconjuntos iniciales y, sobre todo, en los `p(p−1)` pares de OGK. Con p grande, `cov_mrcd` 200×300
+(alpha 0.75) tardaba 30 s, y la Fase I y la recalibración repiten cientos de ajustes (ADR 0007, ADR 0008). La
+versión numpy ya no podía acelerarse sin tocar el método ni la fidelidad bit a bit: además daba otro **signo de
+cero** que R y no era determinista (`np.sort(axis=0)`; especificación §3.12.9 c).
+
+**Decisión.**
+1. **`pymrcd` deja de ser Python puro.** `Qn` y los pares de OGK se calculan en una extensión C propia,
+   `pymrcd._qn_ext` (`packages/pymrcd/src/pymrcd/_ext/`), **port literal** de `qn0` y `whimed_i` de robustbase
+   (`qn_sn.c`, `wgt_himed_templ.h`) y de `R_qsort` y `rPsort` de R 4.5.2. Literal incluye `goto`, el alias de `p`
+   como `w_cand` y las conversiones `(float)`: ninguna ordenación o selección «equivalente» es admisible
+   (§3.12.9 a y c). Es una optimización de la **implementación**, no del método (ADR 0002).
+2. **Sin respaldo en Python (P1 = A).** Sin la extensión, `import pymrcd` falla con un `ImportError` explícito
+   (`_cext.py`). El `Qn` de numpy vive solo en `tests/` como **oráculo** de comparación; en `src/` no queda como
+   alternativa, para que ninguna instalación ejecute en silencio un cálculo distinto.
+3. **Licencias.** El C deriva de robustbase (GPL-2+; P. Rousseeuw dio permiso para publicar `qn0` bajo GPL) y de R
+   (R Core Team, GPL-2+). «O posterior» es compatible con la GPL-3.0-or-later de `pymrcd` (punto 5). Las
+   cabeceras de copyright se conservan en los fuentes y los créditos van en el README. *No es asesoría legal.*
+4. **Runtime sin dependencias nuevas.** Sigue siendo `numpy` y `scipy`; la extensión usa la C-API de CPython con
+   el protocolo de búfer (sin cabeceras de numpy). `types-setuptools` entra solo en el grupo `dev` de la raíz, para
+   que mypy revise `setup.py`.
+5. **Compilación.** `setuptools >= 77` (metadatos de licencia PEP 639) como backend, con un `setup.py` mínimo que
+   solo declara `ext_modules`; sustituye a `hatchling`. Las opciones `-ffp-contract=off -fno-fast-math` van al
+   final para prevalecer sobre las `CFLAGS` de CPython (que no desactivan la contracción FMA; el `clang` por
+   defecto contrae `k_L` y `(s*s − d*d)/4`: §3.12.9 b). `cache-keys` de uv hace que se recompile al cambiar el C,
+   `setup.py` o `pyproject.toml`. Hace falta un compilador de C con pthreads (Xcode CLT, `build-essential`).
+6. **Hilos.** Paralelismo entre columnas (o pares de OGK) con pthreads y el GIL liberado. El número de hilos es
+   un parámetro de **rendimiento**: `n_threads` en `cov_mrcd`; por defecto `PYMRCD_NUM_THREADS` y, si no, la
+   afinidad de CPU o los núcleos en línea. El resultado es idéntico bit a bit con cualquier valor (§3.12.9 e). En
+   producción se fija `n_threads` desde `VORACIOUS_MRCD_THREADS` (no se persiste con la versión de la carta; el
+   cableado en `container` es del Paso 3), sobre todo si las réplicas bootstrap corren en procesos
+   (procesos × hilos sobresuscribe los núcleos).
+7. **Fidelidad.** `Qn` en C coincide con R en bits, incluido el signo del cero, y por no depender de libm ni de
+   BLAS vale en **cualquier plataforma IEEE-754**: es la única pieza de `pymrcd` con esa propiedad (el resto
+   sigue limitado a la plataforma de referencia, punto 6). La compuerta desensambla el binario y exige cero
+   instrucciones FMA (`scripts/check_pymrcd_fma.sh`).
+
+**Punto 7 de la decisión original, acotado.** «Sin Numba/Cython» se mantiene; la **única excepción aprobada** es
+esta extensión C. Cualquier otro código compilado necesita su propia decisión.
+
+**Consecuencias.**
+- Instalar `pymrcd` exige un compilador; la imagen del Paso 4 deberá incluirlo o usar una *wheel* precompilada
+  por plataforma (pendiente de decisión).
+- Aparecen riesgos nuevos de código C (memoria, hilos). Mitigados con espacio de trabajo privado por hilo, una
+  sola escritura por salida y una comprobación defensiva; las pruebas con sanitizers en CI son **deuda**.
+- Defensa contra opciones de coma flotante peligrosas en `CFLAGS` externas (`-fno-signed-zeros`,
+  `-fassociative-math`, `-freciprocal-math`): depende de que `-fno-fast-math` quede al final (riesgo bajo).
+- Rendimiento medido: ver `docs/ESTADO.md` (M5). El objetivo de 10× con un hilo **no** se alcanzó (4.1×): exigiría
+  cambiar el algoritmo, que la especificación prohíbe.

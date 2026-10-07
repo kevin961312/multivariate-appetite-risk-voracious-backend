@@ -153,8 +153,13 @@ Compuerta local (= CI = pre-commit):
 scripts/gate.sh; echo "EXIT=$?"
 ```
 
-`scripts/gate.sh` corre todas las etapas (ruff, format, mypy, import-linter, pytest con cobertura ≥ 80 %)
-aunque falle alguna y deja cada salida en `.gates/<etapa>.log`; el `EXIT` final es 0 solo si todas pasan.
+`scripts/gate.sh` corre todas las etapas (`build-pymrcd`, `fma-pymrcd`, ruff, format, mypy, import-linter, pytest
+con cobertura ≥ 80 %, `mypy-pymrcd` y `pytest-pymrcd`) aunque falle alguna y deja cada salida en `.gates/<etapa>.log`; el `EXIT` final es 0 solo si todas pasan.
+Las dos primeras etapas compilan y comprueban la extensión C de `pymrcd` ([ADR 0006](docs/adr/0006-libreria-pymrcd.md),
+enmienda 2026-10-07): `build-pymrcd` (`uv sync --reinstall-package pymrcd`) y `fma-pymrcd`
+(`scripts/check_pymrcd_fma.sh`: cero instrucciones FMA en el binario); `mypy-pymrcd` cubre también `setup.py`.
+**Hace falta un compilador de C con pthreads** (Xcode Command Line Tools en macOS, `build-essential` en Linux).
+Variable de rendimiento `VORACIOUS_MRCD_THREADS` (hilos de `pymrcd`; vacío = no definida; no cambia resultados).
 Por clon hay que activar el hook: `git config core.hooksPath .githooks`. Siempre `uv run …` para ejecutar
 Python o herramientas sueltas (el `python` del PATH es de pyenv, no el del proyecto).
 

@@ -161,6 +161,11 @@ producción se configuren igual (plantilla en `.env.example`).
 | Variable | Valores | Default | Efecto |
 | --- | --- | --- | --- |
 | `VORACIOUS_LOG_LEVEL` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` | `INFO` | Nivel mínimo de los logs JSON (structlog). Un valor inválido falla al arrancar. |
+| `VORACIOUS_MRCD_THREADS` | entero ≥ 1, o vacío | vacío (= no definida) | Hilos de la extensión C de `pymrcd` por ajuste MRCD. Solo rendimiento: no cambia ningún resultado ni se guarda en las versiones de la carta ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07). Vacío: `pymrcd` usa `PYMRCD_NUM_THREADS` o todos los CPU visibles. **Existe en `Settings` pero aún no está cableada** en `container` (Paso 3). |
+
+**Sobresuscripción.** Cada ajuste MRCD usa hilos y el bootstrap puede repartir réplicas en procesos
+(`TaskMapper`): procesos × hilos no debe superar los núcleos. Con réplicas en procesos conviene fijar
+`VORACIOUS_MRCD_THREADS` (p. ej. núcleos ÷ procesos); con un solo proceso, dejarla vacía.
 
 ## Contrato de la API
 

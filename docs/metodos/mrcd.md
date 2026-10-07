@@ -65,10 +65,26 @@ Capa fina sobre `pymrcd`, para que ninguna carta dependa de la librería (ADR 00
   cada carta decide si las admite (T²MRCD las rechaza, ver [`t2mrcd.md`](t2mrcd.md)).
 - Los subconjuntos iniciales los calcula `pymrcd` (no se inyectan).
 
+## Extensión C de `Qn` y rendimiento (n_threads)
+
+`Qn` y los pares de OGK se calculan en C (`pymrcd._qn_ext`), por qué y con qué límites: [ADR 0006](../adr/0006-libreria-pymrcd.md),
+enmienda 2026-10-07. Es una optimización de la implementación, no del método: port literal de `qn0`
+(`robustbase` 0.99-6, `qn_sn.c:118-296`), `whimed_i` (`wgt_himed_templ.h:27-122`), `R_qsort`
+(`R` 4.5.2, `qsort.c:164-167` y `qsort-body.c:27-169`) y `rPsort` (`sort.c:724-727`), con la tabla original → port
+en [`mrcd-especificacion.md`](mrcd-especificacion.md) §3.12.9. Los pares de OGK siguen `detmrcd.R:87-97`
+(`rrcov` 1.7-7).
+
+- `Qn` es igual a R en bits, incluido el signo del cero, en cualquier plataforma IEEE-754 (sin libm ni BLAS).
+- Sin FMA (`-ffp-contract=off`); lo comprueba `scripts/check_pymrcd_fma.sh` en la compuerta.
+- **`n_threads`** (`fit_mrcd`, `MRCDEstimator`) es de **rendimiento**: no está en `MRCDParams`, no se persiste con la
+  versión de la carta y no cambia ningún bit. `None` deja decidir a `pymrcd` (`PYMRCD_NUM_THREADS` o los CPU
+  visibles). Origen en producción: `VORACIOUS_MRCD_THREADS` (cableado en `container` pendiente, Paso 3).
+- Sin respaldo en Python: sin la extensión compilada, `import pymrcd` falla.
+
 ## Pasos del algoritmo
 
 Ver [`mrcd-especificacion.md`](mrcd-especificacion.md) §3 (cada paso con su archivo:línea de `rrcov`) y §3.12
-(replicación bit a bit: BLAS, LAPACK, FMA, nmath).
+(replicación bit a bit: BLAS, LAPACK, FMA, nmath) y §3.12.9 (`Qn` en C).
 
 ## Tests golden
 
