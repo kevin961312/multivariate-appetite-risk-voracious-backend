@@ -4,8 +4,14 @@ Cada carta (``domain/charts/<carta>/``) lo implementa con su propia lógica esta
 ``application`` e ``infrastructure`` solo trabajan contra este ``Protocol``. Una carta no guarda
 estado entre llamadas: el modelo de Fase I es un valor que se persiste fuera del dominio, y la base
 de datos de cada versión también (``recalibrate`` la recibe de vuelta).
+
+Para que modelos, versiones y recalibraciones se puedan persistir sin guardar objetos invocables,
+cada carta codifica sus parámetros como **datos** (números, textos, booleanos, ``None`` y
+diccionarios, con cada estrategia por su nombre estable) y los decodifica antes de usarlos
+(mejora M1 del Paso 2b.2).
 """
 
+from collections.abc import Mapping
 from typing import Protocol, TypeVar
 
 from voracious.domain.common.parallel import TaskMapper
@@ -86,6 +92,66 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
 
         Raises:
             InvalidInputError: Si no son compatibles con el modelo.
+        """
+        ...
+
+    def encode_params(self, params: ParamsT_contra) -> dict[str, object]:
+        """Codifica los parámetros de la carta como datos serializables.
+
+        Args:
+            params: Parámetros de la carta.
+
+        Returns:
+            Diccionario con números, textos, booleanos, ``None`` y diccionarios.
+
+        Raises:
+            InvalidInputError: Si algún elemento no se puede codificar (p. ej. una estrategia sin
+                nombre registrado).
+        """
+        ...
+
+    def decode_params(self, data: Mapping[str, object]) -> object:
+        """Decodifica los parámetros de la carta (inversa de ``encode_params``).
+
+        Devuelve ``object`` porque ``ParamsT_contra`` es contravariante; el resultado solo se
+        usa para volver a llamar a la misma carta.
+
+        Args:
+            data: Parámetros codificados.
+
+        Returns:
+            Los parámetros de la carta.
+
+        Raises:
+            InvalidInputError: Si los datos no son válidos o nombran una estrategia desconocida.
+        """
+        ...
+
+    def encode_recalibration_params(self, params: RecalParamsT_contra) -> dict[str, object]:
+        """Codifica los parámetros de la recalibración como datos serializables.
+
+        Args:
+            params: Parámetros de la recalibración.
+
+        Returns:
+            Diccionario serializable.
+
+        Raises:
+            InvalidInputError: Si algún elemento no se puede codificar.
+        """
+        ...
+
+    def decode_recalibration_params(self, data: Mapping[str, object]) -> object:
+        """Decodifica los parámetros de la recalibración (inversa de la codificación).
+
+        Args:
+            data: Parámetros codificados.
+
+        Returns:
+            Los parámetros de la recalibración.
+
+        Raises:
+            InvalidInputError: Si los datos no son válidos o nombran una estrategia desconocida.
         """
         ...
 

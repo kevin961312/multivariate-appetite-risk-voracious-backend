@@ -1,17 +1,12 @@
-from dataclasses import dataclass, field, replace
+from collections.abc import Mapping
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pytest
 
-from support.memory import (
-    InMemoryModelRepository,
-    InMemoryMonitoringRepository,
-    RecordingJobQueue,
-    SequentialIds,
-    TickingClock,
-)
+from support.app import App
 from support.solo_test import fast_params, small_data
-from voracious.application.charts import AnyChart
 from voracious.application.errors import (
     ModelNotFoundError,
     ModelNotReadyError,
@@ -19,16 +14,9 @@ from voracious.application.errors import (
     UnknownChartError,
 )
 from voracious.application.ports import JobKind, JobRequest
-from voracious.application.records import JobStatus
-from voracious.application.use_cases import (
-    INTERNAL_ERROR,
-    GetModel,
-    GetMonitoring,
-    MonitorObservations,
-    RunMonitoringJob,
-    RunTrainingJob,
-    TrainModel,
-)
+from voracious.application.records import JobStatus, MonitoringSummary
+from voracious.application.use_cases import INTERNAL_ERROR
+from voracious.application.use_cases.training import initial_version
 from voracious.domain.charts.t2mrcd import (
     T2MRCD_DECISION_PENDING,
     T2MRCDBootstrap,
@@ -37,50 +25,15 @@ from voracious.domain.charts.t2mrcd import (
     T2MRCDMonitoring,
     T2MRCDParams,
 )
-from voracious.domain.common import InvalidInputError, SerialTaskMapper
+from voracious.domain.common import InvalidInputError, RowDisposition
 
 TENANT = "tenant-a"
 OTHER = "tenant-b"
+T0 = datetime(2026, 3, 1, tzinfo=UTC)
 
 
-@dataclass
-class App:
-    """Casos de uso cableados con dobles en memoria."""
-
-    charts: dict[str, AnyChart]
-    models: InMemoryModelRepository = field(default_factory=InMemoryModelRepository)
-    monitorings: InMemoryMonitoringRepository = field(default_factory=InMemoryMonitoringRepository)
-    queue: RecordingJobQueue = field(default_factory=RecordingJobQueue)
-    ids: SequentialIds = field(default_factory=SequentialIds)
-    clock: TickingClock = field(default_factory=TickingClock)
-
-    def train(self) -> TrainModel:
-        return TrainModel(self.charts, self.models, self.queue, self.ids, self.clock)
-
-    def get_model(self) -> GetModel:
-        return GetModel(self.charts, self.models)
-
-    def run_training(self) -> RunTrainingJob:
-        return RunTrainingJob(self.charts, self.models, SerialTaskMapper(), self.clock)
-
-    def monitor(self) -> MonitorObservations:
-        return MonitorObservations(
-            self.charts, self.models, self.monitorings, self.queue, self.ids, self.clock
-        )
-
-    def get_monitoring(self) -> GetMonitoring:
-        return GetMonitoring(self.charts, self.monitorings)
-
-    def run_monitoring(self) -> RunMonitoringJob:
-        return RunMonitoringJob(self.charts, self.models, self.monitorings, self.clock)
-
-    def run_all(self) -> None:
-        while self.queue.jobs:
-            job = self.queue.jobs.pop(0)
-            if job.kind is JobKind.TRAIN:
-                self.run_training().execute(job)
-            else:
-                self.run_monitoring().execute(job)
+def _dates(m: int, start: datetime = T0) -> list[datetime]:
+    return [start + timedelta(hours=i) for i in range(m)]
 
 
 def _t2mrcd_app() -> App:
@@ -99,6 +52,12 @@ class _BoomChart:
     @property
     def chart_id(self) -> str:
         return "boom"
+
+    def encode_params(self, params: object) -> dict[str, object]:
+        return {}
+
+    def decode_params(self, data: Mapping[str, object]) -> object:
+        return data
 
     def fit_phase1(self, x: object, params: object, *, mapper: object) -> object:
         raise RuntimeError("fallo inesperado con traza")
@@ -128,15 +87,28 @@ def test_full_phase1_and_phase2_with_real_t2mrcd() -> None:
 
     x_new = small_data(6, 4, seed=50)
     x_new[2] += 10.0
-    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, x_new.tolist())
+    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, x_new.tolist(), _dates(6))
     queued = app.get_monitoring().execute(TENANT, "t2mrcd", model_id, monitoring_id)
     assert queued.status is JobStatus.QUEUED
     app.run_all()
     done = app.get_monitoring().execute(TENANT, "t2mrcd", model_id, monitoring_id)
     assert done.status is JobStatus.SUCCEEDED
-    assert isinstance(done.result, T2MRCDMonitoring)
-    assert done.result.signal[2]
-    assert done.result.limit == record.model.operative_limit == record.model.limits.phase1_limit
+    assert isinstance(done.result, MonitoringSummary)
+    assert done.result.version_numbers == (0,) * 6
+    observations = [
+        app.observations.get(TENANT, "t2mrcd", model_id, i) for i in done.result.observation_ids
+    ]
+    assert all(o is not None for o in observations)
+    third = observations[2]
+    assert third is not None
+    assert third.signal
+    assert done.result.n_signals >= 1
+    assert third.limit == record.model.operative_limit == record.model.limits.phase1_limit
+    assert third.limit_kind == "phase1_provisional"
+    assert third.observed_at == T0 + timedelta(hours=2)
+    direct = T2MRCDChart().score_phase2(record.model, x_new)
+    assert isinstance(direct, T2MRCDMonitoring)
+    assert [o.t2 for o in observations if o is not None] == direct.t2.tolist()
     assert [r.status for r in app.monitorings.history] == [
         JobStatus.QUEUED,
         JobStatus.RUNNING,
@@ -164,8 +136,8 @@ def test_tenant_isolation() -> None:
     with pytest.raises(ModelNotFoundError):
         app.get_model().execute(OTHER, "t2mrcd", model_id)
     with pytest.raises(ModelNotFoundError):
-        app.monitor().execute(OTHER, "t2mrcd", model_id, small_data(2, 4).tolist())
-    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4))
+        app.monitor().execute(OTHER, "t2mrcd", model_id, small_data(2, 4).tolist(), _dates(2))
+    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     with pytest.raises(MonitoringNotFoundError):
         app.get_monitoring().execute(OTHER, "t2mrcd", model_id, monitoring_id)
     with pytest.raises(MonitoringNotFoundError):
@@ -196,7 +168,7 @@ def test_monitoring_requires_succeeded_model() -> None:
     app = _t2mrcd_app()
     model_id = app.train().execute(TENANT, "t2mrcd", small_data(), fast_params())
     with pytest.raises(ModelNotReadyError) as info:
-        app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4))
+        app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     assert info.value.code == "MODEL_NOT_READY"
     assert info.value.details == {"model_id": model_id, "status": "queued"}
 
@@ -207,17 +179,17 @@ def test_failed_model_is_not_ready() -> None:
     model_id = app.train().execute(TENANT, "t2mrcd", small_data(), params)
     app.run_all()
     with pytest.raises(ModelNotReadyError):
-        app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4))
+        app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
 
 
 def test_phase2_input_is_validated_before_enqueue() -> None:
     app = _t2mrcd_app()
     model_id = _trained(app)
     with pytest.raises(InvalidInputError) as info:
-        app.monitor().execute(TENANT, "t2mrcd", model_id, np.zeros((3, 5)))
+        app.monitor().execute(TENANT, "t2mrcd", model_id, np.zeros((3, 5)), _dates(3))
     assert info.value.details["expected_features"] == 4
     with pytest.raises(InvalidInputError):
-        app.monitor().execute(TENANT, "t2mrcd", model_id, [1.0, 2.0, 3.0, 4.0])
+        app.monitor().execute(TENANT, "t2mrcd", model_id, [1.0, 2.0, 3.0, 4.0], _dates(1))
     assert app.queue.jobs == []
     assert app.monitorings.records == {}
 
@@ -248,7 +220,7 @@ def test_unexpected_phase2_error_is_internal_error_and_reraised() -> None:
     model_id = app.train().execute(TENANT, "boom", small_data(), object())
     key = (TENANT, "boom", model_id)
     app.models.records[key] = _succeeded(app, key)
-    monitoring_id = app.monitor().execute(TENANT, "boom", model_id, small_data(2, 4))
+    monitoring_id = app.monitor().execute(TENANT, "boom", model_id, small_data(2, 4), _dates(2))
     job = app.queue.jobs.pop()
     with pytest.raises(RuntimeError):
         app.run_monitoring().execute(job)
@@ -258,8 +230,15 @@ def test_unexpected_phase2_error_is_internal_error_and_reraised() -> None:
     assert record.error.code == INTERNAL_ERROR
 
 
+class _FakeModel:
+    base_mask = np.ones(40, dtype=np.bool_)
+    row_disposition = (RowDisposition.KEPT,) * 40
+
+
 def _succeeded(app: App, key: tuple[str, str, str]) -> object:
-    return replace(app.models.records[key], status=JobStatus.SUCCEEDED, model=object())
+    record = replace(app.models.records[key], status=JobStatus.SUCCEEDED, model=_FakeModel())
+    app.versions.add(initial_version(record, record.model, app.clock.now()))
+    return record
 
 
 def test_jobs_are_idempotent() -> None:
@@ -270,7 +249,7 @@ def test_jobs_are_idempotent() -> None:
     before = len(app.models.history)
     app.run_training().execute(job)
     assert len(app.models.history) == before
-    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4))
+    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     mjob = app.queue.jobs[0]
     app.run_all()
     before = len(app.monitorings.history)
@@ -284,7 +263,7 @@ def test_jobs_are_idempotent() -> None:
 def test_monitoring_fails_if_model_disappears() -> None:
     app = _t2mrcd_app()
     model_id = _trained(app)
-    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4))
+    monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     del app.models.records[(TENANT, "t2mrcd", model_id)]
     app.run_all()
     record = app.get_monitoring().execute(TENANT, "t2mrcd", model_id, monitoring_id)

@@ -63,6 +63,15 @@ from voracious.domain.charts.t2mrcd.phase2_limit import (
     ReplicateSampler,
     bootstrap_oob_sampler,
 )
+from voracious.domain.charts.t2mrcd.registry import (
+    BEST_SUBSET_CRITERION_NAME,
+    DEFAULT_STRATEGIES,
+    T2MRCDStrategies,
+    decode_params,
+    decode_recalibration_params,
+    encode_params,
+    encode_recalibration_params,
+)
 from voracious.domain.charts.t2mrcd.revalidation import (
     DEFAULT_MIN_OBSERVATIONS,
     DEFAULT_RELATIVE_CHANGE_THRESHOLD,
@@ -85,6 +94,7 @@ from voracious.domain.charts.t2mrcd.statistic import t2
 
 __all__ = [
     "BASE_CONSISTENCY_RTOL",
+    "BEST_SUBSET_CRITERION_NAME",
     "BOOTSTRAP_LIMIT_NOT_FINITE",
     "BOOTSTRAP_OOB_EMPTY",
     "BOOTSTRAP_REPLICATE_FAILED",
@@ -95,6 +105,7 @@ __all__ = [
     "DEFAULT_N_REPLICATES",
     "DEFAULT_PHASE2_ALPHA_LIMIT",
     "DEFAULT_RELATIVE_CHANGE_THRESHOLD",
+    "DEFAULT_STRATEGIES",
     "MC_ERROR_RESAMPLES",
     "QUANTILE_METHOD",
     "SLOT_COVARIANCE_TEST",
@@ -137,13 +148,18 @@ __all__ = [
     "T2MRCDParams",
     "T2MRCDRecalibrationParams",
     "T2MRCDRecalibrationReport",
+    "T2MRCDStrategies",
     "any_formal_test_change",
     "best_subset_criterion",
     "bootstrap_oob_sampler",
     "calibrate_limits",
     "compare_bases",
     "decide",
+    "decode_params",
+    "decode_recalibration_params",
     "depurate",
+    "encode_params",
+    "encode_recalibration_params",
     "fit_stage",
     "frobenius_relative_change",
     "pooled_quantile",

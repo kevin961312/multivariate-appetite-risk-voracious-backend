@@ -13,7 +13,8 @@ Límite operativo (Q2): la versión inicial vigila con ``phase1_limit`` de forma
 """
 
 import dataclasses
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from functools import partial
 from typing import TYPE_CHECKING, Final
 
@@ -29,6 +30,14 @@ from voracious.domain.charts.t2mrcd.phase1 import (
     T2MRCD_NO_CLEAN_OBSERVATIONS,
     Phase1Stage,
     fit_stage,
+)
+from voracious.domain.charts.t2mrcd.registry import (
+    DEFAULT_STRATEGIES,
+    T2MRCDStrategies,
+    decode_params,
+    decode_recalibration_params,
+    encode_params,
+    encode_recalibration_params,
 )
 from voracious.domain.charts.t2mrcd.revalidation import (
     LimitsSnapshot,
@@ -220,14 +229,73 @@ class T2MRCDChart:
         statistic_reference: Cita del artículo que define la estadística T² de la carta (P6).
             Por defecto ``STATISTIC_REFERENCE`` (artículo en proceso de publicación); se
             actualiza con la cita final cuando se publique.
+        strategies: Registro ``nombre → estrategia`` con el que se codifican y decodifican los
+            parámetros (M1). Por defecto, solo las estrategias de producción decididas.
     """
 
     statistic_reference: str = STATISTIC_REFERENCE
+    strategies: T2MRCDStrategies = field(default=DEFAULT_STRATEGIES, compare=False)
 
     @property
     def chart_id(self) -> str:
         """Identificador de la carta: ``"t2mrcd"``."""
         return CHART_ID
+
+    def encode_params(self, params: T2MRCDParams) -> dict[str, object]:
+        """Codifica los parámetros con las estrategias por nombre (M1).
+
+        Args:
+            params: Parámetros de la carta.
+
+        Returns:
+            Diccionario serializable.
+
+        Raises:
+            InvalidInputError: Si una estrategia no está en ``strategies``.
+        """
+        return encode_params(params, self.strategies)
+
+    def decode_params(self, data: Mapping[str, object]) -> T2MRCDParams:
+        """Decodifica los parámetros (inversa de ``encode_params``).
+
+        Args:
+            data: Parámetros codificados.
+
+        Returns:
+            Los parámetros.
+
+        Raises:
+            InvalidInputError: Datos inválidos o estrategia desconocida.
+        """
+        return decode_params(data, self.strategies)
+
+    def encode_recalibration_params(self, params: T2MRCDRecalibrationParams) -> dict[str, object]:
+        """Codifica los parámetros de la recalibración con las estrategias por nombre (M1).
+
+        Args:
+            params: Parámetros de la recalibración.
+
+        Returns:
+            Diccionario serializable.
+
+        Raises:
+            InvalidInputError: Si una estrategia no está en ``strategies``.
+        """
+        return encode_recalibration_params(params, self.strategies)
+
+    def decode_recalibration_params(self, data: Mapping[str, object]) -> T2MRCDRecalibrationParams:
+        """Decodifica los parámetros de la recalibración.
+
+        Args:
+            data: Parámetros codificados.
+
+        Returns:
+            Los parámetros de la recalibración.
+
+        Raises:
+            InvalidInputError: Datos inválidos o estrategia desconocida.
+        """
+        return decode_recalibration_params(data, self.strategies)
 
     def pending_decisions(self, params: T2MRCDParams) -> list[str]:
         """Elementos estadísticos de la Fase I sin decidir, en orden estable.
