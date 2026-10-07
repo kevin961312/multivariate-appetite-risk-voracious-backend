@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Hook pre-commit: ejecuta la compuerta completa. Si falla, el detalle está en .gates/<etapa>.log.
+echo "pre-commit: corriendo scripts/gate.sh (logs en .gates/)"
+exec scripts/gate.sh
