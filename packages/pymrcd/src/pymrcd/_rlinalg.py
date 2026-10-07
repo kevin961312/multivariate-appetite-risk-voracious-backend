@@ -19,7 +19,7 @@ from scipy.linalg import blas, lapack
 
 from pymrcd._errors import RError
 from pymrcd._fma import fma_array
-from pymrcd._rbase import r_rowsums
+from pymrcd._rbase import r_order, r_rowsums, seqsum
 from pymrcd._rlapack import dgetrf, dpotrf_upper, dpotri_upper
 from pymrcd._types import FloatArray
 
@@ -31,6 +31,8 @@ __all__ = [
     "r_det",
     "r_determinant",
     "r_eigen_sym",
+    "r_eigen_values",
+    "r_is_symmetric",
     "r_mahalanobis_d",
     "r_mahalanobis_inverted",
     "r_matprod",
@@ -241,6 +243,17 @@ def r_eigen_sym(x: FloatArray) -> EigenResult:
     previa).
     Especificación §3.12.6, trampas T13 y T22. Solo lee el triángulo inferior, como R.
 
+    Divergencia aceptada (decisión del dueño, 2026-10-06): en el oráculo, ``eigen`` llama al
+    ``dsyevr`` de **Rlapack 3.12.1** (Fortran de referencia compilado con R), mientras que
+    ``scipy.linalg.lapack.dsyevr`` usa el LAPACK de **Accelerate** (vecLib), con otra
+    implementación de ``dsytrd``/``dstemr`` y otro bloqueo. Con la misma llamada y los mismos
+    argumentos, los autovalores difieren en 1-4 ulp y los autovectores en unos ulp y, a veces,
+    en el **signo** de una columna. No es bit a bit ni siquiera en la plataforma de referencia:
+    rigen las tolerancias clase B de la especificación §11 (autovalores ``atol = 10·p·eps·λmax``;
+    autovectores módulo signo en autoespacios con gap relativo > 1e-8). Consecuencias aguas abajo
+    (``initset`` vía Qn, trampa T3; ``e1``/``ep`` de la selección de ``rho``) se documentan en los
+    tests de extremo a extremo.
+
     Args:
         x: Matriz cuadrada ``p x p``.
 
@@ -275,6 +288,115 @@ def r_eigen_sym(x: FloatArray) -> EigenResult:
     values = np.asarray(w, dtype=np.float64)[::-1].copy()
     vectors = np.asarray(z, dtype=np.float64)[:, ::-1].copy()
     return EigenResult(values=values, vectors=vectors)
+
+
+def _all_equal_numeric(target: FloatArray, current: FloatArray, tolerance: float) -> bool:
+    """``isTRUE(all.equal.numeric(target, current, tolerance))`` para vectores finitos.
+
+    Fuente: ``R-4.5.2/src/library/base/R/all.equal.R:99-174``: se descartan las posiciones con
+    ``target == current`` (``:134-145``); ``scale = sum(abs(target)/N)`` (``:149``, ``sum`` de R
+    secuencial con ``LDOUBLE = double``); si ``scale`` es finita y ``> tolerance`` la diferencia es
+    relativa, si no absoluta (``:150-155``); ``xy = sum(abs(target - current)/(N*scale))``
+    (``:161``); ``TRUE`` si ``xy <= tolerance`` (``:164-165``).
+
+    Args:
+        target: Vector.
+        current: Vector de la misma longitud.
+        tolerance: Tolerancia.
+
+    Returns:
+        ``True`` si R los considera iguales.
+    """
+    t = np.asarray(target, dtype=np.float64).ravel()
+    c = np.asarray(current, dtype=np.float64).ravel()
+    out = (t == c) | (np.isnan(t) & np.isnan(c))
+    if bool(out.all()):
+        return True
+    keep = ~out
+    tk = t[keep]
+    ck = c[keep]
+    n_keep = float(tk.shape[0])
+    scale = seqsum(np.abs(tk) / n_keep)
+    if not (math.isfinite(scale) and scale > tolerance):
+        scale = 1.0
+    xy = seqsum(np.abs(tk - ck) / (n_keep * scale))
+    return not (math.isnan(xy) or xy > tolerance)
+
+
+def r_is_symmetric(x: FloatArray) -> bool:
+    """``isSymmetric.matrix(x)`` de R para una matriz real.
+
+    Fuente: ``R-4.5.2/src/library/base/R/eigen.R:22-43``: ``tol = 100*eps``, ``tol1 = 8*tol``;
+    pre-pruebas con las filas/columnas ``unique(c(1, 2, n-1, n))`` (``:31-35``) y después
+    ``all.equal(x, t(x), tolerance = tol)`` en orden de columna (``:37-41``).
+
+    Args:
+        x: Matriz.
+
+    Returns:
+        ``True`` si R la trata como simétrica.
+    """
+    a = np.asarray(x, dtype=np.float64)
+    if a.ndim != 2 or a.shape[0] != a.shape[1]:
+        return False
+    n = a.shape[0]
+    eps = float(np.finfo(np.float64).eps)
+    tol = 100 * eps
+    tol1 = 8 * tol
+    if n > 1:
+        for i in dict.fromkeys((1, 2, n - 1, n)):
+            if not _all_equal_numeric(a[i - 1, :], a[:, i - 1], tol1):
+                return False
+    return _all_equal_numeric(a.ravel(order="F"), a.T.ravel(order="F"), tol)
+
+
+def r_eigen_values(x: FloatArray) -> FloatArray:
+    """``eigen(x)$values`` de R **sin** ``symmetric=`` (rama automática, trampa T13).
+
+    Fuente: ``R-4.5.2/src/library/base/R/eigen.R:45-74``: ``symmetric = isSymmetric.matrix(x)``
+    (``:57``); si es simétrica, ``La_rs`` con vectores (``only.values = FALSE``; ``dsyevr`` con
+    ``jobz='V'``, ``Lapack.c:166-237``) y orden decreciente (``:60-62``); si no, ``La_rg``
+    (``dgeev`` con ``jobVR='V'``, ``Lapack.c:263-336``) y orden por ``Mod`` decreciente
+    (``:63-66``). Si ``La_rg`` devuelve valores complejos (``|wI| > 10·eps·|wR|``,
+    ``Lapack.c:309-315``), ``rrcov`` fallaría después en ``min()`` (``detmrcd.R:474``): se lanza
+    el error equivalente. Usado en ``rrcov-1.7-7/R/detmrcd.R:473``. Hereda la divergencia de
+    LAPACK documentada en ``r_eigen_sym`` (clase B).
+
+    **D9 se extiende a ``dgeev``** (especificación §11, decisión D9 de 2026-10-06): la rama
+    ``La_rg`` usa el ``dgeev`` de Accelerate (``scipy.linalg.lapack``), no el de Rlapack 3.12.1, y
+    sus autovalores se aceptan con la misma tolerancia B que ``dsyevr``. La rama es casi
+    inalcanzable en ``.detmrcd``: requiere que ``scfac * mS`` (producto ``dgemm`` de ``mE`` por su
+    traspuesta) **falle** ``isSymmetric`` (tolerancia ``100·eps``), cosa que no ocurre en ningún
+    caso golden (trampa T13).
+
+    Args:
+        x: Matriz cuadrada.
+
+    Returns:
+        Autovalores reales en el orden de R.
+
+    Raises:
+        RError: si ``eigen`` falla o los autovalores son complejos.
+    """
+    a = np.asarray(x, dtype=np.float64)
+    if a.ndim != 2 or a.shape[0] != a.shape[1]:
+        raise RError("non-square matrix in 'eigen'")
+    if a.shape[0] == 0:
+        raise RError("0 x 0 matrix")
+    if not np.isfinite(a).all():
+        raise RError("infinite or missing values in 'x'")
+    if r_is_symmetric(a):
+        return r_eigen_sym(a).values
+    wr, wi, _vl, _vr, info = lapack.dgeev(_fortran(a), compute_vl=0, compute_vr=1)
+    if info != 0:
+        raise RError(f"error code {info} from Lapack routine 'dgeev'")
+    w_r = np.asarray(wr, dtype=np.float64)
+    w_i = np.asarray(wi, dtype=np.float64)
+    eps = float(np.finfo(np.float64).eps)
+    if bool((np.abs(w_i) > 10 * eps * np.abs(w_r)).any()):
+        raise RError("invalid 'type' (complex) of argument")
+    # sort.list(Mod(values), decreasing=TRUE): radix estable sobre -|w|.
+    return np.asarray(w_r[r_order(-np.abs(w_r))], dtype=np.float64)
 
 
 def r_chol(x: FloatArray) -> FloatArray:

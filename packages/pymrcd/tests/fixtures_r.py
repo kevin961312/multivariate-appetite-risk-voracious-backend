@@ -26,6 +26,7 @@ import numpy.typing as npt
 import pytest
 
 FloatArray = npt.NDArray[np.float64]
+IntArray = npt.NDArray[np.int64]
 
 FIXTURES = Path(__file__).parent / "golden" / "fixtures"
 PRIMITIVAS = FIXTURES / "primitivas"
@@ -39,13 +40,9 @@ EPS = float(np.finfo(np.float64).eps)
 TOL_OFF_PLATFORM: dict[str, tuple[float, float]] = {
     "E": (0.0, 0.0),  # exacto en cualquier plataforma
     "L": (1e-15, 0.0),  # libm: rtol 1e-15
-    "scfac": (1e-14, 0.0),  # .MCDcons vía scipy
+    "scfac": (1e-14, 0.0),  # .MCDcons (nmath portado; fuera de la referencia, §11)
     "B": (1e-12, 1e-14),  # BLAS/LAPACK: rtol 1e-12, atol 1e-14·max|ref|
 }
-
-TOL_SCFAC_ALWAYS = 1e-14
-"""``.MCDcons`` vía scipy (decisión P3): rtol 1e-14 también en la plataforma de referencia (§3.6,
-S5)."""
 
 
 def read_csv_gz(path: Path) -> FloatArray:
@@ -60,6 +57,78 @@ def read_csv_gz(path: Path) -> FloatArray:
     with gzip.open(path, "rt", encoding="ascii") as fh:
         rows = [[float(tok) for tok in line.split(",")] for line in fh.read().splitlines() if line]
     return np.array(rows, dtype=np.float64)
+
+
+class Inter:
+    """Intermedios de ``.detmrcd`` de un caso golden, con *skip* explícito si falta alguno.
+
+    Los intermedios pesados de los casos grandes no se versionan (``golden/fixtures/README.md``):
+    si faltan, el test se salta con el motivo «intermedio no versionado; regenerar con tools/r/».
+    """
+
+    def __init__(self, case: str) -> None:
+        self.case = case
+        self.root = FIXTURES / case
+        self.folder = self.root / "intermedios"
+        self.index: dict[str, Any] = json.loads(
+            (self.folder / "indice.json").read_text(encoding="utf-8")
+        )
+        self.manifest: dict[str, Any] = json.loads((self.root / "manifest.json").read_text("utf-8"))
+
+    def has(self, name: str) -> bool:
+        """``True`` si el intermedio está exportado y presente en disco."""
+        meta = self.index.get(name)
+        return meta is not None and (self.folder / str(meta["archivo"])).exists()
+
+    def get(self, name: str) -> FloatArray:
+        """Lee un intermedio con su forma declarada (o salta el test con el motivo)."""
+        meta = self.index.get(name)
+        if meta is None:
+            pytest.skip(f"{self.case}: intermedio {name} no exportado para este caso")
+        path: Path = self.folder / str(meta["archivo"])
+        if not path.exists():
+            pytest.skip(f"{self.case}: intermedio {name} no versionado; regenerar con tools/r/")
+        return read_csv_gz(path).reshape(tuple(int(v) for v in meta["forma"]))
+
+    def scalar(self, name: str) -> float:
+        """Intermedio escalar."""
+        return float(self.get(name).item())
+
+    def ints(self, name: str) -> IntArray:
+        """Intermedio entero como vector ``int64`` (base de R)."""
+        return np.asarray(self.get(name).ravel(), dtype=np.int64)
+
+    def output(self, name: str) -> FloatArray:
+        """Salida final del caso (``<caso>/<name>.csv.gz``)."""
+        return read_csv_gz(self.root / f"{name}.csv.gz")
+
+    def input_x(self) -> FloatArray:
+        """Datos de entrada ``x`` (ruta del manifiesto)."""
+        return read_csv_gz(self.root / str(self.manifest["entrada"]["archivo"]))
+
+    @property
+    def equicorrelation(self) -> bool:
+        """``True`` si el caso usa ``target = "equicorrelation"``."""
+        return str(self.manifest.get("variante_target")) == "equicorrelation"
+
+    @property
+    def target(self) -> str:
+        """``target`` del caso."""
+        return "equicorrelation" if self.equicorrelation else "identity"
+
+    def r6_input(self) -> FloatArray:
+        """Entrada de ``r6pack`` (``mW`` con equicorrelación, ``mU`` con identidad)."""
+        return self.get("eq_mW") if self.equicorrelation else self.get("std_mU")
+
+    def mx(self) -> FloatArray:
+        """``mX`` (``p x n``) estandarizada y rotada (``detmrcd.R:422``, ``:433``)."""
+        return np.array(self.r6_input().T, dtype=np.float64)
+
+
+INTER_CASES = sorted(
+    p.parent.parent.name for p in FIXTURES.glob("*/intermedios/indice.json") if p.is_file()
+)
+"""Casos golden con intermedios exportados."""
 
 
 @dataclass(frozen=True)

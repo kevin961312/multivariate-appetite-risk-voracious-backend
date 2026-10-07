@@ -7,20 +7,16 @@ explícito (nunca falla en silencio).
 
 from __future__ import annotations
 
-import json
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from fixtures_r import (
     EPS,
-    FIXTURES,
-    TOL_SCFAC_ALWAYS,
-    FloatArray,
+    INTER_CASES,
+    Inter,
     assert_r_equal,
-    read_csv_gz,
 )
 from pymrcd import _rbase as rb
 from pymrcd._rlinalg import r_crossprod, r_eigen_sym, r_scale
@@ -30,35 +26,7 @@ from pymrcd.scaling import do_scale
 
 MINSCALE = 0.001  # detmrcd.R:27
 
-CASES = sorted(
-    p.parent.parent.name for p in FIXTURES.glob("*/intermedios/indice.json") if p.is_file()
-)
-
-
-class Inter:
-    """Acceso a los intermedios de un caso, con *skip* explícito si falta alguno."""
-
-    def __init__(self, case: str) -> None:
-        self.case = case
-        self.folder = FIXTURES / case / "intermedios"
-        self.index = json.loads((self.folder / "indice.json").read_text(encoding="utf-8"))
-        self.manifest = json.loads((FIXTURES / case / "manifest.json").read_text("utf-8"))
-
-    def get(self, name: str) -> FloatArray:
-        meta = self.index.get(name)
-        if meta is None:
-            pytest.skip(f"{self.case}: intermedio {name} no exportado para este caso")
-        path: Path = self.folder / str(meta["archivo"])
-        if not path.exists():
-            pytest.skip(f"{self.case}: intermedio {name} no versionado; regenerar con tools/r/")
-        return read_csv_gz(path).reshape(tuple(int(v) for v in meta["forma"]))
-
-    @property
-    def equicorrelation(self) -> bool:
-        return str(self.manifest.get("variante_target")) == "equicorrelation"
-
-    def r6_input(self) -> FloatArray:
-        return self.get("eq_mW") if self.equicorrelation else self.get("std_mU")
+CASES = INTER_CASES
 
 
 @pytest.fixture(params=CASES)
@@ -152,4 +120,4 @@ def test_consistency_factor(inter: Inter) -> None:
     p = int(inter.get("pre_p").item())
     h = int(inter.get("pre_h").item())
     got = mcd_cons(p, h / n)  # detmrcd.R:460
-    np.testing.assert_allclose(got, inter.get("scfac").item(), rtol=TOL_SCFAC_ALWAYS, atol=0)
+    assert_r_equal(got, inter.get("scfac").item(), "scfac", "scfac")  # nmath portado: bit a bit

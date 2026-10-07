@@ -8,7 +8,7 @@ import math
 import numpy as np
 import pytest
 
-from fixtures_r import EPS, REFERENCE_PLATFORM, Case, assert_r_equal, case_params
+from fixtures_r import EPS, Case, assert_r_equal, case_params
 from pymrcd import _rlapack
 from pymrcd._errors import RError
 from pymrcd._rbase import r_pow
@@ -84,21 +84,21 @@ def test_determinant(case: Case) -> None:
     det = r_det(a)
     assert_r_equal(det, case.outputs["det"].item(), "B", case.id)
     p = a.shape[0]
-    # El fixture "general" (signo negativo) exporta abs(det)^(1/7)
-    # (tools/r/exportar_primitivas.R:322).
-    base = abs(det) if case.id == "general" else det
-    assert_r_equal(r_pow(base, 1 / p), case.outputs["obj"].item(), "B", case.id)
+    # obj = det(A)^(1/p) (detmrcd.R:409-413, objective='geom'); con det < 0 R da NaN.
+    assert_r_equal(r_pow(det, 1 / p), case.outputs["obj"].item(), "B", case.id)
 
 
 # ----------------------------------------------------------------------------- eigen (LAPACK de
-# Accelerate)
+# Accelerate). Decisión del dueño: se acepta la divergencia con Rlapack (1-4 ulp en autovalores,
+# signo de autovectores) con tolerancias clase B (especificación §11); no hay test bit a bit.
 
 _EIGEN_CASES = case_params("eigen_sym") + case_params("eigen_auto")
 
 
 def _eigen_input(case: Case) -> np.ndarray:
-    # eigen_auto exporta S y calcula eigen(1.3 * S) (tools/r/exportar_primitivas.R:358).
-    return 1.3 * case.inputs["A"] if case.func == "eigen_auto" else case.inputs["A"]
+    # eigen_auto exporta A = 1.3 * S calculada en R: la matriz exacta que recibe eigen()
+    # (tools/r/exportar_primitivas.R).
+    return case.inputs["A"]
 
 
 @pytest.mark.parametrize("case", _EIGEN_CASES)
@@ -122,22 +122,6 @@ def test_eigen_declared_tolerance(case: Case) -> None:
         s = 1.0 if float(v @ vr) >= 0 else -1.0
         tol = 10 * p * EPS * lam_max / gap
         assert np.max(np.abs(s * v - vr)) <= tol, f"{case.id}: vector {i}"
-
-
-@pytest.mark.skipif(not REFERENCE_PLATFORM, reason="bit a bit solo en la plataforma de referencia")
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "Divergencia documentada: R usa dsyevr de Rlapack 3.12.1 (referencia) y scipy el "
-        "dsyevr del LAPACK de Accelerate; difieren en 1-4 ulp en autovalores y en el signo de "
-        "autovectores (T3). Pendiente de decisión del dueño."
-    ),
-)
-@pytest.mark.parametrize("case", _EIGEN_CASES)
-def test_eigen_bitwise(case: Case) -> None:
-    res = r_eigen_sym(_eigen_input(case))
-    assert_r_equal(res.values, case.outputs["valores"].ravel(), "B", case.id)
-    assert_r_equal(res.vectors, case.outputs["vectores"], "B", case.id)
 
 
 # ----------------------------------------------------------------------------- casos límite
