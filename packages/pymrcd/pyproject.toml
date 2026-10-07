@@ -1,0 +1,50 @@
+[project]
+name = "pymrcd"
+version = "0.1.0"
+description = "Port a Python de rrcov::CovMrcd (MRCD, Boudt et al. 2020), fiel a rrcov 1.7-7."
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.5.3",
+    "scipy>=1.18.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pymrcd"]
+
+# --- mypy ------------------------------------------------------------------
+# Propio de pymrcd: sin plugin de pydantic (pymrcd no depende de pydantic).
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+warn_unreachable = true
+
+# --- pytest ----------------------------------------------------------------
+# La compuerta lo usa con `-c packages/pymrcd/pyproject.toml` para no heredar la config de la raíz.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
+xfail_strict = true
+
+# --- coverage --------------------------------------------------------------
+[tool.coverage.run]
+source = ["pymrcd"]
+branch = true
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:"]
+show_missing = true
+
+# scipy no publica anotaciones de tipos (sin scipy-stubs en el entorno): sus resultados se convierten
+# siempre con np.asarray(..., dtype=np.float64) en la frontera.
+[[tool.mypy.overrides]]
+module = ["scipy", "scipy.*"]
+ignore_missing_imports = true

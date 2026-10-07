@@ -2,6 +2,12 @@ version = 1
 revision = 5
 requires-python = "==3.12.*"
 
+[manifest]
+members = [
+    "pymrcd",
+    "voracious",
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.5"
@@ -440,6 +446,21 @@ wheels = [
 ]
 
 [[package]]
+name = "pymrcd"
+version = "0.1.0"
+source = { editable = "packages/pymrcd" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.5.3" },
+    { name = "scipy", specifier = ">=1.18.1" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -612,6 +633,7 @@ dev = [
     { name = "httpx" },
     { name = "import-linter" },
     { name = "mypy" },
+    { name = "pymrcd" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
@@ -633,6 +655,7 @@ dev = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "import-linter", specifier = ">=2.15" },
     { name = "mypy", specifier = ">=2.4.0" },
+    { name = "pymrcd", editable = "packages/pymrcd" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.16.10" },

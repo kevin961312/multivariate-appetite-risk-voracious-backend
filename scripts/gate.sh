@@ -24,5 +24,11 @@ run_stage format uv run ruff format --check .
 run_stage mypy uv run mypy src
 run_stage imports uv run lint-imports
 run_stage pytest uv run pytest --cov=voracious --cov-fail-under=80
+# pymrcd (ADR 0006): config propia de mypy, pytest y coverage en packages/pymrcd/pyproject.toml.
+run_stage mypy-pymrcd uv run mypy --config-file packages/pymrcd/pyproject.toml packages/pymrcd/src
+run_stage pytest-pymrcd env COVERAGE_FILE=.coverage.pymrcd uv run pytest \
+    -c packages/pymrcd/pyproject.toml --rootdir packages/pymrcd \
+    --cov=pymrcd --cov-config=packages/pymrcd/pyproject.toml --cov-fail-under=90 \
+    packages/pymrcd/tests
 
 exit "${failed}"

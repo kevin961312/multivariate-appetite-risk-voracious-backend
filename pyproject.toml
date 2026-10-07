@@ -26,16 +26,26 @@ dev = [
     "httpx>=0.28.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
+    "pymrcd",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
 ]
 
+# --- workspace de uv ------------------------------------------------------
+# pymrcd: librería del port MRCD (ADR 0006). Por ahora solo en el grupo dev; entra en
+# [project].dependencies en el Paso 2.
+[tool.uv.workspace]
+members = ["packages/pymrcd"]
+
+[tool.uv.sources]
+pymrcd = { workspace = true }
+
 # --- ruff ------------------------------------------------------------------
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "packages/pymrcd/src", "packages/pymrcd/tests"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "N", "D", "ANN", "S", "RUF", "PT", "C4", "TID"]
@@ -47,6 +57,7 @@ convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "D", "PLR2004"]
+"packages/pymrcd/tests/**" = ["S101", "D", "PLR2004"]
 
 # --- mypy ------------------------------------------------------------------
 [tool.mypy]
@@ -72,9 +83,9 @@ exclude_also = ["if TYPE_CHECKING:"]
 show_missing = true
 
 # --- import-linter -----------------------------------------------------------
-# Verifica la dirección de dependencias de CLAUDE.md, sección 2.
+# Verifica la dirección de dependencias de CLAUDE.md, sección 2, y el aislamiento de pymrcd (ADR 0006).
 [tool.importlinter]
-root_package = "voracious"
+root_packages = ["voracious", "pymrcd"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
@@ -150,3 +161,23 @@ source_modules = ["voracious.api"]
 forbidden_modules = ["voracious.infrastructure"]
 # Indirecto permitido: api -> container -> infrastructure es el camino legítimo.
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "pymrcd no importa voracious (ADR 0006)"
+type = "forbidden"
+source_modules = ["pymrcd"]
+forbidden_modules = ["voracious"]
+
+[[tool.importlinter.contracts]]
+name = "pymrcd no importa dependencias fuera de numpy/scipy (ADR 0006)"
+type = "forbidden"
+source_modules = ["pymrcd"]
+forbidden_modules = [
+    "pandas",
+    "rpy2",
+    "sklearn",
+    "statsmodels",
+    "fastapi",
+    "pydantic",
+    "structlog",
+]
