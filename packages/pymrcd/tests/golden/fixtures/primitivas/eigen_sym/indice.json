@@ -1,0 +1,328 @@
+{
+  "funcion": "eigen_sym",
+  "descripcion": "eigen(A, symmetric=TRUE) (dsyevr jobz='V', uplo='L'): valores decrecientes y vectores (columnas). Los signos de los vectores son los de LAPACK.",
+  "referencia": "eigen.R:45-74, Lapack.c:166-237",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "cor de datos 3x3 (rango deficiente, autoespacio nulo)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "71827ebba1eacb82e05f889e66af1d2746309884488b42fc267e65217322ceab"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_01.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "340446e4b92be41d481eb79dd50b4262736a14ffe3ff12ef39342b0a2cf2853e"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c84b4c707b51de6bdec1186e6995c20774092880197a4991d6f8ee54d4633517"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "cor de datos 20x5",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "4502b0520ce092a236cd50ba2973fabd52f0ae4add95954dc4d9505253521ce2"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_02.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "5ff8be7047dedfc5bf0f32739e82c93e19c695b7ed5dfb1d49537d97e81bc63b"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_02.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "831f3e4b91f61bf72ec35dca5e543d2ee9fc3f02797adada481be2cf095848ee"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "cor de datos 40x12",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9436f622caf91ec3b161e812f534996aac5eefa5ac592890eabb13e6db7b58c5"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_03.csv.gz",
+          "forma": [12, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "cd68e0e9aff24619436b2b0f541ddd92dd9cc17f604d373913e3812c328b5cd7"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "0611dfcd975fb7dffc078ae6a26d9f35e71d7f783d323593ad9c254b818a24c8"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "cor de datos 100x20",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ffbeb0098195399a431bb70766ab0507920273bd84bdc4814fa1cec2602000e4"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_04.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8f4635c1334b38b9d44c5380f9d8bbfaebd06f4d7875b5b958b355318886e473"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_04.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "e9af44b56f629426c9c72e3d3e34ab7e4592196a33faec240cbbdad4eba5fc08"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "cor de datos 60x40",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "e9fa0f6609bd05036843668e71532f5bf64081b92d8352298a47df84114961ae"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_05.csv.gz",
+          "forma": [40, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ab328b1ca6a33c084e90b355ecfd3b00cc45666fcde294140c625af2a059a4c4"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_05.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "704675cc6d66049c7bb69cf4854232a38d4ee864b57a138b44dcc7d1c2bbffe0"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "cor de datos 30x60 (rango deficiente, autoespacio nulo)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9687f772bcd773deffd623b3153e5e4246a5e7b175d9b0a87d830ecedd35253f"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_06.csv.gz",
+          "forma": [60, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "827e1f5e7fc0e98fdb346c4cc733a994d35a69e7dbce0e95fb2f15a063958ec8"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_06.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "58a9292b47c63ace3e4aaf8c4cb68392761052a8496bddd53e0df02494f4658a"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "cor de datos 50x100 (rango deficiente, autoespacio nulo)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "574c61576e1be5f08d3cf7b0de8499a51f3c9892450acb993f1e04967f56294f"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_07.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "66d6ac9aeb7ee970c8f6eee2ca10f4fadf7bf381f21429b5704732799b9e6f3c"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ff98593f79d3d536120a7dbadaa59fb71a1c427e3dd0a284cc7a49c46284d493"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "cor de datos 50x200 (rango deficiente, autoespacio nulo)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "64d33f3255f541db1460b217c60177c2662aff3429d7d704a142ee4be57918eb"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_08.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "32703c6e01d283bd17f2bc93ad60916960842c29e42b4859bc153c9a9db8f8fd"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "4ad8b8d9b2895fcfb143a187c826c6eac6db6b54e7cbe943cd192a6c0c833ea8"
+        }
+      }
+    },
+    {
+      "id": "identidad",
+      "descripcion": "identidad 6x6",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_identidad.csv.gz",
+          "forma": [6, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bebb828204df7e2bcc45cc11964204b5f9a2fea919eecd47fde5d327b8bef74b"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_identidad.csv.gz",
+          "forma": [6, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a3efa882e2173e9799f630d69865908094a754c9640c18b37bd745fb80fef07f"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_identidad.csv.gz",
+          "forma": [6, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "5cd1428023f8af870661b1bc24651ee79e3b53362405fc5a21b9e4d266f170e7"
+        }
+      }
+    },
+    {
+      "id": "diag_distinta",
+      "descripcion": "diagonal 5x5",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_diag_distinta.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ddf067185382c9e6f17c2d552af6bdfffea94c97dabbc023abeb6ce4974b6de3"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_diag_distinta.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "dfab5625b2fb12c583308be0f70fb40c281cee4b8ede4bd589543109f84ec3b4"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_diag_distinta.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "71db955c1d2398b79a435ed119182cf6ad4ddc4ea0220a2b50fa520b1eb9c3b2"
+        }
+      }
+    },
+    {
+      "id": "ogk_U",
+      "descripcion": "forma de la U de OGK (diag 1, simetrica, 8x8)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_ogk_U.csv.gz",
+          "forma": [8, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2c6b591881656288912302ebb140d65b19d76f0b116af8e2ff94feb114ca5c8f"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_ogk_U.csv.gz",
+          "forma": [8, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a397d47beff8c3db74e3cb8ebe57e520fab262395f22680737a35bb3f506a13e"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_ogk_U.csv.gz",
+          "forma": [8, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b3f9a95bb63083b4438b968ab67aed81acc56cffe32d5daf5a2dace298b34285"
+        }
+      }
+    }
+  ]
+}

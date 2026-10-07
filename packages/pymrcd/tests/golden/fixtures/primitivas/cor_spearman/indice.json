@@ -1,0 +1,163 @@
+{
+  "funcion": "cor_spearman",
+  "descripcion": "stats::cor(X, method='spearman') = pearson de rangos promedio.",
+  "referencia": "cor.R:66-70",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "matriz 10x3 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_01.csv.gz",
+          "forma": [10, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "e0e9ceca4a4bc37a480378b8a0c5e3f66cd2c5d12ccfe15d9bebf671dbe5cbb0"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9be248487adc8752b977c60e4bd22af2c207f5bc55420768f43cdf1d93f97df3"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "matriz 20x5 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_02.csv.gz",
+          "forma": [20, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "0e35787979db2b9dc8d48f3e77c1aa737e395fa9b507243c8bb8cde2ba41c2ab"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_02.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "fc07289cfaa9a3d41763822a3a7214d5440db4c5ec71177f09a27bcb503daf7a"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "matriz 25x12 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_03.csv.gz",
+          "forma": [25, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a591cf03b7ad04b7a21aafe12622150c56336e055f068ebae31d4648779d5062"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "75c2b78e5f104414e15591c0053ef78ed9086ed539c04e4194ca5335a080b6e9"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "matriz 50x8 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_04.csv.gz",
+          "forma": [50, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "954900902df9c0ed1c0ae12452699d64a7257fc973d82e2006e12f90232d2c88"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_04.csv.gz",
+          "forma": [8, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "28d5e40737597127fbb6b47f127ba197a1512ca5572ccc4b64cb1c9a095df1a5"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "matriz 60x40 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_05.csv.gz",
+          "forma": [60, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b5a009d5b2b12c7e02d27c51ceecf2467d628636da9d9c5e1ced20a8b0b1c9ce"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_05.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "5d22d0c8b9a5be82c3ba0e8a70b13df2cbef3f5f4bd338c4128c9c2a0998b1d4"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "matriz 20x30 AR(1) 0.5",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_06.csv.gz",
+          "forma": [20, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9ade28d11c7c4d784d307495792d58a86b433587b0de1d57bcd01ea2030de94c"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_06.csv.gz",
+          "forma": [30, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "14634e5db6d720139d4df81e91776b46f3ae051529a4615b0c08ea659e31d275"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "matriz 100x6 AR(1) 0.5, columna 1 con empates",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_07.csv.gz",
+          "forma": [100, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ed7509a4a90306ffefa87d02d9c3e2e1517c21a2350a012b37ac27a1c091ee79"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_07.csv.gz",
+          "forma": [6, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "7d6cd18ffaa1834939b7b98504b1f0ced65f0799902cbeaa9fd6809d5161752d"
+        }
+      }
+    }
+  ]
+}

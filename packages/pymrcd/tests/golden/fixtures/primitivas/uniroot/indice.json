@@ -1,0 +1,5322 @@
+{
+  "funcion": "uniroot",
+  "descripcion": "stats::uniroot(f, lower, upper) con tol y maxiter por defecto (tol=.Machine$double.eps^0.25, maxiter=1000), envuelto en try() como detmrcd.R:495. Salidas: path (1 = ok, 2 = error), root, f.root, iter, estim.prec (solo si path=1). f segun 'parametros$f'.",
+  "referencia": "nlm.R:55-170, zeroin.c:89-194",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "C1_k1",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "34410f5e0f393f5ee8e7b451b2fc4a646b603f5102f59751bbe295bb6e404a43"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "47d2f3befaf51e8cb45755bd05c4e8db19662f3bd5581c819edaa0cc7e127240"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1a5317b6aa32883ed87f0ec9328a8e01e8d4b0d449b88b428e7ff5bf621f16a6"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "797d693a4f56f0b641ee412df0ab8416d5e4d638329678ff1e1dd3aee9a50043"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5d7d15907a0bebde8b872ca3fd49207a5f6ed8d08fa0898b2bbf6acde5f43e89"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "16161ff16232e95f3d39c40213ee9ad76c0578a66c8e00440a3216d364472122"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "10187668bca810dc86fdb7e6f26792e4943d913a096eae30ac30423e2018e24d"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C1_k2",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a7876637e67855b405f9d8ff36b5e3162076ef6ce99afc73da999ca224068d2d"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4785cbe215d5ee6c5c985798e08f5bd0ec0d3a926bd04f8327c10ba2bd38d62b"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3c96705da23878e0673c2112557ec99855f4b6a87a6b147468cecfd73b454a9c"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cd64403d3347b0b7b7dd655ad7257a170bd658796d945cf5819b6329f70c412f"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9e5f026ef4d10b7ffcf5a296de2325b1b450b4c4b64d7fd505a905724ccf1114"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "765589804ec134a57b03e6585ad955c87c36b0aab69cb9c564ad4377386b41f0"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7d68bb97bc3f45505baad3b752acf2554c565f3f6d676735e0be5953199a8ba9"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C1_k3",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6806d1007278f7c7b8762ed8e8f40b4fa0c811a14c6cf3d7545578c71cad25aa"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b848297d9eb48233f83d893bfee8d6fcec13b77136feaf5bbb712ee98b68b74"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2d6b0e7c696b5f135efc6a8dc90fe3065d763823aa0960e5b77431e66a95295b"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e53e9ead8574c30bc431ffdd1fbf82773fd3b6784b2ebfb8e136638227d11633"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "637941112139f43c77f6a5fc52a0f55094c003f589626812bbd5ddee67fa9e18"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5afeefd72dd5bf26730610e825df12f37995f926b7ff4e594af3b46426c3b5b0"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C1_k4",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b23d0173fb6210815c33f6c1448628a81da1966f6d785b8efa90f4bd782998fa"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4280f244ffed67f7a89d317aac6e38fb19bff58f9bc661c3f42823f2562f5414"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "927787efdb12cf5770599af34f5d1dfb2b89d315111c4ca34e0f8627726bfa22"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "60d1be062e31bbc3a6cf6ac9ae58c63c80798a387eceaa41ecebcd6dada8509d"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6e301e0b67079b2d1cbf2bd115596ae50426cd331d0c40aaa8824bacddbfaa48"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "51591a6005d7db37094b9f4459f5892209d70eb97d3003f52da07fdcb4b1a852"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C1_k5",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "47b3d7be68372e6a7d5be2b6e66e0fffaa51932aaf3a25b01fe1fa964296aead"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "854d87c643a330be64bef9aedca5b8a7b808f563db7b94e375dee46f658c5a4a"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bb8e5d93ea092df612a8d64e0b146be6370de5268762ae154f96e8379f1da0ae"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4f6d253f8c5e0bd804b791b3cae21fa9a3756f1c2c7e682b7cfeae94dc0a4766"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "870e6ec21c8b13a5b4258e77f4f1c9e22a7d4d110fc3a1a0882acaed3e8e9e90"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fe0afffe6fd6577d87a415bf8b2b051fac0e1b92afb2d04e6d0a9222f3d81726"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C1_k6",
+      "descripcion": "(e1,ep) reales del caso C1, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9fe7afd53b5ffa006ed789043fbac394873d6275ff87de1126ac409f1f0bcd4a"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "93e8ce94a76f70277b2bfe0e7233bc45356bab8712c9cd97c5c4256c7d6cfde6"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c342469dc80149d8339f98fd92d4d3c3653ee6e3d616be3cb3ba1f134d785c43"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "12abf22ac814fcaace4ab0f71fb8b17815e556fc0c624e2825db75645cf28df5"
+        },
+        "iter": {
+          "archivo": "salida_iter_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f01ebe6e94638b69b7ca71dc09b8d0155670929212d4b960a5168d9ef9197fe4"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cca7254bd20801fc2241e25bc51307a23e6bc8e205a2518817a412f103b2588e"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C1_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1932ef131bcde65618ec5a88e459adb20d532d818392da9711748f14fd8995b5"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k1",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d48bee7b278183b94fb3a246b8d96e897ab1d785d9d5db4ee5acd5f99090c264"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fc2ff249519eb0d706121c180879a2766eee339a971f8edf30efad5de90e5810"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "113574536f5d08181ced245594cd12965a0d445be1969b82fa0924e44f25db7d"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "780b4db07ed4997512447a8ccb97f941a53cf665f94049f0708977abe80942b0"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "981901e7c44fb5df4293acc5f517de852d233f3d2618b9deacc42f62d75bc784"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c3c2ed71257ae48494e166ea5ad5dd761c18d336846351ded18ce9d92f1c20fe"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k2",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b02b1b054bd173413088b551ebe7cebcd217b702b7f6aec0d4fee8bcbfbab35"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5de6abd239eaac8255bc3ef4a73f142cb01d63a1fe3c88659dbbbe363d3b206d"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a68b29b8fd3a1ffc5c22fc4ab2e261f6ae100d5ab8f3261c095f98f290381b5f"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a6d8cf19b3f995aece01a9db553555fc09862870b2165e1274fe9aa0a8b8e035"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0c2cfecb9d48fc884dc6ed986014324d86b6d0544fb5737c2c866f9d552dc8ed"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c3c2ed71257ae48494e166ea5ad5dd761c18d336846351ded18ce9d92f1c20fe"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k3",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2bc4db1564269c95669c72802443d2cc5c47e37fa26976125abdcf86582f8407"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4dfbc8ed778ed9201933fee3a10663eb1b78f31403685df32fb230ff54532c4b"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7b20aa67a5538856346a1be0f9708be8b2d981c5bee2513618171890750b6ff1"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0094738e9a793e5ed1f043371c33c0b10096a1613de473aeb92fb9c9c3306fa0"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f42920ef5ba64f4b5daf1b5479de78218f56e3227398ab0134e8e1d98dea43c3"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d2df4c676afa9b392b019cb49179d47ab585496017b0334c364860c12a1b7478"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k4",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "563480d296379710e01a947b2464d4fb81e4b533e65f182f5d271d3745921f9c"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9118ba978c1cb6c4780296430de469f3dcbbb2c4aa112c9b2e903c874b10ae2b"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e70231cc6fa2de77be377af58defd43dbf28f57d52f5b9505b40d42fec3679b4"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1a9e8a23a51a3a5a64c7f887bb31b10a01f946b48be1dcf3759ef5e3f4c7db5e"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "dedb79379029f46ce34720a61889a603f4a3ab1512af00b57d5adb490c4c054b"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5636b49004dc383a1c63b93b88bd93e5e7bef4bf33fa4acc1725e281ac88a0f2"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f16f06ab82c762c4a6d17a99660c644d9299a02942d4a10d7d5c56be2fee96a6"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k5",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e6ec87c044650c84b94d68da14dbbf4cff718724b6b2697b25ea4251369f514"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "04b959703c47f9c3dec81f94f0ceb7620d9978e165bc195085ce4e5d0a5c469a"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7a27bc12aa6955428f5badeffcdee335660222b8b34859d90b89ae017d5ffe31"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "22fa3a34c4ef0eea887cba2372c9ed459b246e76b26b30f02893e7c8de081c9d"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d5edcd1e54327eee374246498f6af870c9b0d4a0ea287ec3e0482ffb8b3707aa"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "34b09fdd5542bd679fd77d5c8ee8119421e93770475e0892f8e3f93dabe6cee5"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C5_k6",
+      "descripcion": "(e1,ep) reales del caso C5, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "db6f58813db61fb3da00b1e8d262ebb54c13ef938afcd7955d59077969d05ba7"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e66974b269e0c60817d6330f84389dd4f19492be2271379c25e8f54e318c6d87"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4977ba0b0325ad5a240db0a5c7d120f7c8ca13385282d3b06e23fb4563a1725c"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e6cd6aa969f2bf7b3d1344d57a8fabc7aa88cbdf0358e2c00e01d6e5e755979f"
+        },
+        "iter": {
+          "archivo": "salida_iter_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1a906544a31eb98c8eb10bacfe0b787acfe164a554def565a7ef34468a8bc7eb"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C5_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c2a2a59c424a9477140478fcb3335bfa79a33a337c276a0c59971ee8ac3098f5"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k1",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "51293ea566f7d696954640e166c3210067b123306510139f45d7d2585a0ab159"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9c013f357be390a93eb2275b326613cf4c7e22d2cf50883d8c513b46e8cd86cd"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f2b057c877f966419f796e444e7a6bc41aeb2bcef24e0a7531574fb1baf82867"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "50f357463a5f55b9ff0c183b3058459132fc92f2e04427ad778b267e25a66025"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k2",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3be81dafa96fccef29e1e69002dbd90f59e49a955c5992cd1339320edfc16e53"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4c455a5cafe937df39bd1a1c115a3eb71e684224b9b20c7eb19f7cc62031b503"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d8ecf4d1c46784af0550e4b7496d2c462d63f429f9a000a085005093eec77847"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "752b59b8d7f706151abd6afa0cc0820c51c45bcc867c126d571ab4b701227c92"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k3",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0aef695f345698329158c1eb1b7dec7c37068f47a598dcdf83df7a96522b654a"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5cdae420c92c576d9285f900c51c7694b5f78bd6ccaf9a972dca1416c4f34241"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3cbed96ad8295e7f5f963252a6e8838d6e2487ff0aa96272c72f604dbb585b92"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4efb92ffe069273df76a7e0762232838e999f7c6ca8fa9b1e238254ab0ee7d56"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k4",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "aecb5dddf4da283071af283b01d764019db02f6d0001841bf8fb209be5bdbc7c"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b360bcb2f9be6ba1142d746dc6b5b5fb9e98ea3870e497cc042243cc98960c54"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bd34ae4ace3a1e5067fe99724dc3f539591416482ddd6521a52669cdfb946997"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a57ba1c738416b7f1626a8ee8a9d1e859f122db8931ad114bd3a56ca7c247d87"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k5",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a4e19b3c61d726b1be687a469892f00ea2ef230d87ca14961159a7eaf6857259"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ec268c72933218247944a4ffc23027a0ce08b2524cd4cd2bd856d67f62d9c9ae"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "841c65c51419629c4f925134bd1d2e3ab5f8ad103d996095bf239b2dac69359c"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0aae7a2a4c698a1fbe03b088f582ac9587ba9a1a44e554f64d58aedf9399171d"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C7_k6",
+      "descripcion": "(e1,ep) reales del caso C7, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9f71fa300c34b3822418424d746a34f3589f45ece3bb77b4f4df574b43781f00"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4855e9d2dbf9a69012429abb85a1f4faba9c3b64e30436e2448b9066d0a5677d"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2a40869a02672b8b56cc5bb74add4032e66b0d8cf3879718e599f24e13254641"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C7_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "af0f20670501d9b678969c1f6924674cddd849c3dbd368718e4286d0a878e6a5"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k1",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "890f059926cdc9b4275867c9672339bdde2aed5feac67c97258b715d939809c9"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8d007f50db7ffc536475dad807212b78cf31ef4e78817db3988936fc91860add"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2078f79f3703cf0fa9a8171475a00329402b38ea13f0d4c1ae3cb75dc9e0f8ab"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "adc2826bdded40a4f50fa3786239a11b89f2f5198fd66ba5fcf62fe0856155a9"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7cfbad44aeab250efb9a79edc95645720315aea9abfc26d69c8fe1a513ae92f0"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "427f4dee55ceee09e1fd6876bcf243cedbccb4997d36b7b569038ee1b6ab72df"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k2",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bf0efc87c40c0b02c8c6cf699243b095990bd9aac0198f4827f378534e432418"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1dbc5a7068c4a434429f2615f02e620ecc23c110e7dfb8307345548b7067d24e"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "eea4cfb423092310b2ff6f6c17ced5ad2c59815e6695343587ae0df42478d775"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d001eb3169a133615c188fe360b9e714d4c6e444b78112ecf92a515cfd726d8e"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "98c199f338817352ac62fcfc16405114024d0abb0b00a8ce82e1e4ca6dc3bccd"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "57270fc663cf1ef7eeae9bdaabff418ec744342cd4c2f99398ab7e5f189f9f8d"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k3",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0733321843e87a5c08fbb75a351c8f6c2e487c094289b5e4b7e4d083cb01774e"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "71fc45d23470fb8d64ad0e04af34f0267ec7a6c50c5ad452e8e4912aa2fbd466"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4bfa12750a3d7fbf48b92f6bb6c9fe8a90d970937137aa0da04ddf03745e269c"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "997d6d920b6980636e504fabf28f974263ec8330d5b84d2e034157167abfa5e4"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "02129d25d502041cb43f18de9ef0f98ac88a72beb1438290818593159e89196d"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ed90d0b01f4000006cb397a91734d75fb12242dd22d24c6b563a4cf5f8c632fb"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k4",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "58715e7fd0e756e2e901023face6b962f64ce54cb05e7da2b51d8c757fa267fb"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ae2d2d97b92a5d681b11bde5e0b96cd0507e774cff6356b7ca2d91c51091c896"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c9e556e4c0af77b693c4bf343bc68bac1a077a4639fc18767f94c400399e8dd1"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "aa6cac550aa9b145e68a4a3e875d006f4beff252c319efd9d6ad8fb12a2a22fd"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e38b0718edde615d57b7fa3b9efee6a9e0fc3acef42e367492239c2baee4c9a4"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "600f9e15dfc1cabcee642925ff909daf3504335545f661d3a0115539571be6aa"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k5",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "708d0f04529716c2692b67c64a2b147491caecc0947e98a05c1fd44d3e12d836"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d9adecdfbc83b94d602c97da717299916b2ce3dcc67f9523c30651255e247f67"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9158845782b2e7f3d6303640682e7ccab6316caad4f5712b565b05da82bf70f0"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9653ddf976597772eddf115eaedbe0f360ab9e162a37dab45fc4c68f383594c0"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b1b6fb8cacafb50d9009c0c8c0a9b80b599011e3f5488f82b03d0058ce38762"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3ff3105b5f8905344ad3e1eb9af488aee57ec785527bcc75f18843cacaacec60"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2f65b8f59f3122624d46b8bc7771777de0d20c4bd560c09bf29e912d4f594130"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_k6",
+      "descripcion": "(e1,ep) reales del caso C8, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6c8aa58a74fec78f3d6d5ed2ca2596d4226842e7e5e52a75c32e6936bf68f8b1"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a22e817a851e300dbf7286e2a83a85daa00ed7413b851170d42d75a98b6e407b"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "80478593d678ab7c9ae37916ee1da5a839a993832233d3a3e010c88306f2fe33"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a8a9d036d732218ac47190978700ca961f0ca99f65a27d47a9aa700415d3a9ba"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3f3fa2211c3f86eac69518106a14a64266873c9e47c404668a3da8a3343523dd"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c8df81bdf55092320171322bb6a546149a760b9343048084c1809e75266e755b"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k1",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "83ed9b21c603aaf2b14800abbbedbdf962f94b3d57bbdc66452214116e6989ce"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "754ea0e2fd24e08494a4a0e04172f10cc9e8c6012ac1a073595587447ba232fc"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cb9879e2e76477c2130a35b28de46aeb4e10559b05c0a473797e76137a160471"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9f982b3e984110f7ef81d6beef27580cb420722852185144ddbd578910412597"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k2",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "26e4ba01b9fe2efc21a5d328907c4214f0b392140dbfff8726403d55070fb142"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bb4a855a5b15f73a701fd8eae8f011fbfbd165ef5a9ddd7c467c4c31aa0ce852"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c9cacc9a7ea45e7556e0c8eca0f3a7cdfa230a1d97b86a29134e44832eef4a61"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8fc58a66d96e5070858851ec943f08584d73c5c7ee21d9c897e8d5cd9b3c9516"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k3",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f378928d45158b41ef55ce1db054b7f9d13daad831ab8793c0a67b90f68501d9"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "99b2c335ce511ac151181fd681ca4d60905a4d9d85c8f30992f00a08367fd024"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b6bca0c9d8c33adc3412c313facfb9d9e46d24c071b3665491335dfbb39252e4"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0a7cd0038cffa490319a6a6eca809dedeb3ded234a016da843b9735a8a27163d"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k4",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "198c483b15007eaebcbfa9d65a504c1048b38b3e78e9d3ad76a37ed10ed01e21"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3b214ace5f7a466b99e6a8b726c6550e07c0eb946404c7fff71d68427ee9874c"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "75a144d249e24e38269929fed24146868a32dde70c7d12c74f1ca118d2137b10"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "040e6bc6821e3716aa80bc4d283518d1d73682f71418aaccee530c12498fd27a"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k5",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5c984fa180a4f4bb7b3a2517effe4a1d078daa8c65ff10f23b7c1af02ed86deb"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "714ecea87b8aee870a80e827993c6399f594940f3c6dad0049a034a0180f138d"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9f2d369ce10eacbd79de46e71a968eeb3ddbbbbceae6f520fcc7c8f7c18e9866"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "baacef063790a294f6628ac23df67b3f7337e9b830809d17cae8bf19e251f2c0"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C9_k6",
+      "descripcion": "(e1,ep) reales del caso C9, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "63d399c20550b9c998d2ad488b683b5843d27ac0c38dce4d1b9bf4fc6a9c8d3c"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "964c1edad4d3e35c1f3b91e35c8d666e8f9fd92e22e8d04fdf5c5646f80473fb"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6fe353054ab3c218f1afc8cfee070674932736abb0c24740cb007c72c4a0a50e"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C9_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0a7cd0038cffa490319a6a6eca809dedeb3ded234a016da843b9735a8a27163d"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k1",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "249b01eb4e4d549173e82d6c7b75517f1b839158466714f8155de0d7fa642eb9"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "26a7c8c96f117f8de0e82d5fafd3e32fa66ab1daa52e96f14ae04a97c88c97d5"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cec15139295cf42c2c7e7520047c863a7a27858e117a44eb78e7d289448bfa02"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c45e14bd3a2f4c7605f4c16f633f6a4a9e9d2f8f91662ab4083bdd485dcf5255"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4ab8da0705690dcaea708327e379922e39d59ee3551b8fa215b6d9004c6f0d74"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e55ffc6165ed7fdb7ef12174fa83cd5ea4f9d6d48c058c64c4fb09401fa5b4f5"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "272b81c54d7dd5879695ebb3c7a117716f25d86514f4f5a5c75dafc91bd9ffcc"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k2",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6c5a41f451c8eca89814b104a2a91105184c0cd59fbf777ac4f88508582bf870"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0c787f630197a1d1fb59d5fc028447c6d12631d7a2c6212612c62f76af131d35"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4053057423f81c28d013c565020875fb7e0e883eeb8c7ec205ca296a6d02fff0"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "da3e452a4be38759f1fdd0689929405e8148fe35a94cf346efb2be3a39ba1820"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d638287bdb7260a7dddb3d9ec21f2739176aed3f0b95cf162c29c671dd59d790"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "596da65977ad25f481044ec7b3a13940ab43d4b24f73d96e760af3bc3d08bfb9"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "504b0b689c91bfbbe2e14ea4375ffb51fd09ddc283a63dc8a1280eda95a1f224"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k3",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "75b40306086b65a72f8762666ed0f60d0d5aebb3ecbd1b40d88aa8e0e990e687"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fd57f84e573e92bfeb2fd18ecaf678f878661e8df532da2dbd5c8d9eac27e7fe"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ec47525c4c9705c2d345b5ae127f906c148d914b845824348822a2f1bfa7df93"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "297bdca247b94fe8aad00a3eac41322212020fbedae53f92731fad52db640897"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fd76e9de76c2368b2a9e8d6cfe36e24962e9362001d45b92643e72edc47fe38b"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "926d4d6d544f1f23ec116a661dc758b9b8aa6892a21912379d8aaa718d15a80e"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3d817fa3805f2fccd0724a409b53fa032e54b70c3745d14f380ed8280c89fc2e"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k4",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "73b954281e982dd7b90556d1f1222349ee60c51ccd3a71af06175cb9d2a1b10a"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6718442a9fcd14c6b2258a5aafa24b095e1eab946ebbc9ddf8a41601cb0a108a"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9d24dce06bff9ce5dc25293b870c2092b1bbf26668f13140f4bd2c20bfc3d1ec"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "225c30931df135eccb44be23f10d6960242fa06654492ee66976ef5eaa8652fe"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4ab8da0705690dcaea708327e379922e39d59ee3551b8fa215b6d9004c6f0d74"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e02a2a375c05841716ef6e2d5811e527619934aecd1917c793728f9af3b8681e"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "082c68d8a0c0934a4c2f135511739b65a93ef867fe86f987d6164dffd228f4e1"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k5",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4c7153f8b4137629c2a5e3c9701411f7152299a7b43c77d995d75b3ea6860158"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ad809356ce2dc622bae0b1065309296e1f1ce72879e8ae787f420c403948b84f"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e2bbfcce2ac6aa2d4ba33aae92e983edbd3b917710088ecef076a10c860442b1"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "29dd0bc51758cad57c5b8a98d406101a7c13b9ae3df0c3a0e0db8399f01fd1fd"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fd455dd8cbd3d16171bace69ee82fadf3dccae0fe9b69dfbec5ed3ac8cb23fe4"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ff94c7385aed60b56bd8c938ef0cf26a3cc898761e50c9e81e4157f3f9e2f38a"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "36e44cb3e99a5ba5ee08ab1cb525fb4257cfd68aa95dcbb491e0e6a59bf88723"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C10_k6",
+      "descripcion": "(e1,ep) reales del caso C10, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e8c524999e99e0ba694a3ce2778608e45190a0974c30a53eebdb94f5770d28f3"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "71958ca7904ea18ede03d8c9b65c2dedcede9514402452f5c33bb5bfbee8d68d"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5d20ebce1878c7800e42cece3cae49d9838daad289e403468926915e0871fe69"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c44870968d11e04a923360b83f7789c79c8640c21f66fdf10bfb905519158613"
+        },
+        "iter": {
+          "archivo": "salida_iter_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4ab8da0705690dcaea708327e379922e39d59ee3551b8fa215b6d9004c6f0d74"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e1cb51f05e74faa48b1f19154faa172cbe8b85fc7ec0197e66946882fdf2d1f9"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C10_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8fa68433fe5cdbfa92e35b3ca6972bc5f34827cd44de5c345a5465d7ad027395"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k1",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 1",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fc4c028cdef6196436a3e77687c4f78d5f8583b310ce8350c9e245e288a2b121"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7f0fb35e2ad9a460fb849718ac7e1582b76d780efdeac59474828b9d2d36c437"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b4514725ad25fc84ca449686c1cd8decec8579de441f0627e3d3100329b0f852"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b9450cb5a2fc9b0e7f27a7d6f345641b82ca1f1293bade73d6018a0b0ddbacba"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a6381df02e3e226c390e2e20fc5428e35a866130710a350f91a979e4001bac0f"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k1.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c209e98641156757a05c74bd8cf748b48093f94537c938f653da7ede7e0a2664"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k2",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 2",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e07a7ace98d41eea1b9e73394e754a78d8b1324616b92570357a665f9980fba5"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "80c9f920cd3a5b2de0db2707175d000f16bb6c8fb26085c5932c223438646707"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3e25d09292f8b113e0352ba92de40fb7b489f89cca8828f63d94b3c024e215ef"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f2ca445f0b1a4e12ca38eec3270bf876e8ced30d06c76b592b759e1db8ed5300"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b93ec1a4856393c8adf550c5614f82c5e735dc727875f21081b16302d01f6f15"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "769f4f8d8a1af5d7468da85946188ccfe0a2ea2b4ef7fcd5431b82e680c54970"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k3",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 3",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "09bd00db51e8e67beb62d6a56bed860b9643e827bc48e17046c14da2ac3e8794"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1109e593f34f6e916e9ef09a0fe28d2ff29a87a19219e8eb7465d8b36d5ce03a"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3639cc7bc79233d1bd79ee02aeba470962612047c74cf15fbbcdc8c7550bd198"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8b96a36c66ad407bd3198277b83884e8032343413c4c1d8b5895a8a3dec552ee"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c472ea5ed97d653f055392ec5cc8aaebe0d366878456ab9e58084f3531887d60"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e86dc82549a531b00ef26ab5012645f210252b2191008b7ea6330555adb77b21"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "370fc1bddec05b547aec67ca8b8a715f103c735488df4f89558ba761e067f828"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k4",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 4",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "473c68d308baaa20c3ff26ee1a33e0e778d8905a578f32d6157fee4722c043b7"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "79b095d141a536c7daca86d052edce50bcdcc78c94aea33d05863a3b0aca127b"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f124975ebda5b2f52873f3d62f885c99ce54b002f861921369091407bd22e509"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "afe167beec4fee5c878b9acec9528689426a488ee7baf07f9e82bc8b546cf77d"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1269d2a1fad124520689768156408ac1b97ce02927dd5abd1704d69151cca057"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k4.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0980dd0efde41f5bc84e94df4c0b64062793285e60bf7d6d127e2a603c5780d7"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k5",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 5",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1451628893a514b309f12fdb6b95e0465e651fe4fe6a6dea49b133246e4b4cd2"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "733947e486f6c9b9b4efcf3be7bf7b06ebd6d543b8bf817ef6542b4f578b2b17"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3b6ac5827df6859e52090b91a7cd4ac8041da98da63227db1008931418579c97"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6999f84292256a9ccad2481d2791899b3321791773a9ada73fe563943377c8c6"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b1b6fb8cacafb50d9009c0c8c0a9b80b599011e3f5488f82b03d0058ce38762"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "28b7ca4f92b140e7bd93409692094803c72b572f6e89d6b898e0ee9d1abdf231"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k5.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0cc44b02bdccde34d995386ba95e42320e41f9420b9a9f33717abec09b83baaf"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "C8_eq_k6",
+      "descripcion": "(e1,ep) reales del caso C8_eq, subconjunto 6",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "885e784d97214321c961f951d3dd12317175e4691b552520002d65dceab48aad"
+        },
+        "ep": {
+          "archivo": "entrada_ep_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f1382d63182d8eacf613bb9cbac4e77cc0369106744e6460c90b942153e969ea"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "12c904ede371a317dd3eab4d5b355c2f6b2b3979375e940cf1875640dc9d0bb7"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "297b4decb3766fbc65e5a6589e093138380a96a24531b27dcaba87fc75419fe8"
+        },
+        "iter": {
+          "archivo": "salida_iter_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b84cb8131727d14760cf75d0b3cfac96ecb2c381bf97b4a76211acf9b3975459"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f1aec98fe5003e95c0054d1d99dbabb4654a3d21ae75a8dbde712f5413ee6115"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_C8_eq_k6.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ed6d4324dbc5f4b4a1663669c3d22bb648332e755c44cf25ea4471e2c0125ca3"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint01",
+      "descripcion": "(e1,ep)=(0.001,2) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "29594816e92c48ebd540abf69e38a92e4073296cd61a1a2bca48b0895b9d1eaa"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c7807d081a841663140a0922870f973f83c9df27e80803f1c6dcafd361f6fe7f"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0e88ac583714f6e07291cd81e5cb1cb70c12589e4143364b63dbad8c25f64f4d"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "3abfd81586139dcc668599a46350ac1bea6684424e9344781fde404822689be0"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b1b6fb8cacafb50d9009c0c8c0a9b80b599011e3f5488f82b03d0058ce38762"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0f70ccc60ee046c8d6e92a33238d8ee81c0001ddbb5b12c6489bbc0abfeef10f"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8a92bdeb4e22471bc2e03d47f817e60920bf0d4362247ffdb027517ed975b569"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint02",
+      "descripcion": "(e1,ep)=(0.01,5) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "dffcdb9d351824bbb8e7ed3b2fb66a0ac856c9c771069fc0fb592c8f77d7fe55"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d3dafea87dcbe4c732c700dc7aff5e6e419ec0c8f77e5ad455451904eaf9d808"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b36ee003f45d170e313b81f7d8b52cf2c5164fd757e8d593b360cb61cd0d8161"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f5ba7931c86eb13746777484ea30ef50865b9c36ed4eae9cde9f1d306dc117dc"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "3abfd81586139dcc668599a46350ac1bea6684424e9344781fde404822689be0"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c472ea5ed97d653f055392ec5cc8aaebe0d366878456ab9e58084f3531887d60"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5ff53139cbd8810418eb99840fa4c9b68b7d78a6048bc1f28e44b6b2a00b3c58"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3d2899b849b8f32404fd67fda83b90c56536b712abe36419884fd1c392019c39"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint03",
+      "descripcion": "(e1,ep)=(0.0001,10) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2564b771bae421a254a69fc6839827306156ceb75a64d50926ab642985bb8b0f"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3abfd81586139dcc668599a46350ac1bea6684424e9344781fde404822689be0"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9b0a795ee74c57f4d9c53e7ee1f47373c27cdacf7521c2ca71041ef13cc86bed"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7ea91c613f2ce8d446362097e88440b26accb936c26bfd3e560a90ce346ae4b2"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4ab8da0705690dcaea708327e379922e39d59ee3551b8fa215b6d9004c6f0d74"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e36fb3c596de558b48236281d4b55f4cace81c5a73c1950deacd18f1882515d"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "392fa6f5b0e41e3a152b40c58d9af6c6c4291621f397f05d2d9816db6354bcd2"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "aebd930b0fc21ac8b58d12f9b165b00f01761994035589b9d5f40c15ffe6d4fc"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint04",
+      "descripcion": "(e1,ep)=(1e-05,1) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de352776418008a7991443abd7d8115247b1e81a92c352fb1cf718eda3fb6e65"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5794a911bf5946f1974458aee7f65e61e454641bf0a0937e1a1d5b1ffd66bcaa"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "6c460d3787e0a2f44647536cf6ecb6037754a083b160e0f051baf699d6bd4897"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ee89fc65ae3a1bb1f3c06145ae8df393bf4de101db5cb1cf1dc8a6c79dcbd3ba"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e773afdd041f591325162d83c4b5fa747643457198752c7e6670b6308eef4e96"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4a4fcd41ce46fb3e4c651b2169498f2539498d50dbda14711f49a696ec6d81cb"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint05",
+      "descripcion": "(e1,ep)=(0.05,3) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "59d4803aea2c410f4667b46da3f515fe1da6a11edabeef4542278203bc654684"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "db90010a773162d3b206889308f9339f9d4e3df5af73c1b95707bbd2a8bf82e3"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6469e0151423c790b5a801a86ac1b5c61c260356dae244548dd551687777189b"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9be00e00d6a4d78a598b89ff6f341b6105b1bd1d0e1df3ba47d17ad6496b1bbf"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "853bea618e68ab8e272d10684184e6559896e6ed1f9665a3b3ff5252471787f4"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7d5c9ca1551486a966ea80da97471347df966fe82de71bc246403c392dcc0006"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d495a78145b73db6a4334b889ace35b2c9228ae819a13aaa91d140b9dca2ce95"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint06",
+      "descripcion": "(e1,ep)=(0.3,1.2) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "d7fff56119d799e751be34b38ad73ad3d9a95dc4345ae0cf22e2f4d934c30687"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7056c21a0ea0455cfdc8bee55df9f6ac40d7fdecd57f1c940493d3d5e8e26b3f"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6373d8f9483784959bc1bd52c675bada3d8045c36d5d35ad20256cd19edaf0cc"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "31f1484189330e494f05c4887ae37b3b8c1eadc5332ba815eb0909e16e31b8e8"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint07",
+      "descripcion": "(e1,ep)=(-8.9e-16,120) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0b1378e864c0ec84a2ce0cec09c95d03c50d27c69c7efd6787c367b53455f51a"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4a5c6048854590c1d3897d78dbdb3fce63a1b821d593e28c447a813cc11d72e6"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ddcdcef486f08c4a06acc783a4c96bfd3990c4a56f7c1b887e9d7097ba642f41"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cd25b6a0aaa67e212bef6b7532d950d612786a8b2aff63cb11f97b215e946712"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "698a62470d28472922d6ca142e7ffacb2012d30b21f154f94c474aa0df13c2b4"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e09054cc3b5424d972517074769cb7cd3db91bcb3430c76325c35ad79f1ba11"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4be55ce7a89716df65ab2d062c25853a7ccfbe3c4fef18aa53da007861a7b017"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint08",
+      "descripcion": "(e1,ep)=(2,3) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "db90010a773162d3b206889308f9339f9d4e3df5af73c1b95707bbd2a8bf82e3"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a37edf75400b1e3930b9ed44f496557dae81e89f1e0ba3add917d6bc51b6a130"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint08.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "eb67b777bba7702739dbc4de56982685027a769a46f954b0ec0f299c05752513"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint09",
+      "descripcion": "(e1,ep)=(0.5,0.5) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6f1ced3f04e130ae6ecba70c13b8b4e2a52f7744a9868e7e9600df64b8317fe5"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint09.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6f1ced3f04e130ae6ecba70c13b8b4e2a52f7744a9868e7e9600df64b8317fe5"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "sint10",
+      "descripcion": "(e1,ep)=(1e-10,0.001) sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ee786e915e2dd24c7685eeb299055d72ff444debcc0e83651c4c2bfde2aec878"
+        },
+        "ep": {
+          "archivo": "entrada_ep_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "29594816e92c48ebd540abf69e38a92e4073296cd61a1a2bca48b0895b9d1eaa"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+        },
+        "lower": {
+          "archivo": "entrada_lower_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "92221ffa921ed61c46311f8203990831364adb682d5055ccb106217fd32058df"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ce74b6ec4364c14252074ecdfe5129c3b0b902ab69439d51e942c10788ce1e00"
+        },
+        "iter": {
+          "archivo": "salida_iter_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4c38aa759667989ad1abb1abfa91b1ebce9003e4e2fba976aa99a6502b19d61f"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ee925e33e61f15ff8728e2e4c896111b83652905efbc6e9c554e3683d7546de1"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "8d4ff2703c83922f337459b7cfbe1b390a8d31180b7a0fd52f4c12756e7c9901"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_sint10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e13a349a1746de0699aaeb76c15fe33e044921db5fd8664ecbb81c00a67ab710"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "maxcond10",
+      "descripcion": "maxcond=10 sintetico",
+      "entradas": {
+        "e1": {
+          "archivo": "entrada_e1_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "dffcdb9d351824bbb8e7ed3b2fb66a0ac856c9c771069fc0fb592c8f77d7fe55"
+        },
+        "ep": {
+          "archivo": "entrada_ep_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e"
+        },
+        "maxcond": {
+          "archivo": "entrada_maxcond_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3abfd81586139dcc668599a46350ac1bea6684424e9344781fde404822689be0"
+        },
+        "lower": {
+          "archivo": "entrada_lower_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2a4c77609142ae12dc8ccc60eaf9548fa5f46a010cad1249e22c5cedb9b0485f"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "32a4da386c139ea560dad4ce6c1e2a08f168226407c4afc95dc1c3ba7a349675"
+        },
+        "iter": {
+          "archivo": "salida_iter_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "4ab8da0705690dcaea708327e379922e39d59ee3551b8fa215b6d9004c6f0d74"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "77b3f6e1844c335a44a99d39831d1ce154f9f11252d55647752dc1867ce76052"
+        },
+        "f_lower": {
+          "archivo": "salida_f_lower_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "504b553558dfa3c39d1b9ff1bef4045c69df92d10dd746df259658a0b31c1bea"
+        },
+        "f_upper": {
+          "archivo": "salida_f_upper_maxcond10.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "10b16e3a4b523678eb09b6a357d04214e8df4724cb719f1720921ed05b1901a9"
+        }
+      },
+      "parametros": {
+        "f": "(rho+(1-rho)*ep)/(rho+(1-rho)*e1)-maxcond",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "f_poly3",
+      "descripcion": "funcion de prueba x^3 - 2",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4ac1db1340696324f49411020b1036ffb909df7eae902098d4d19a8578d14c97"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b0fd67abccc05abaad5f7c9d27a4097444e328e2d45b7291b2a5cc648cd9932d"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "d3dafea87dcbe4c732c700dc7aff5e6e419ec0c8f77e5ad455451904eaf9d808"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_poly3.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ff40b3eaa5e95ee96dd4d2b057ba5ff9e121a031a722d6f8dcb69009637b8755"
+        }
+      },
+      "parametros": {
+        "f": "x^3 - 2",
+        "lower": 0,
+        "upper": 2
+      }
+    },
+    {
+      "id": "f_cosx",
+      "descripcion": "funcion de prueba cos(x) - x",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "e72636fd1b8417ec33e8376e8fe2e465dd244349bb3a9036ceb56eb3f341b49e"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7761f2e0a7e55306d432588bc2a3c53f9882a630f1ec52d9c120abfcd91f2b6a"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "f0146172fdd4d86b6d04ac7763e903557fddd18f0fc3bf3627b6b98c634ba401"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_cosx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "698a62470d28472922d6ca142e7ffacb2012d30b21f154f94c474aa0df13c2b4"
+        }
+      },
+      "parametros": {
+        "f": "cos(x) - x",
+        "lower": 0,
+        "upper": 1
+      }
+    },
+    {
+      "id": "f_expx",
+      "descripcion": "funcion de prueba exp(x) - 5",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "db90010a773162d3b206889308f9339f9d4e3df5af73c1b95707bbd2a8bf82e3"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "18885bd0b3ef33e64dbb941018b01cf567a7723fed5812754131bc10198cc64b"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3bfbf25ebd24364baff269eea37fc7be7224cfd1f6e4b45006d0fd82d659afc7"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_expx.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "adf59b1dd4e9d50758e8b5538eb6187512b8ae24abe9c9e5ba1a243d5beb11d1"
+        }
+      },
+      "parametros": {
+        "f": "exp(x) - 5",
+        "lower": 0,
+        "upper": 3
+      }
+    },
+    {
+      "id": "f_sqrt2",
+      "descripcion": "funcion de prueba x*x - 2",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4498f129a7ad69d7ea2f2070a45f0ed32b7382cdb5a1dc9c31bdcebc440de4b7"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fb04836d08fb67bfed727ababd8bfd48b6835f3440fdf3760aec9acbc9348d79"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_sqrt2.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ff40b3eaa5e95ee96dd4d2b057ba5ff9e121a031a722d6f8dcb69009637b8755"
+        }
+      },
+      "parametros": {
+        "f": "x*x - 2",
+        "lower": 0,
+        "upper": 2
+      }
+    },
+    {
+      "id": "f_lineal",
+      "descripcion": "funcion de prueba 3*x - 1",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "222a1eeeb0126cfb9933a498fc98be36b010528dc1e41b13c04e56cfcdb3a1d0"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2d885fbf53ef10f30ec41b7c27b82126379dba7d3574a3237011fcd59778464c"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_lineal.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4e3993dcd523057e94bf9fcf3a7ad05ccc3cc61749167139904051bf75172b8c"
+        }
+      },
+      "parametros": {
+        "f": "3*x - 1",
+        "lower": -1,
+        "upper": 1
+      }
+    },
+    {
+      "id": "f_rac_extremo",
+      "descripcion": "funcion de prueba x - 1e-5",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4b714c1b7cdc424106e33ccce3ea20dc766db4e190dc61e963aeb1b846db87d3"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_rac_extremo.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        }
+      },
+      "parametros": {
+        "f": "x - 1e-5",
+        "lower": 1e-05,
+        "upper": 0.99
+      }
+    },
+    {
+      "id": "f_sin_cambio",
+      "descripcion": "funcion de prueba x*x + 1",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_sin_cambio.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_sin_cambio.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_sin_cambio.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "7c7d926e49c2baabb26290bc7456e6e58ec8078d43ac41cccbdba310c96666dc"
+        }
+      },
+      "parametros": {
+        "f": "x*x + 1",
+        "lower": 0,
+        "upper": 1
+      }
+    },
+    {
+      "id": "f_pendiente",
+      "descripcion": "funcion de prueba (x-0.3)^3 (raiz triple)",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2b7528e6a2959b0bf8c8eb9301359e31230bbca6234b0b57ed85496805d16dea"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "948dfc814bac7f84acbc6328b4452e506f6618dbb14cba9624b7f94c078a47f5"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8e34f546d040d8f5ba1ba8d1cc7b65d32269458a44703540e42a9fcd560201e5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_pendiente.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+        }
+      },
+      "parametros": {
+        "f": "(x-0.3)^3 (raiz triple)",
+        "lower": 0,
+        "upper": 1
+      }
+    },
+    {
+      "id": "f_tanh",
+      "descripcion": "funcion de prueba tanh(x) - 0.5",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "db90010a773162d3b206889308f9339f9d4e3df5af73c1b95707bbd2a8bf82e3"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f1ba74aafece6e570abfca3df01c63152d2075d26407dfb31ab6757de403b5d8"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0884285772cf43d53aab1ba853a8fa5a5cb7e8eb469ea50539b454bb1a856923"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_tanh.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ca9c8bc8a2b0b7f214397958047f3a7822a80a4e3f6fb76d48d7dd5d68b4105e"
+        }
+      },
+      "parametros": {
+        "f": "tanh(x) - 0.5",
+        "lower": 0,
+        "upper": 3
+      }
+    },
+    {
+      "id": "f_recip",
+      "descripcion": "funcion de prueba 1/x - 7",
+      "entradas": {
+        "lower": {
+          "archivo": "entrada_lower_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "dffcdb9d351824bbb8e7ed3b2fb66a0ac856c9c771069fc0fb592c8f77d7fe55"
+        },
+        "upper": {
+          "archivo": "entrada_upper_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a5959c2a845b75d0190fed986b17c01c67cf583a82894a4a5a8127d60970cd5b"
+        }
+      },
+      "salidas": {
+        "path": {
+          "archivo": "salida_path_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "root": {
+          "archivo": "salida_root_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "282a1da271235f67d83d671441f43514aed50d9ee9a347123c935a80be735bc0"
+        },
+        "f_root": {
+          "archivo": "salida_f_root_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "49decd9ba2a4561d6e46f4023ca58f2d1bf0872fb71c742f94604052598e4960"
+        },
+        "iter": {
+          "archivo": "salida_iter_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "63ab38603eca2160b449fb7cad96a2d36671b1fa50342cbcb97b576f66bf27f5"
+        },
+        "estim_prec": {
+          "archivo": "salida_estim_prec_f_recip.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bdf38f2eb5aa631088c95b8fa3f7b5ab421112d32bd087ce971ceb39d4c35590"
+        }
+      },
+      "parametros": {
+        "f": "1/x - 7",
+        "lower": 0.01,
+        "upper": 0.99
+      }
+    }
+  ]
+}

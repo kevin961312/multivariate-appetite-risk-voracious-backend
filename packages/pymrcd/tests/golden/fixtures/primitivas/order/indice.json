@@ -1,0 +1,141 @@
+{
+  "funcion": "order",
+  "descripcion": "order(x) (radix, estable, -0 == 0), base 1.",
+  "referencia": "sort.R:211-269",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "n=5 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_01.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "631d3d0498076f12480baaa94f7066d3a567841593663b0a711de5dbceda2bbc"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_01.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "cb92b2aa4fbf011c85c216d22051a5be271cabd09ccbbc1ad32f8f58f603b4e7"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "n=20 decimales con empates",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_02.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7a8459f04ee829b6970de18ad783a71505418360c69258b64c46c353abcc071d"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_02.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "542797d344ee76815b793538e72f8ffcfa45b110d122d4b8a8446d39dd080f06"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "n=50 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_03.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "01a441ddd8cbd2671f73de72027b5415266b67f620c3601140b2038c7b714a99"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_03.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "c1961bd4bd85635aa122a5938f853e00ba7292fef92283f9702cd780d4c491d0"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "n=100 decimales con empates",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_04.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ca7fdb0e41058b368ac6751e56f093e50f6006a4f8958c7c6f69c85090ed9596"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_04.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "833165fff4f755aae17ec97644b8a076ad210efe2e7403752731b536f44b158f"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "n=200 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_05.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "dd68fa3effb757a51c0cfe9b8b425fa3732a06873aaf039805e51979a73654fc"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_05.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "89245d145e8a15b40ed1a29994e1728f917f243740b469c64126eb1913f974e1"
+        }
+      }
+    },
+    {
+      "id": "cero_negativo",
+      "descripcion": "-0 y 0 empatan",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_cero_negativo.csv.gz",
+          "forma": [7, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "50b03d7b9cbf3853680ae59e9bae00339386860dd84cc0359beb00231e7cdd30"
+        }
+      },
+      "salidas": {
+        "ord": {
+          "archivo": "salida_ord_cero_negativo.csv.gz",
+          "forma": [7, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "36cd76edd540e029458ef1a67b500f0643c719a19136bd9adb5a25b96f32ad10"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "funcion": "exp",
+  "descripcion": "base::exp(x) (libm); det = sign*exp(modulus).",
+  "referencia": "det.R:25-29",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "exp (incluye subdesborde/desborde)",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_rejilla.csv.gz",
+          "forma": [3002, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "73db8254520021470dcde6fd69e09d0cf8c701717f7e70775808857ce4ee80eb"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_rejilla.csv.gz",
+          "forma": [3002, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "cad57c8bb0f0910be9121a1646b54dbf19330164a2436bd0f7f097d8b3f306d3"
+        }
+      }
+    }
+  ]
+}

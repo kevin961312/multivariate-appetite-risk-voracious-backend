@@ -1,0 +1,2050 @@
+{
+  "cs_det_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:548",
+    "descripcion": "det(cov)",
+    "archivo": "cs_det_k1.csv.gz",
+    "sha256": "53b7b21db04939fd71a297baf78124b17efafbded88b2f94ee2979be57194616"
+  },
+  "cs_det_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "det(cov)",
+    "archivo": "cs_det_k2.csv.gz",
+    "sha256": "53b7b21db04939fd71a297baf78124b17efafbded88b2f94ee2979be57194616"
+  },
+  "cs_det_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "det(cov)",
+    "archivo": "cs_det_k5.csv.gz",
+    "sha256": "8d2767c023c886fa461f9c0f2c0d911b7d2c56e1b58c88ba8a5f57999f185e72"
+  },
+  "cs_index_k1_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:350",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k1_it0.csv.gz",
+    "sha256": "73bc380362df0e33706060c33fa2b0215adaddd679a0c385771cb1138b87e447"
+  },
+  "cs_index_k1_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:366",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k1_it1.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_index_k2_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:350",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k2_it0.csv.gz",
+    "sha256": "c0b77281ae62c1f1b79a82ced6681a5fdf26024a070dc0924d6b0108c34d9e3c"
+  },
+  "cs_index_k2_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:366",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k2_it1.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_index_k5_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:350",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k5_it0.csv.gz",
+    "sha256": "17d79c10d5e2c8db93b4a1e25fae8a735c68d2f7359f096a246e9925cc24ef59"
+  },
+  "cs_index_k5_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:366",
+    "descripcion": "indice h usado en la iteracion (base 1, h)",
+    "archivo": "cs_index_k5_it1.csv.gz",
+    "sha256": "9065cee2286573e1bdc073f386d5004fae8e7b5c1d06328046aa24ff69589492"
+  },
+  "cs_nndex_k1_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:361",
+    "descripcion": "nuevo indice sort(order(vdst)[1:h]) (base 1, h)",
+    "archivo": "cs_nndex_k1_it0.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_nndex_k1_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:372",
+    "descripcion": "nuevo indice (base 1, h)",
+    "archivo": "cs_nndex_k1_it1.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_nndex_k2_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:361",
+    "descripcion": "nuevo indice sort(order(vdst)[1:h]) (base 1, h)",
+    "archivo": "cs_nndex_k2_it0.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_nndex_k2_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:372",
+    "descripcion": "nuevo indice (base 1, h)",
+    "archivo": "cs_nndex_k2_it1.csv.gz",
+    "sha256": "8f97e30c850be980c1ca5b8019372adbf07d4e380b0540d59e6ef2351a90b618"
+  },
+  "cs_nndex_k5_it0": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:361",
+    "descripcion": "nuevo indice sort(order(vdst)[1:h]) (base 1, h)",
+    "archivo": "cs_nndex_k5_it0.csv.gz",
+    "sha256": "9065cee2286573e1bdc073f386d5004fae8e7b5c1d06328046aa24ff69589492"
+  },
+  "cs_nndex_k5_it1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:372",
+    "descripcion": "nuevo indice (base 1, h)",
+    "archivo": "cs_nndex_k5_it1.csv.gz",
+    "sha256": "9065cee2286573e1bdc073f386d5004fae8e7b5c1d06328046aa24ff69589492"
+  },
+  "cs_numit_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:548",
+    "descripcion": "iteraciones del C-step del subconjunto inicial",
+    "archivo": "cs_numit_k1.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "cs_numit_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "iteraciones del C-step",
+    "archivo": "cs_numit_k2.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "cs_numit_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "iteraciones del C-step",
+    "archivo": "cs_numit_k5.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "cs_obj_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:548",
+    "descripcion": "obj = det(cov)^(1/p)",
+    "archivo": "cs_obj_k1.csv.gz",
+    "sha256": "2a017b896ac6f355b2279098332ec348c643fc5ae97090e576eb2bb945bab199"
+  },
+  "cs_obj_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "obj = det(cov)^(1/p)",
+    "archivo": "cs_obj_k2.csv.gz",
+    "sha256": "2a017b896ac6f355b2279098332ec348c643fc5ae97090e576eb2bb945bab199"
+  },
+  "cs_obj_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:561",
+    "descripcion": "obj = det(cov)^(1/p)",
+    "archivo": "cs_obj_k5.csv.gz",
+    "sha256": "70761d1934265a4963a34bbd4ac6932c7c994b39df3461c4776456fb42255133"
+  },
+  "cs_smwG_k1_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k1_it0.csv.gz",
+    "sha256": "87d5e433aa53debfe229fe42842b0f8dbb838ebdab1b68c2824c02802d21f3ab"
+  },
+  "cs_smwG_k1_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k1_it1.csv.gz",
+    "sha256": "546783163cf30278f18bd5e9333ea0f1b12a4e3bfa7a0c00d65d8bb93c0a8a6b"
+  },
+  "cs_smwG_k2_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k2_it0.csv.gz",
+    "sha256": "f012641300424e4c90991f320702bb2dfcad0a9995a4748fd050098a9acabf41"
+  },
+  "cs_smwG_k2_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k2_it1.csv.gz",
+    "sha256": "546783163cf30278f18bd5e9333ea0f1b12a4e3bfa7a0c00d65d8bb93c0a8a6b"
+  },
+  "cs_smwG_k5_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k5_it0.csv.gz",
+    "sha256": "124c5774e490efbcee929aa1b1e60bd857d2474690c2f6b9185a3757cda76df6"
+  },
+  "cs_smwG_k5_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwG_k5_it1.csv.gz",
+    "sha256": "61b3aae18aafc43470df139a021c2ebc1a349fce93e2a45b69340242c2eb46c5"
+  },
+  "cs_smwTemp_k1_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k1_it0.csv.gz",
+    "sha256": "b8cbeb3b9c3d20c67722e6ad46ced948515e32eda35a8238f4db2e2eff43a5a3"
+  },
+  "cs_smwTemp_k1_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k1_it1.csv.gz",
+    "sha256": "eb1278c9bc8144e726c4a11d8fbb4a3ffe9c94386ff8411c118a16374fd07922"
+  },
+  "cs_smwTemp_k2_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k2_it0.csv.gz",
+    "sha256": "9abf1f8965268aa2d0004f58b54f865182f40404f10391857394704b2d4096d4"
+  },
+  "cs_smwTemp_k2_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k2_it1.csv.gz",
+    "sha256": "eb1278c9bc8144e726c4a11d8fbb4a3ffe9c94386ff8411c118a16374fd07922"
+  },
+  "cs_smwTemp_k5_it0": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k5_it0.csv.gz",
+    "sha256": "67b2028a87255274f208985593145fc7ba259fc7f1165c17d5409709f5af26af"
+  },
+  "cs_smwTemp_k5_it1": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "cs_smwTemp_k5_it1.csv.gz",
+    "sha256": "e753a7370fa357ce73137f50bba53e9ad42fafbdba8907b7ab5a6817131ec1ca"
+  },
+  "cs_vdst_k1_it0": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "distancias diag(t(D) %*% (mIS %*% D)) (n)",
+    "archivo": "cs_vdst_k1_it0.csv.gz",
+    "sha256": "66e60174ccb80a88c406b455a56f9c961e64e678a321d13d3222417fca61f5f9"
+  },
+  "cs_vdst_k1_it1": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "distancias (n)",
+    "archivo": "cs_vdst_k1_it1.csv.gz",
+    "sha256": "6185d323d40a65bd6994410110a8fd793f69e44bce5b3ae59b7d242e7f350b91"
+  },
+  "cs_vdst_k2_it0": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "distancias diag(t(D) %*% (mIS %*% D)) (n)",
+    "archivo": "cs_vdst_k2_it0.csv.gz",
+    "sha256": "a4715fd3ee9162441ac745946a0644c728b5df6cce71ca4bef8474faf7e7df21"
+  },
+  "cs_vdst_k2_it1": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "distancias (n)",
+    "archivo": "cs_vdst_k2_it1.csv.gz",
+    "sha256": "6185d323d40a65bd6994410110a8fd793f69e44bce5b3ae59b7d242e7f350b91"
+  },
+  "cs_vdst_k5_it0": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "distancias diag(t(D) %*% (mIS %*% D)) (n)",
+    "archivo": "cs_vdst_k5_it0.csv.gz",
+    "sha256": "36acb8bbac26959cf00f3f0ae42cd9de888d3b7dd8e3e53152b2ca04ba3d10e7"
+  },
+  "cs_vdst_k5_it1": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "distancias (n)",
+    "archivo": "cs_vdst_k5_it1.csv.gz",
+    "sha256": "07fc6379e97151da2a2fd8be80839280fad98286ef5fbc4e69223aada7a33eba"
+  },
+  "cs_vMu_k1_it0": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k1_it0.csv.gz",
+    "sha256": "66e7aaca6f2b3887f4b7978ad055692c2714ccdf93368ed920401b5bb24c83e5"
+  },
+  "cs_vMu_k1_it1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k1_it1.csv.gz",
+    "sha256": "64a4dca2323d93bcb5e5b7595a2875b75b718d8df46a0cbe549ed847d5887c18"
+  },
+  "cs_vMu_k2_it0": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k2_it0.csv.gz",
+    "sha256": "979f24c994a5cd0cefa066e2e88320c9c02e6b8cc56a17ce9e69607cd714afb5"
+  },
+  "cs_vMu_k2_it1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k2_it1.csv.gz",
+    "sha256": "64a4dca2323d93bcb5e5b7595a2875b75b718d8df46a0cbe549ed847d5887c18"
+  },
+  "cs_vMu_k5_it0": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:361",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k5_it0.csv.gz",
+    "sha256": "e83f9026e18cb6d34bf15be09ab0f9a40707dde3e68605acb2a24d684aa6c217"
+  },
+  "cs_vMu_k5_it1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:372",
+    "descripcion": "media del subconjunto en el paso t (p)",
+    "archivo": "cs_vMu_k5_it1.csv.gz",
+    "sha256": "4dd2cb8427d477358d0e4ce6cd626b523f2ae0eae49da55f129efefdd122ef09"
+  },
+  "eq_mQ": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:432",
+    "descripcion": "matriz de Helmert mQ (p x p); solo target=1",
+    "archivo": "eq_mQ.csv.gz",
+    "sha256": "21b0a375e97c97c474360a7a2d50fe01a549f8b24183e5aff57a59a21f2faa8b"
+  },
+  "eq_mW": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:432",
+    "descripcion": "mU %*% mQ %*% misqL (n x p); solo target=1",
+    "archivo": "eq_mW.csv.gz",
+    "sha256": "eff4abe3861b5bbb3ae22310c02af8992d61028daf53fcec799589cd0d20bea2"
+  },
+  "eq_values": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:432",
+    "descripcion": "valores propios de eigenEQ (p); solo target=1",
+    "archivo": "eq_values.csv.gz",
+    "sha256": "8efc4420b4a6746cdf9a02eaf9ad9f13cd6c113a69021ece8a9a7591ebfb47cc"
+  },
+  "fin_center": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:615",
+    "descripcion": "centro final tras retro-transformacion (p)",
+    "archivo": "fin_center.csv.gz",
+    "sha256": "f754be250e8e7288e8ae4714525b23ddb4c1f509e50e71669fd1b1b628d70c6f"
+  },
+  "fin_cov": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:615",
+    "descripcion": "covarianza final (p x p)",
+    "archivo": "fin_cov.csv.gz",
+    "sha256": "10b5a48971ec36283b8a7e721819fc9ba096bb76973deae82eaf5ca7b39fa383"
+  },
+  "fin_cov_std": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:584",
+    "descripcion": "rho*I + (1-rho)*c_alpha*W (p x p), espacio estandarizado",
+    "archivo": "fin_cov_std.csv.gz",
+    "sha256": "1b8e0d7dfa0c45d7b79ea02c1c3fc0bff78bffc4691adb446a8848dc3b45db15"
+  },
+  "fin_crit": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:619",
+    "descripcion": "determinant(MRCDcov)$modulus (log-det)",
+    "archivo": "fin_crit.csv.gz",
+    "sha256": "bce91c7e107b28a78bab4308f06feb5f66821a6f0f58ddc6a3576f3b3a526cf0"
+  },
+  "fin_dist_detmrcd": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:618",
+    "descripcion": "distancias mahalanobis internas de .detmrcd (NO usadas por CovMrcd) (n)",
+    "archivo": "fin_dist_detmrcd.csv.gz",
+    "sha256": "140fe6f36a0e9a90839c8a480e2f2ef2c457b5063a20895be7cb882887cf8e4c"
+  },
+  "fin_icov": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:615",
+    "descripcion": "inversa final (p x p)",
+    "archivo": "fin_icov.csv.gz",
+    "sha256": "81c40a33e58a022faddcde341598bbe8b09782525b5cb99d129df3acc2d5aed7"
+  },
+  "fin_icov_std": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:588-593",
+    "descripcion": "inversa (SMW o chol2inv) en espacio estandarizado (p x p)",
+    "archivo": "fin_icov_std.csv.gz",
+    "sha256": "c4ed8eda50de3173b800249451506f5484b7eea435e7a28ee2dfc9a527dc1cc2"
+  },
+  "fin_mE": {
+    "forma": [200, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:578",
+    "descripcion": "mX[,hindex] - ret$mu (p x h)",
+    "archivo": "fin_mE.csv.gz",
+    "sha256": "af83aa020c66be3733a5f28a7aefc4b8618c5aa7baaa6b8051ca0791a0defa17"
+  },
+  "fin_mu_std": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:583",
+    "descripcion": "rowMeans(mX[,hindex]) (p)",
+    "archivo": "fin_mu_std.csv.gz",
+    "sha256": "4dd2cb8427d477358d0e4ce6cd626b523f2ae0eae49da55f129efefdd122ef09"
+  },
+  "fin_smwG": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "G = t(mU) %*% (imB %*% mU) (h x h) dentro de .InvSMW",
+    "archivo": "fin_smwG.csv.gz",
+    "sha256": "33a92912706043e2a2bdc6958dba094d19fd14dcccbc3fb7f06082ea9021e86f"
+  },
+  "fin_smwTemp": {
+    "forma": [25, 25],
+    "tipo": "double",
+    "captura": "detmrcd.R:314",
+    "descripcion": "chol2inv(chol(I + nu*G)) (h x h) dentro de .InvSMW",
+    "archivo": "fin_smwTemp.csv.gz",
+    "sha256": "984779d09ecb0e235719f9d1f7ee053c4b0cb649d5f699131591f68fddafb95f"
+  },
+  "fin_target": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:615",
+    "descripcion": "target final retro-transformado (p x p)",
+    "archivo": "fin_target.csv.gz",
+    "sha256": "b224db90133a7403ff7ab2d9fd17679561bafdf536c66715f2dba472b936e9d1"
+  },
+  "fin_W": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:579",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "fin_W.csv.gz",
+    "sha256": "484984d97cfdb86591317af899b60bb70e22235bb74e3a07365a95e010824624"
+  },
+  "hs_init": {
+    "forma": [25, 6],
+    "tipo": "int",
+    "captura": "detmrcd.R:459",
+    "descripcion": "subconjuntos iniciales hsets.init[1:h,] (h x 6), base 1, orden de distancia",
+    "archivo": "hs_init.csv.gz",
+    "sha256": "33e46eb1569db08cf1ca9a1152e156e394939c65ba1df923bb82a82a4dceb440"
+  },
+  "in_ok": {
+    "forma": [50, 1],
+    "tipo": "logical",
+    "captura": "CovMrcd.R:19",
+    "descripcion": "filas finitas de x (n0); TRUE/FALSE como 1/0",
+    "archivo": "in_ok.csv.gz",
+    "sha256": "b5e5a6f27fe10c34abba19991afddd6f8509511427d38cbd3ddc68d75173861f"
+  },
+  "in_x": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "CovMrcd.R:20",
+    "descripcion": "x filtrada (n x p)",
+    "archivo": "in_x.csv.gz",
+    "sha256": "dbcceb4ebff5b037497c1cad7caa0792bf244ad6babb7883fa891d9dac97e06c"
+  },
+  "is_centeredx_k1": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k1.csv.gz",
+    "sha256": "e6676c65e23b09a5702bd688a0459db613e897e50afd1639f2a4936b333c264b"
+  },
+  "is_centeredx_k2": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k2.csv.gz",
+    "sha256": "6b69a76f3d5f9b5e95df00bdc096621ac139a40b8cbea0f1917b09d7a8d5719c"
+  },
+  "is_centeredx_k3": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k3.csv.gz",
+    "sha256": "8c22d2903c0421d10314e7f163c1d72a88d2cae50bffc5753b6ebfc9f2b8d282"
+  },
+  "is_centeredx_k4": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k4.csv.gz",
+    "sha256": "7d17eb1af030b53d95fa521d99e05a08568d104a797a94be013b6b97b51a1548"
+  },
+  "is_centeredx_k5": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k5.csv.gz",
+    "sha256": "7b5599141ebc7a9b7ebd930d990683670a23e3c6c6d42b883940914d9e3c21e9"
+  },
+  "is_centeredx_k6": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:74",
+    "descripcion": "(data - estloc) %*% P (n x p)",
+    "archivo": "is_centeredx_k6.csv.gz",
+    "sha256": "a8c387549d4c37a09f00d25bbd59b3e2eff7daba027fbfe5a70d094d36e9abf8"
+  },
+  "is_colmed_k1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k1.csv.gz",
+    "sha256": "465b7f0f3a1b2573781573956e9cece5b362f3517484dbe538e88777b0d768c1"
+  },
+  "is_colmed_k2": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k2.csv.gz",
+    "sha256": "19dbed13dd69181fdda549ae28e79765f5c85f4af5011e51da18465727c23c26"
+  },
+  "is_colmed_k3": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k3.csv.gz",
+    "sha256": "d80d2431d82b71f0bd6ada883d7619536748f1a7dcd262916429c76a8eafce33"
+  },
+  "is_colmed_k4": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k4.csv.gz",
+    "sha256": "73572e41292c9a70cd155d870ff6eb2426a3950730e2d954f77cf2eb173cde0d"
+  },
+  "is_colmed_k5": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k5.csv.gz",
+    "sha256": "1cfdbd954c04921488afd420d3367521539e7685ce4f0933dcb993a3f9f6915d"
+  },
+  "is_colmed_k6": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "colMedians(data %*% sqrtinvcov) (p)",
+    "archivo": "is_colmed_k6.csv.gz",
+    "sha256": "ec9b35a5244e0454153c25581b3e0f1dbfee5e02041fbb40e1118ffdae5dd178"
+  },
+  "is_dist_k1": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k1.csv.gz",
+    "sha256": "736e2f046a209bbcc63ce991e708885dc12d497642c6bfb25d99382952a1fe43"
+  },
+  "is_dist_k2": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k2.csv.gz",
+    "sha256": "54bfaaa9476bf78c3f487f4fa732df85a385253c75beb9f22754a7db046eac37"
+  },
+  "is_dist_k3": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k3.csv.gz",
+    "sha256": "a5583f5b545b07658d6ee9fe872bd77c0cc8040c2dd5bf3a5da118dbedda134b"
+  },
+  "is_dist_k4": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k4.csv.gz",
+    "sha256": "076ecc86581c9da16a50edb778fadabbeea942c4e598843f5a23c7ef8f4e06a1"
+  },
+  "is_dist_k5": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k5.csv.gz",
+    "sha256": "f0b2789fa21f513616ff3bce012adface85f33390aee5ec61a921156020fd633"
+  },
+  "is_dist_k6": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:75",
+    "descripcion": "distancias mahalanobisD (n)",
+    "archivo": "is_dist_k6.csv.gz",
+    "sha256": "d763751260c76fa480c77847e7882cd7dcced1686f822865b2b2dbd82e6cba35"
+  },
+  "is_estloc_k1": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k1.csv.gz",
+    "sha256": "fe1ec1ecabae8166310164b2cb55017bd80697cbb30b7de8e93951b76030d81a"
+  },
+  "is_estloc_k2": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k2.csv.gz",
+    "sha256": "3b8590462e6368aea60c2faa5287c2b1b4d1c13483f1fcc665f81e590fff919c"
+  },
+  "is_estloc_k3": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k3.csv.gz",
+    "sha256": "777d190ec14706d0de70976c028dd2fa32ea3c84f8f2a758ae13755e0be25b99"
+  },
+  "is_estloc_k4": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k4.csv.gz",
+    "sha256": "b269bddc83e849346a8b4d3c55e5ef72cf040d27a35982591c5a703db376477d"
+  },
+  "is_estloc_k5": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k5.csv.gz",
+    "sha256": "cee99585659348acdeb18d4ab6f24bed9c81438b24b1b035bd9e150607a3395c"
+  },
+  "is_estloc_k6": {
+    "forma": [1, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:73",
+    "descripcion": "estloc = colMedians(.) %*% sqrtcov (p)",
+    "archivo": "is_estloc_k6.csv.gz",
+    "sha256": "851bf45ad86d9c1e06ed25a87d3d33d043e50dfaa4f8a17f321dc5ce7971bcf6"
+  },
+  "is_lambda_k1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k1.csv.gz",
+    "sha256": "17009b7c2774c593175956d540b96bc5f436d2660fe0b245f866ac9c6ee188fd"
+  },
+  "is_lambda_k2": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k2.csv.gz",
+    "sha256": "3c4aafcb35947c371febc8def5cc236de41c139f86bd52b329f43f6b0b571c58"
+  },
+  "is_lambda_k3": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k3.csv.gz",
+    "sha256": "48cef9f9af22d21e2f8a242704bb7dbcf2066e2099a2988324ec540bd30ce8d2"
+  },
+  "is_lambda_k4": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k4.csv.gz",
+    "sha256": "a38950a5b9f6c7f07d128be5bbd59727a7d85d55d19220606c7c6319b67eaa4c"
+  },
+  "is_lambda_k5": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k5.csv.gz",
+    "sha256": "39b2fc06713491b45b9aab566c377cc6e8dd282d098914be7d505658bb5d5c7c"
+  },
+  "is_lambda_k6": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "escalas lambda de doScale(data %*% P) (p)",
+    "archivo": "is_lambda_k6.csv.gz",
+    "sha256": "47e323797e0d754460f8449e6c8ec3c2ca52897a4951db2bc8e85ec6a7ee4496"
+  },
+  "is_ord_k1": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k1.csv.gz",
+    "sha256": "73bc380362df0e33706060c33fa2b0215adaddd679a0c385771cb1138b87e447"
+  },
+  "is_ord_k2": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k2.csv.gz",
+    "sha256": "c0b77281ae62c1f1b79a82ced6681a5fdf26024a070dc0924d6b0108c34d9e3c"
+  },
+  "is_ord_k3": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k3.csv.gz",
+    "sha256": "10ec734d8333e9d0c0e361c4689558b67fc2b8957b3584a0fb235b4e53034fa7"
+  },
+  "is_ord_k4": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k4.csv.gz",
+    "sha256": "3b333ec6611a9cc7a863dab0cee1e77e7a720d680a615235f79b60aede2d2f15"
+  },
+  "is_ord_k5": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k5.csv.gz",
+    "sha256": "17d79c10d5e2c8db93b4a1e25fae8a735c68d2f7359f096a246e9925cc24ef59"
+  },
+  "is_ord_k6": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:75",
+    "descripcion": "primeras h posiciones del orden de distancias, base 1 (h)",
+    "archivo": "is_ord_k6.csv.gz",
+    "sha256": "225a62a54d99cb4dc98b1544b864b0efdfae46ed2636c830efb83f831c780bd4"
+  },
+  "is_proj_k1": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k1.csv.gz",
+    "sha256": "dfb88783e37fc554f225a2863842848606cb1ae979e030642d9a845a38652a32"
+  },
+  "is_proj_k2": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k2.csv.gz",
+    "sha256": "56eaa5689bd91ad6de28cb5c78be7d91974e06d73dde9e07c923896d0336ef00"
+  },
+  "is_proj_k3": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k3.csv.gz",
+    "sha256": "51b35105e4920c1ccdfee4bfa828c1379fef57facee0bdd09d8a695ba6d2393a"
+  },
+  "is_proj_k4": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k4.csv.gz",
+    "sha256": "fc53fffc314496d9ee8afbc249782a2d44cddbe042061430ae5b48803eb17a99"
+  },
+  "is_proj_k5": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k5.csv.gz",
+    "sha256": "58aa6e0865783418a95c5247d65d5e3ea9e1dbc9129afc1961eed745b181f13a"
+  },
+  "is_proj_k6": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:70",
+    "descripcion": "proyeccion data %*% P (n x p) del conjunto k",
+    "archivo": "is_proj_k6.csv.gz",
+    "sha256": "0fbdc2dce7922bf0adc9bcbb7fb5677309c2c79ffa7330df7d4a95ceb5913510"
+  },
+  "is_sqrtcov_k1": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k1.csv.gz",
+    "sha256": "e281a3f236fb163fae5753317070461ec88ca176097abbb69b433376e8d49741"
+  },
+  "is_sqrtcov_k2": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k2.csv.gz",
+    "sha256": "e7a060606db8a21e2bdc5d462c9638f44a19f7f7c2281ef90532789e5c78fbb2"
+  },
+  "is_sqrtcov_k3": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k3.csv.gz",
+    "sha256": "f5a24e684f136ef08d1fa6071bbbc962f1359c61b434502f1bcecdaf95a53ca9"
+  },
+  "is_sqrtcov_k4": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k4.csv.gz",
+    "sha256": "e01b8eed1a5832e5d3250dbcdd321e8ac4d4388a1a6a69df46578ba065f46299"
+  },
+  "is_sqrtcov_k5": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k5.csv.gz",
+    "sha256": "60a23e3c64cb9f86817bce167f87fd653dec345b275ac75d55a435375e87515a"
+  },
+  "is_sqrtcov_k6": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:71",
+    "descripcion": "P %*% (lambda * t(P)) (p x p)",
+    "archivo": "is_sqrtcov_k6.csv.gz",
+    "sha256": "bdadcf4483cb9ffc9b02921018ee9d28c3797aa7bbb42438a2b589fc1d09fc13"
+  },
+  "is_sqrtinvcov_k1": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k1.csv.gz",
+    "sha256": "239510336186a444feedcf34b55708c6384f044b5525c86a84cc78aa6b3c09a4"
+  },
+  "is_sqrtinvcov_k2": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k2.csv.gz",
+    "sha256": "a56d8d06236467a47974a24f4c05017120a43657d47f1b89cd1fec7894d150f5"
+  },
+  "is_sqrtinvcov_k3": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k3.csv.gz",
+    "sha256": "cddf6ab0c0991eb17527aaeefc177f59b8a91830b60872575300c9d35eead4f5"
+  },
+  "is_sqrtinvcov_k4": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k4.csv.gz",
+    "sha256": "7150c5285af745214db8cbf4a57c0f3245534ebd5ca0c64dfb2d73a6132a4db9"
+  },
+  "is_sqrtinvcov_k5": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k5.csv.gz",
+    "sha256": "81a72abd81eccb24648c13d54aae2b3baefe004c44f5e37db34e0e5a5a03f7f2"
+  },
+  "is_sqrtinvcov_k6": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:72",
+    "descripcion": "P %*% (t(P)/lambda) (p x p)",
+    "archivo": "is_sqrtinvcov_k6.csv.gz",
+    "sha256": "38a996dd3122011e2c52436248491a57d5f099dcf759ffc69383dc75b994bb29"
+  },
+  "out_alpha": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot alpha del objeto S4 CovMrcd",
+    "archivo": "out_alpha.csv.gz",
+    "sha256": "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e"
+  },
+  "out_best": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot best del objeto S4 CovMrcd",
+    "archivo": "out_best.csv.gz",
+    "sha256": "9065cee2286573e1bdc073f386d5004fae8e7b5c1d06328046aa24ff69589492"
+  },
+  "out_center": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot center del objeto S4 CovMrcd",
+    "archivo": "out_center.csv.gz",
+    "sha256": "f754be250e8e7288e8ae4714525b23ddb4c1f509e50e71669fd1b1b628d70c6f"
+  },
+  "out_cnp2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot cnp2 del objeto S4 CovMrcd",
+    "archivo": "out_cnp2.csv.gz",
+    "sha256": "9c442eb9f44649208eb85f12b616995ef868f34e7d73c0daa0e935bf5714eeb2"
+  },
+  "out_cov": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot cov del objeto S4 CovMrcd",
+    "archivo": "out_cov.csv.gz",
+    "sha256": "10b5a48971ec36283b8a7e721819fc9ba096bb76973deae82eaf5ca7b39fa383"
+  },
+  "out_crit": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot crit del objeto S4 CovMrcd",
+    "archivo": "out_crit.csv.gz",
+    "sha256": "bce91c7e107b28a78bab4308f06feb5f66821a6f0f58ddc6a3576f3b3a526cf0"
+  },
+  "out_iBest": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:634",
+    "descripcion": "iBest devuelto por .detmrcd (base 1, longitud variable)",
+    "archivo": "out_iBest.csv.gz",
+    "sha256": "d3dafea87dcbe4c732c700dc7aff5e6e419ec0c8f77e5ad455451904eaf9d808"
+  },
+  "out_icov": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot icov del objeto S4 CovMrcd",
+    "archivo": "out_icov.csv.gz",
+    "sha256": "81c40a33e58a022faddcde341598bbe8b09782525b5cb99d129df3acc2d5aed7"
+  },
+  "out_mah": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot mah del objeto S4 CovMrcd",
+    "archivo": "out_mah.csv.gz",
+    "sha256": "1e45427a429cfa3acd3787305b36fa76afb100eb25da86e1d8e378704234e5db"
+  },
+  "out_n_csteps": {
+    "forma": [6, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:634",
+    "descripcion": "n.csteps devuelto por .detmrcd (6)",
+    "archivo": "out_n_csteps.csv.gz",
+    "sha256": "da9ea54674d329a4d0148f8d3868e485d2c60691795dba31a1679e3cfceba940"
+  },
+  "out_n_obs": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot n_obs del objeto S4 CovMrcd",
+    "archivo": "out_n_obs.csv.gz",
+    "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+  },
+  "out_quan": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot quan del objeto S4 CovMrcd",
+    "archivo": "out_quan.csv.gz",
+    "sha256": "170db151d301ffa2b4d0ac515f1d640d97387bf3b02c5b7656e1e44f75bc4c3f"
+  },
+  "out_rho": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot rho del objeto S4 CovMrcd",
+    "archivo": "out_rho.csv.gz",
+    "sha256": "d56bf4e5e83eef8c6c6520f96a7ae87087642af973f60694df21a20cc00cb31b"
+  },
+  "out_target": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "CovMrcd.R:66-81",
+    "descripcion": "slot target del objeto S4 CovMrcd",
+    "archivo": "out_target.csv.gz",
+    "sha256": "b224db90133a7403ff7ab2d9fd17679561bafdf536c66715f2dba472b936e9d1"
+  },
+  "pre_alpha": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:404",
+    "descripcion": "alpha efectivo",
+    "archivo": "pre_alpha.csv.gz",
+    "sha256": "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e"
+  },
+  "pre_h": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:404",
+    "descripcion": "tamano del subconjunto h",
+    "archivo": "pre_h.csv.gz",
+    "sha256": "170db151d301ffa2b4d0ac515f1d640d97387bf3b02c5b7656e1e44f75bc4c3f"
+  },
+  "pre_n": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:404",
+    "descripcion": "numero de observaciones",
+    "archivo": "pre_n.csv.gz",
+    "sha256": "c5f742cf3cb132d0af36ad9505d58e3b6084b633e22bd11fada30b3d00b14a84"
+  },
+  "pre_p": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:404",
+    "descripcion": "numero de variables",
+    "archivo": "pre_p.csv.gz",
+    "sha256": "17aeaa641ae586bab8488faada199431b3b4f4b4014a35533d46c4116ca03b42"
+  },
+  "r6_center": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:124",
+    "descripcion": "centros de doScale (p)",
+    "archivo": "r6_center.csv.gz",
+    "sha256": "71a99dda7f9e516cd5852672bea37225d5899cc5c400cc128c62b4693755ab74"
+  },
+  "r6_covx": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:161",
+    "descripcion": "cov(x[Hinit,]) (p x p)",
+    "archivo": "r6_covx.csv.gz",
+    "sha256": "1b06a584bae14db1d51475c643672caa55e9fab078291e9ef1ab806c4eb24a89"
+  },
+  "r6_ev1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:134",
+    "descripcion": "autovalores de R1 (p)",
+    "archivo": "r6_ev1.csv.gz",
+    "sha256": "51dd75811f02f6611787f9d77be49c8a88c7e19312b3f51c51a8f56b9b66b986"
+  },
+  "r6_ev2": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:139",
+    "descripcion": "autovalores de R2 (p)",
+    "archivo": "r6_ev2.csv.gz",
+    "sha256": "df535b450d12a5036dac97a1ced05d6cb506abe93c70f0c36d00388584eaf80c"
+  },
+  "r6_ev3": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:145",
+    "descripcion": "autovalores de R3 (p)",
+    "archivo": "r6_ev3.csv.gz",
+    "sha256": "8f156bcfdbc841b1f20270a4e3756976ee3b195f60d82dc5864dc485476039aa"
+  },
+  "r6_ev4": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:154",
+    "descripcion": "autovalores de SCM (p)",
+    "archivo": "r6_ev4.csv.gz",
+    "sha256": "c2547da10b7263754d8a5ad086a46316eca650b4bada634ef175f699c70265d1"
+  },
+  "r6_ev5": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:162",
+    "descripcion": "autovalores de covx (p)",
+    "archivo": "r6_ev5.csv.gz",
+    "sha256": "6650ef37e2c93e4953e435bc2144ba7ebaa2b5920c268cf1757dd64376adf35a"
+  },
+  "r6_ev6": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:101",
+    "descripcion": "autovalores de U (p)",
+    "archivo": "r6_ev6.csv.gz",
+    "sha256": "44cdf3386bcacd7ebab25a6bb71678cac06c9e6f8f01fed0adc5c11da2967491"
+  },
+  "r6_Hinit": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:160",
+    "descripcion": "primeras ceil(n/2) filas de ind5, base 1",
+    "archivo": "r6_Hinit.csv.gz",
+    "sha256": "86c32cf4ee16c8ed8d9fb06712adcd2655e98e4b3fa541341037468d1cd99547"
+  },
+  "r6_ind5": {
+    "forma": [50, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:158",
+    "descripcion": "order(znorm), base 1 (n)",
+    "archivo": "r6_ind5.csv.gz",
+    "sha256": "94a61d741140a9b18dfc9fa5ebc18b182f79e7ce74ec3c85617dd44c23ce712c"
+  },
+  "r6_P1": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:134",
+    "descripcion": "autovectores de R1 (p x p, orden decreciente de valores)",
+    "archivo": "r6_P1.csv.gz",
+    "sha256": "8b4d6e28fe14a7a64c17642301326e97c6a1d30d21fa93d570d84516464341d6"
+  },
+  "r6_P2": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:139",
+    "descripcion": "autovectores de R2 (p x p)",
+    "archivo": "r6_P2.csv.gz",
+    "sha256": "24d3bda3c69e168794360e257fffb9abce3e32961d5e4718970ba9432531fac6"
+  },
+  "r6_P3": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:145",
+    "descripcion": "autovectores de R3 (p x p)",
+    "archivo": "r6_P3.csv.gz",
+    "sha256": "b721750e6a255d98428da80bb89dfac49e41cef47777e7f8bb8a2073807179c8"
+  },
+  "r6_P4": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:154",
+    "descripcion": "autovectores de SCM (p x p)",
+    "archivo": "r6_P4.csv.gz",
+    "sha256": "83daaeca2225479f2d9765f962f932419f0932e0a471cf1e162be6ccbfb8d951"
+  },
+  "r6_P5": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:162",
+    "descripcion": "autovectores de covx (p x p)",
+    "archivo": "r6_P5.csv.gz",
+    "sha256": "efb797bba5ae0ef7604120341bdcf950e8fc60e7f95ee6ca25aeec5791b93593"
+  },
+  "r6_P6": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:166",
+    "descripcion": "autovectores de U (p x p)",
+    "archivo": "r6_P6.csv.gz",
+    "sha256": "6a625e3bf8a7d782dd71d2be30ba4359973fb83e32b95f298d6b2af43de64431"
+  },
+  "r6_R1": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:133",
+    "descripcion": "cor(y1) (p x p)",
+    "archivo": "r6_R1.csv.gz",
+    "sha256": "4504573dab0bba5e0a8ea62980a4bb3ea3a069f47a48473d07c497d4935a7a30"
+  },
+  "r6_R2": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:138",
+    "descripcion": "cor spearman de x (p x p)",
+    "archivo": "r6_R2.csv.gz",
+    "sha256": "8d0d693bca942bdcbfb74777fdbf2a5983a8a6c6f148628d3732990592e0becc"
+  },
+  "r6_R3": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:144",
+    "descripcion": "cor(y3, use=complete.obs) (p x p)",
+    "archivo": "r6_R3.csv.gz",
+    "sha256": "7030191f9bb213ab09fa73c885645b72e99cc40c6b50354c8242daa123ba1a87"
+  },
+  "r6_rank": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:138",
+    "descripcion": "rangos promedio por columna de x (n x p)",
+    "archivo": "r6_rank.csv.gz",
+    "sha256": "07a380d1c31477c445d26969deb423b520c38d3bae47b9a2a471824dd355d1b4"
+  },
+  "r6_scale": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:124",
+    "descripcion": "escalas Qn de doScale tras centrar (p)",
+    "archivo": "r6_scale.csv.gz",
+    "sha256": "cfef60c6b03acce5216e77668688f150511ca19cc945ef1f104720b87fd55d34"
+  },
+  "r6_SCM": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:153",
+    "descripcion": "crossprod(x.nrmd) (p x p)",
+    "archivo": "r6_SCM.csv.gz",
+    "sha256": "84fef871075cdee57d1c020f8130b68f802c2ad94915017e190293e0b20c51d9"
+  },
+  "r6_U": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:97-101",
+    "descripcion": "matriz U de ogkscatter completa antes de eigen (p x p)",
+    "archivo": "r6_U.csv.gz",
+    "sha256": "2e8af8aedefc42db9036c44b37b24cd03c86a4ef6d912035972387ccd99f39f4"
+  },
+  "r6_x": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:124",
+    "descripcion": "x tras doScale (n x p)",
+    "archivo": "r6_x.csv.gz",
+    "sha256": "459c28161135c0a2a9eca9115ead8ffb10109fbd5cfc46c6498d9b2d29107697"
+  },
+  "r6_xnrmd": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:152",
+    "descripcion": "x con filas normalizadas (n x p)",
+    "archivo": "r6_xnrmd.csv.gz",
+    "sha256": "168cf3b702ffb828f83c8088271a9592c997e6f567aa92497f459d94955a7c2f"
+  },
+  "r6_y1": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:132",
+    "descripcion": "tanh(x) (n x p)",
+    "archivo": "r6_y1.csv.gz",
+    "sha256": "332939a8d95b74e28c6f01a7f5bb8baee1df2bc5c723a79a74b03c4cdc2f08d6"
+  },
+  "r6_y3": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:143",
+    "descripcion": "qnorm((rank-1/3)/(n+1/3)) (n x p)",
+    "archivo": "r6_y3.csv.gz",
+    "sha256": "ea29c4cd376f5a78ea39f91226d6872b3558c37319ccdf261ef157d4f16285fb"
+  },
+  "r6_znorm": {
+    "forma": [50, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:149",
+    "descripcion": "norma euclidea por fila de x (n)",
+    "archivo": "r6_znorm.csv.gz",
+    "sha256": "71ece94bdf684d9b8edab89d0e81fe9ca1f06c712ddf22ed6d2b6149719b88c5"
+  },
+  "rs_cutoff": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:518",
+    "descripcion": "max(0.1, median(rho6))",
+    "archivo": "rs_cutoff.csv.gz",
+    "sha256": "9570c7bddd51dba94859dad399c3eb55a90000c6f8926c0fe8c693b375fb724e"
+  },
+  "rs_e1_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k1.csv.gz",
+    "sha256": "296087fa829b65cda31debfbb224e5be7c22bc4eda69fae48f030c9fec15be9b"
+  },
+  "rs_e1_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k2.csv.gz",
+    "sha256": "971e255e46d1e01fc9d137360a1d1faf960f291a16823f67fc7deaf937a878c8"
+  },
+  "rs_e1_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k3.csv.gz",
+    "sha256": "e163020c18d5d1f91fadb843bcb4d42343632ab4e9db3e5ca2e10372b8cd22fc"
+  },
+  "rs_e1_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k4.csv.gz",
+    "sha256": "aef00224e8fa4d02a273d8b57b6c8d94df53eeb03663775baf899040eccbd425"
+  },
+  "rs_e1_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k5.csv.gz",
+    "sha256": "54ccc0ee0ca05ad27ae84ef5be387a4e4c8cee4bc9a10e9ccc3918c2022958e4"
+  },
+  "rs_e1_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "minimo autovalor",
+    "archivo": "rs_e1_k6.csv.gz",
+    "sha256": "581e2bd986d762345d6ee1957f7e6a3004f9ce54c9b04493290676f78ff33009"
+  },
+  "rs_ep_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k1.csv.gz",
+    "sha256": "e3acac5a0bdf65c30118f1bc96b7bf94e80ce48d8ceba38c0df73b320757225d"
+  },
+  "rs_ep_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k2.csv.gz",
+    "sha256": "c6d19b1bf7d66440faba5edfc321d645fdc5f708b0a5b0de06e469e585d58ea9"
+  },
+  "rs_ep_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k3.csv.gz",
+    "sha256": "e006b636a82f8fa8145cf26eb2590a18ae858572b26b06a3d41dc1fc5670d7e8"
+  },
+  "rs_ep_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k4.csv.gz",
+    "sha256": "6fc26bc4f97deef84f573f48cdf6062f1cd2fde18c0c9aacb0fa2f71975d9f94"
+  },
+  "rs_ep_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k5.csv.gz",
+    "sha256": "3e9c0ec3cd6dbcdc342dd508c4ec27db7471eaa6d48d1337485acc38dd92b52d"
+  },
+  "rs_ep_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "maximo autovalor",
+    "archivo": "rs_ep_k6.csv.gz",
+    "sha256": "4ba56d0791d27e89fa859b824f319d1a72582867e729bc3b7cf1c9fb905d5ebe"
+  },
+  "rs_estimprec_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k1.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_estimprec_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k2.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_estimprec_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k3.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_estimprec_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k4.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_estimprec_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k5.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_estimprec_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "estim.prec de uniroot",
+    "archivo": "rs_estimprec_k6.csv.gz",
+    "sha256": "7254c99348d6ab6e9d9c737619b3021a70c1ca796d711588ee1fcd3148c2d3e7"
+  },
+  "rs_flower_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k1.csv.gz",
+    "sha256": "4fb71aad3637ca360a3e33d3817098fb8863a6e2a93f84a8863b35472a892464"
+  },
+  "rs_flower_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k2.csv.gz",
+    "sha256": "4525534be5aec171cec14e479e206536d9e13f7d79a99d11c4e754c7125de966"
+  },
+  "rs_flower_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k3.csv.gz",
+    "sha256": "d5d503dd3b72e289bacc810fbb6e0508ff4a524b3e347ca5084aa33d47a97ee4"
+  },
+  "rs_flower_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k4.csv.gz",
+    "sha256": "c92df867f340c534f84b3254e0d2bdd609b17af6ea29d283130f08b888b50376"
+  },
+  "rs_flower_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k5.csv.gz",
+    "sha256": "bf09a400e993ee05308b61b92532711fe0aa71c744a6b60e44de125d2c73fb9e"
+  },
+  "rs_flower_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(lower=1e-5)",
+    "archivo": "rs_flower_k6.csv.gz",
+    "sha256": "71f93dd5751b8381d2c055c8bbcd6399fc0c959bf8e3cd79a711ed0a5fb14572"
+  },
+  "rs_fupper_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k1.csv.gz",
+    "sha256": "99838a03ce0dcaef42fbff92f537f153f1a177c8026aced76f5c675bdd2f920e"
+  },
+  "rs_fupper_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k2.csv.gz",
+    "sha256": "99838a03ce0dcaef42fbff92f537f153f1a177c8026aced76f5c675bdd2f920e"
+  },
+  "rs_fupper_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k3.csv.gz",
+    "sha256": "2e5e98d3de53d331f32af1a8ef7dfe4b10d640861060313d69e36f6db8fdb57d"
+  },
+  "rs_fupper_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k4.csv.gz",
+    "sha256": "e8fcb5599e35e825c3e21480520020889cfb19f0f0294c530d87b660311485c9"
+  },
+  "rs_fupper_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k5.csv.gz",
+    "sha256": "7e49894784e78115458a6455567e9aefd019d2ad6eb88231fc6c8e5bb559a4ad"
+  },
+  "rs_fupper_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:495",
+    "descripcion": "fncond(upper=0.99)",
+    "archivo": "rs_fupper_k6.csv.gz",
+    "sha256": "a7a82512363840ad3bb386c15f6add15b348b9a866d9dce7c9683b949d49c236"
+  },
+  "rs_initV": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:533",
+    "descripcion": "subconjunto inicial initV (base 1)",
+    "archivo": "rs_initV.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_iter_k1": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k1.csv.gz",
+    "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+  },
+  "rs_iter_k2": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k2.csv.gz",
+    "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+  },
+  "rs_iter_k3": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k3.csv.gz",
+    "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+  },
+  "rs_iter_k4": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k4.csv.gz",
+    "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+  },
+  "rs_iter_k5": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k5.csv.gz",
+    "sha256": "c40a97b47400a9d924da79a1850e62cf815944bc1413e893c478485efc4b4be4"
+  },
+  "rs_iter_k6": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:500",
+    "descripcion": "iteraciones de uniroot",
+    "archivo": "rs_iter_k6.csv.gz",
+    "sha256": "8c32bb0186818a1f4807888fc622f8c53105b904dd0155662359b927d234c239"
+  },
+  "rs_mS_k1": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k1.csv.gz",
+    "sha256": "4284a873e8c61a0e5e58b6e091ef19825e2294b85e99aa9c7626e67496722b50"
+  },
+  "rs_mS_k2": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k2.csv.gz",
+    "sha256": "2aa6633e138bae6025429b67864d7e702064eb37f0470ab39e30b3c6c15eb2c9"
+  },
+  "rs_mS_k3": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k3.csv.gz",
+    "sha256": "90d93cfecf8cb79a12c402feda308871bbdf8a55f9d3cf85f64413d7af148631"
+  },
+  "rs_mS_k4": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k4.csv.gz",
+    "sha256": "89211fd4edda9706fb04866f4ce9aa65a0d9a30fbe7c64f1b3d70ae108819c49"
+  },
+  "rs_mS_k5": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k5.csv.gz",
+    "sha256": "571239d0f7ebc175aa42e0cbad33afbfc8c9fe413aa751dc09b10119c95f002d"
+  },
+  "rs_mS_k6": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:470",
+    "descripcion": "mE %*% t(mE)/(h-1) (p x p)",
+    "archivo": "rs_mS_k6.csv.gz",
+    "sha256": "d7603394bca6976503b6d24a572d24e22699b93d531bea3d5ab1d792cb2636f3"
+  },
+  "rs_mu_k1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k1.csv.gz",
+    "sha256": "66e7aaca6f2b3887f4b7978ad055692c2714ccdf93368ed920401b5bb24c83e5"
+  },
+  "rs_mu_k2": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k2.csv.gz",
+    "sha256": "979f24c994a5cd0cefa066e2e88320c9c02e6b8cc56a17ce9e69607cd714afb5"
+  },
+  "rs_mu_k3": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k3.csv.gz",
+    "sha256": "769effacfb8497f85ade578f5ade07bf38b8190f8cbee9e61360c5150622f0f0"
+  },
+  "rs_mu_k4": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k4.csv.gz",
+    "sha256": "8e34f8e0fbbba9177a9906d57aa1df7b3a761d2d070f734b12003acb40b0c1f0"
+  },
+  "rs_mu_k5": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k5.csv.gz",
+    "sha256": "e83f9026e18cb6d34bf15be09ab0f9a40707dde3e68605acb2a24d684aa6c217"
+  },
+  "rs_mu_k6": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:468",
+    "descripcion": "medias del subconjunto k (p)",
+    "archivo": "rs_mu_k6.csv.gz",
+    "sha256": "06a202da7aa149ee3a57675ff2caa8a9ab0813d66b80a3dc61133bdc168920d3"
+  },
+  "rs_path_k1": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k1.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_path_k2": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k2.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_path_k3": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k3.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_path_k4": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k4.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_path_k5": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k5.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_path_k6": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:495-511",
+    "descripcion": "camino de rho_k: 1 = uniroot, 2 = rejilla (uniroot fallo)",
+    "archivo": "rs_path_k6.csv.gz",
+    "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+  },
+  "rs_rho": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:519",
+    "descripcion": "rho global = max(rho6[rho6<=cutoff])",
+    "archivo": "rs_rho.csv.gz",
+    "sha256": "d56bf4e5e83eef8c6c6520f96a7ae87087642af973f60694df21a20cc00cb31b"
+  },
+  "rs_rho6": {
+    "forma": [6, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:518",
+    "descripcion": "rho_k de los 6 subconjuntos (6)",
+    "archivo": "rs_rho6.csv.gz",
+    "sha256": "8abd16b88ebcbe8680957680c950c2d7fe0f2601a48c8f59f103a544fb9e9d82"
+  },
+  "rs_rhok_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k1.csv.gz",
+    "sha256": "99e6a92cb178eda967550da8afb32939d75ed35f2b2d829d31799af9e40169ee"
+  },
+  "rs_rhok_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k2.csv.gz",
+    "sha256": "d56bf4e5e83eef8c6c6520f96a7ae87087642af973f60694df21a20cc00cb31b"
+  },
+  "rs_rhok_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k3.csv.gz",
+    "sha256": "4680894103f2b8f7988e1bf499a6f278a1bec1ea33955ce3d642cb64a8241622"
+  },
+  "rs_rhok_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k4.csv.gz",
+    "sha256": "de2258926cc36fab1e325ac256236ede00475b810b89d96f555967206ba2cca7"
+  },
+  "rs_rhok_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k5.csv.gz",
+    "sha256": "b2972bd48132ec58333d05cef08d817afa20d507d5a98c5a61244d108cdb3fcf"
+  },
+  "rs_rhok_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500/511",
+    "descripcion": "rho_k elegido para el subconjunto k",
+    "archivo": "rs_rhok_k6.csv.gz",
+    "sha256": "0175c5431bddb7df0779cc80092a8964da054ff9cb079d2cab21581c5cf9defe"
+  },
+  "rs_root_k1": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k1.csv.gz",
+    "sha256": "99e6a92cb178eda967550da8afb32939d75ed35f2b2d829d31799af9e40169ee"
+  },
+  "rs_root_k2": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k2.csv.gz",
+    "sha256": "d56bf4e5e83eef8c6c6520f96a7ae87087642af973f60694df21a20cc00cb31b"
+  },
+  "rs_root_k3": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k3.csv.gz",
+    "sha256": "4680894103f2b8f7988e1bf499a6f278a1bec1ea33955ce3d642cb64a8241622"
+  },
+  "rs_root_k4": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k4.csv.gz",
+    "sha256": "de2258926cc36fab1e325ac256236ede00475b810b89d96f555967206ba2cca7"
+  },
+  "rs_root_k5": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k5.csv.gz",
+    "sha256": "b2972bd48132ec58333d05cef08d817afa20d507d5a98c5a61244d108cdb3fcf"
+  },
+  "rs_root_k6": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:500",
+    "descripcion": "raiz de uniroot",
+    "archivo": "rs_root_k6.csv.gz",
+    "sha256": "0175c5431bddb7df0779cc80092a8964da054ff9cb079d2cab21581c5cf9defe"
+  },
+  "rs_setsV": {
+    "forma": [2, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:535",
+    "descripcion": "subconjuntos restantes setsV (base 1, longitud variable)",
+    "archivo": "rs_setsV.csv.gz",
+    "sha256": "73361014c6d955876f2dfb6636456a5583750a7b3e5b740d6a9a13381524695f"
+  },
+  "rs_veigen_k1": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k1.csv.gz",
+    "sha256": "0f1d2669e349a24d8eedfbb86d9271a1c9c9bc547b5b176bfb8e2eaa5b5472ff"
+  },
+  "rs_veigen_k2": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k2.csv.gz",
+    "sha256": "566e79c9d3f016528c0dfc3e32d1663c1f8b2df97883020b74159705f9b24f1a"
+  },
+  "rs_veigen_k3": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k3.csv.gz",
+    "sha256": "a93249063a85bafa4fe6e320281a64d08ec759e4bc3b80b6b75e1f82f0a14193"
+  },
+  "rs_veigen_k4": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k4.csv.gz",
+    "sha256": "6437f7810effb4d9eef40301a4388e557ae1fa457d9e1a4abf6fac2e103877be"
+  },
+  "rs_veigen_k5": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k5.csv.gz",
+    "sha256": "9c9c7e45253d19733825f129b8d3ffff712890a90e8ce5ef92ca7d9dfc9e144d"
+  },
+  "rs_veigen_k6": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:475",
+    "descripcion": "autovalores eigen(scfac*mS) (p)",
+    "archivo": "rs_veigen_k6.csv.gz",
+    "sha256": "c92ad80d98b2359b1d753cdf54786c976282ab9ead62f67143471f58bbdb786b"
+  },
+  "rs_Vsel": {
+    "forma": [6, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:528",
+    "descripcion": "Vselection (6), NA como -1 (NA exportado como -1)",
+    "archivo": "rs_Vsel.csv.gz",
+    "sha256": "98e461d10c430fa1f8c1d31497b8bf8c89b7581d1525b87d96d4edf453ddaa49"
+  },
+  "scfac": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:460",
+    "descripcion": ".MCDcons(p, h/n)",
+    "archivo": "scfac.csv.gz",
+    "sha256": "9c442eb9f44649208eb85f12b616995ef868f34e7d73c0daa0e935bf5714eeb2"
+  },
+  "scfac_pg": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:460 (covMcd.R:605)",
+    "descripcion": "pgamma(q/2, p/2+1) (covMcd.R:605)",
+    "archivo": "scfac_pg.csv.gz",
+    "sha256": "5b009509295da093803d983d1a53415ae1972c5ec32bda159d988825d063f9e1"
+  },
+  "scfac_q": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:460 (covMcd.R:604)",
+    "descripcion": "qchisq(h/n, p) (covMcd.R:604)",
+    "archivo": "scfac_q.csv.gz",
+    "sha256": "f094d48108cc17ea5a66a816b054a68f1c819f74fe6dc2f60cf06da236bdf033"
+  },
+  "sel_best6pack": {
+    "forma": [1, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:575",
+    "descripcion": "subconjuntos empatados en el optimo (base 1, longitud variable)",
+    "archivo": "sel_best6pack.csv.gz",
+    "sha256": "d3dafea87dcbe4c732c700dc7aff5e6e419ec0c8f77e5ad455451904eaf9d808"
+  },
+  "sel_hindex": {
+    "forma": [25, 1],
+    "tipo": "int",
+    "captura": "detmrcd.R:575",
+    "descripcion": "indice h final (base 1)",
+    "archivo": "sel_hindex.csv.gz",
+    "sha256": "9065cee2286573e1bdc073f386d5004fae8e7b5c1d06328046aa24ff69589492"
+  },
+  "sel_n_csteps": {
+    "forma": [6, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:575",
+    "descripcion": "numit por subconjunto (6; 0 en initV)",
+    "archivo": "sel_n_csteps.csv.gz",
+    "sha256": "da9ea54674d329a4d0148f8d3868e485d2c60691795dba31a1679e3cfceba940"
+  },
+  "std_mU": {
+    "forma": [50, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:421",
+    "descripcion": "datos estandarizados scale(t(mX), vmx, vsd) (n x p)",
+    "archivo": "std_mU.csv.gz",
+    "sha256": "b909b4a61b14d96ad268bf93842ef9a882ad99a8372faedaf514c7d2ee7b26a0"
+  },
+  "std_vmx": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:417",
+    "descripcion": "medianas por variable (apply median sobre mX p x n)",
+    "archivo": "std_vmx.csv.gz",
+    "sha256": "fc405c8b0a1824a7edce17f8ed59b87e23f6cefe499fc711811c6ba2da094974"
+  },
+  "std_vsd": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:419",
+    "descripcion": "Qn por variable tras vsd[vsd<minscale]<-minscale",
+    "archivo": "std_vsd.csv.gz",
+    "sha256": "ad7b48f337ab87148a7fdb0aa80e738ddb489079a695463fac26778ab6f62f58"
+  },
+  "std_vsd_raw": {
+    "forma": [200, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:418",
+    "descripcion": "Qn por variable antes de minscale",
+    "archivo": "std_vsd_raw.csv.gz",
+    "sha256": "ad7b48f337ab87148a7fdb0aa80e738ddb489079a695463fac26778ab6f62f58"
+  },
+  "tgt_constcor": {
+    "forma": [1, 1],
+    "tipo": "double",
+    "captura": "detmrcd.R:224",
+    "descripcion": "constcor tras la cota inferior; solo target=1",
+    "archivo": "tgt_constcor.csv.gz",
+    "sha256": "c4f56c5198b2397a123c49542d90078fbdababeec8448c71ae072fc7c6208d95"
+  },
+  "tgt_cortmp_rank": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:217",
+    "descripcion": "cor(t(mX), method=spearman) (p x p); solo target=1",
+    "archivo": "tgt_cortmp_rank.csv.gz",
+    "sha256": "8d3b4a0e27ba532245f4497a10ef79c12a282ce6c60de5406c27b3bce938d701"
+  },
+  "tgt_cortmp_sin": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:218",
+    "descripcion": "sin(1/2*pi*cortmp) (p x p); solo target=1",
+    "archivo": "tgt_cortmp_sin.csv.gz",
+    "sha256": "63c359b67c22719b64ddd7be78f4400e1f3de74e661ecb59d8cd785d2b46ed7b"
+  },
+  "tgt_R": {
+    "forma": [200, 200],
+    "tipo": "double",
+    "captura": "detmrcd.R:226",
+    "descripcion": "matriz objetivo equicorrelacion R (p x p); solo target=1",
+    "archivo": "tgt_R.csv.gz",
+    "sha256": "0a417c3f41536272cc26f285dd28323144be35dc3315eb74f692edd5be9f7922"
+  }
+}

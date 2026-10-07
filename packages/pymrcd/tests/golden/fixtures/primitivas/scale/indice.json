@@ -1,0 +1,117 @@
+{
+  "funcion": "scale",
+  "descripcion": "scale(X, center=, scale=) = dos sweeps (resta y luego division).",
+  "referencia": "scale.R:21-58",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "10x3, center=mediana, scale=Qn",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_01.csv.gz",
+          "forma": [10, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "35989ae1d09dbd56455cfbb31886ba8a024e43dc828c5ba5ac259e77af4a0cca"
+        },
+        "center": {
+          "archivo": "entrada_center_01.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "3d001bcb9d206a47d8f2b06386719fe2bb2a533067aaab7f4609b7edf73a702e"
+        },
+        "scale": {
+          "archivo": "entrada_scale_01.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "84ed156423eb0aa294c9a975dbff84e7b6fa47a70b03745aa96a012ba543b7c5"
+        }
+      },
+      "salidas": {
+        "Z": {
+          "archivo": "salida_Z_01.csv.gz",
+          "forma": [10, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b9e494e3c92dabd7ac8c66497d14b107a9dd26fa52d6782aced6e6ef1287336d"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "50x12, center=mediana, scale=Qn",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_02.csv.gz",
+          "forma": [50, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ace25816cc56ebf002f94f40b03ed489cc7b496d9843f752c6b5ce739e7475e3"
+        },
+        "center": {
+          "archivo": "entrada_center_02.csv.gz",
+          "forma": [12, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7bc2a1552245464938a944f39bd41b45631193955afe8646a2628b60cf3b45bc"
+        },
+        "scale": {
+          "archivo": "entrada_scale_02.csv.gz",
+          "forma": [12, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b78060843a5e45653d32a221076a4f705a18b2e7491b5c326aa17034087e0a0e"
+        }
+      },
+      "salidas": {
+        "Z": {
+          "archivo": "salida_Z_02.csv.gz",
+          "forma": [50, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9378fd2560770d04ff7f1c4fa760dcc980bf627665a806e4dd9f9142e827f81d"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "100x250, center=mediana, scale=Qn",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_03.csv.gz",
+          "forma": [100, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "4ac1e17814c43a56103c137bbea1c139ec643f9cb4d8769c65d0db88b7b6df60"
+        },
+        "center": {
+          "archivo": "entrada_center_03.csv.gz",
+          "forma": [250, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "30259e0f5089e2f31cefa48b53d667e361585737e40587084295a0d884dbd0f5"
+        },
+        "scale": {
+          "archivo": "entrada_scale_03.csv.gz",
+          "forma": [250, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e8e5ef60bc5a73841d051f2b23a8c84b4e9ec720252dde64bcbdcfacdbb117a6"
+        }
+      },
+      "salidas": {
+        "Z": {
+          "archivo": "salida_Z_03.csv.gz",
+          "forma": [100, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ee7a97f58da48757de035d07d2f5a516f2eb52e4a8f34b562ac5809121e3ff7c"
+        }
+      }
+    }
+  ]
+}

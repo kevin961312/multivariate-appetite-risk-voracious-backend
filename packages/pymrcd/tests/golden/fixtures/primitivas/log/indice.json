@@ -1,0 +1,31 @@
+{
+  "funcion": "log",
+  "descripcion": "base::log(x) (libm).",
+  "referencia": "Lapack.c:1434",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "log",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_rejilla.csv.gz",
+          "forma": [2124, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "421c74a8199e2bfb819c6f8ab0663e40e47b4b0c21381ca550efb85fbea05edf"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_rejilla.csv.gz",
+          "forma": [2124, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "9253fadb1aaf41f0be7c50145705d59ea5cc37e8c841c985007b78da551dd56b"
+        }
+      }
+    }
+  ]
+}

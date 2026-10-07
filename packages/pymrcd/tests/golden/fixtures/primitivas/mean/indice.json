@@ -1,0 +1,141 @@
+{
+  "funcion": "mean",
+  "descripcion": "mean(x) de dos pasadas (summary.c:479-518).",
+  "referencia": "summary.c:479-518",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "vector de 7 con magnitudes mezcladas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_01.csv.gz",
+          "forma": [7, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "98c94894e4187adcd91e18a194273c09af776acb0aeff8ece32e041d62633791"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "4c768a3ca8f456a4849609f21fb9c53c744976613ccc00b9566b0ea9fcb7b2f3"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "vector de 25 con magnitudes mezcladas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_02.csv.gz",
+          "forma": [25, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "1e3963afbb2f733adf33246edec0eb1e4260025526d9f1a42df7c2275eba56fd"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2bddb71a725770e60d9250ce28130428efe9f6eeb8cc94415c6a9398c6a59a17"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "vector de 50 con magnitudes mezcladas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_03.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7f1aa8a19c6dfc50373deb23f8871324268cb77fae20f0c94aad1ee99f436d39"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5c7c2cad1b4c5ca055cb4319e7b7ccae7e306780ec39be63be6490d78caa25df"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "vector de 100 con magnitudes mezcladas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_04.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8da0304f836effb357d33f41db11627e912a423e8a9bec9f1ed5dc738fb9e8ea"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "441950a81d41f63163553de62a3e93367ae9dfcc52e79b868861dbf61bcf30fa"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "vector de 1000 con magnitudes mezcladas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_05.csv.gz",
+          "forma": [1000, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "19380f1adb4ea32c17b2ee39185024aab72c1948844557d0a34fc7f760675cad"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3dd38c15885bfd8fd128d49fc329e94668c4dad5cd7d43ba0dcfce046e776d96"
+        }
+      }
+    },
+    {
+      "id": "upper_tri",
+      "descripcion": "vals de upper.tri de sin(pi/2*cor spearman) como en .TargetCorr",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_upper_tri.csv.gz",
+          "forma": [66, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ff020492a539579cacb99f278fb6ea90af41aeb230430f3887c6c998d395b5b2"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_upper_tri.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5493fcbd57b179e0e170084854cb7d9c7cbb2d57e3344dd911af7acc1808c89b"
+        }
+      }
+    }
+  ]
+}

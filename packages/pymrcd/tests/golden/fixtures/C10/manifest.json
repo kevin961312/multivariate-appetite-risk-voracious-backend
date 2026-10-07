@@ -1,0 +1,415 @@
+{
+  "caso": "C10",
+  "caso_base": "C10",
+  "variante_target": "identity",
+  "entorno": {
+    "R": "R version 4.5.2 (2025-10-31)",
+    "rrcov": "1.7.7",
+    "rrcov_ruta": "/Users/KEPINEDA/Documents/multivariate-appetite-risk-voracious-backend/referencias/R-lib/rrcov",
+    "robustbase": "0.99.6",
+    "robustbase_ruta": "/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/library/robustbase",
+    "plataforma": "aarch64-apple-darwin20",
+    "BLAS": "/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libBLAS.dylib",
+    "LAPACK": "/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib",
+    "LAPACK_version": "3.12.1",
+    "La_library": "/Library/Frameworks/R.framework/Versions/4.5-arm64/Resources/lib/libRlapack.dylib",
+    "RNGkind": [
+      "Mersenne-Twister",
+      "Inversion",
+      "Rejection"
+    ]
+  },
+  "semilla": 20261010,
+  "n": 50,
+  "p": 200,
+  "sigma": "identidad",
+  "contaminacion": {
+    "fraccion": 0.1,
+    "filas": 5,
+    "desplazamiento": 5
+  },
+  "parametros": {
+    "funcion": "rrcov::CovMrcd(x, target=)",
+    "alpha": 0.5,
+    "h": 25,
+    "maxcsteps": 200,
+    "rho": "NULL (calculado)",
+    "target": "identity",
+    "maxcond": 50,
+    "defaults": "CovControlMrcd() de rrcov 1.7-7"
+  },
+  "entrada": {
+    "archivo": "../C10/x.csv.gz",
+    "sha256": "d7ee11585230dc8c97860ddbb738a94302e969fa57415c0f82019b2fc314ccf8"
+  },
+  "salidas_sha256": [
+    "6f51ab3ab2b4e02474e82c1f0d76b525f6a716dc1cceef230133d9db9e25add1",
+    "a04b8d775c71ba8ec6a7da81a3c6e059f68e188242c584356b597256102f0a19",
+    "f5043ce5031bf04719aa15f80a262ed2eaeab9b1fd68f9e156694aabade41d7b",
+    "4053057423f81c28d013c565020875fb7e0e883eeb8c7ec205ca296a6d02fff0",
+    "e781bc76f210bfa66fd075dfa284d34c3b9d15ffc6e17a5b77b84fc4ff5cd6d9",
+    "4b9441f41ccb418d465782f21373ffe4ab43dcc5e2f0cee4d15506c487fdb3e0",
+    "278073fbd7b92649a0987ab17beda6ddb4f7f02c6961508ba1320df8601b8483",
+    "01a6732f6c90eb6d5d6ae6f341fee436896b7d227f29d8791ee2fe90a39355a2",
+    "170db151d301ffa2b4d0ac515f1d640d97387bf3b02c5b7656e1e44f75bc4c3f",
+    "cf28aba857769d443a1ba1d7593a45f604ecde1458fd644b8356509ee49d187e",
+    "9c442eb9f44649208eb85f12b616995ef868f34e7d73c0daa0e935bf5714eeb2",
+    "d3dafea87dcbe4c732c700dc7aff5e6e419ec0c8f77e5ad455451904eaf9d808",
+    "3d671fd3f0d2cb1c506650f91d3d0ad91b4f2a50fa415f719fa988a5f9b40834",
+    "3dcdd37263e0b17ce13c5dca885e17a1a56dd9db0d9b5bdfd02c2125a79cab12"
+  ],
+  "convenciones": "CSV sin cabecera, 17 cifras significativas (%.17g), filas = filas de R; vectores = 1 columna; escalares 1x1; indices 1-based; enteros sin decimales; logicos 1/0",
+  "tolerancias": {
+    "fuente": "docs/metodos/mrcd-especificacion.md seccion 11 (propuestas del analista-port; pendientes de aprobacion del dueño)",
+    "nota_plataforma": "Igualdad exacta (rtol=atol=0, bit a bit) SOLO en la plataforma de referencia del oraculo: arm64 (aarch64-apple-darwin20) + BLAS Accelerate/vecLib + LAPACK Rlapack 3.12.1 de R + long double == double (R 4.5.2). En otras plataformas (p. ej. x86-64 Linux con OpenBLAS y long double de 80 bits) aplican las tolerancias numericas declaradas por cantidad (columnas tol_etapa y tol_extremo); las cantidades de clase E (enteros, medianas, Qn, rho dado e1/ep...) deben seguir siendo exactas si el port sigue el pseudocodigo de la especificacion, salvo donde dependan de BLAS/LAPACK/libm. Fuente: seccion 11 de docs/metodos/mrcd-especificacion.md.",
+    "clases": {
+      "E": "exacto (rtol=atol=0): escalar IEEE sin BLAS/LAPACK ni libm transcendental",
+      "L": "dependen de libm",
+      "B": "dependen de BLAS/LAPACK (bit a bit solo en la plataforma de referencia)"
+    },
+    "por_cantidad": [
+      {
+        "cantidad": "enteros (h, hsets, index, best, iBest, n.csteps, numit, initV, setsV, ord)",
+        "intermedios": [
+          "pre_n",
+          "pre_p",
+          "pre_h",
+          "in_ok",
+          "hs_init",
+          "is_ord_k*",
+          "r6_ind5",
+          "r6_Hinit",
+          "rs_Vsel",
+          "rs_initV",
+          "rs_setsV",
+          "rs_path_k*",
+          "rs_iter_k*",
+          "cs_index_k*_it*",
+          "cs_nndex_k*_it*",
+          "cs_numit_k*",
+          "sel_best6pack",
+          "sel_hindex",
+          "sel_n_csteps",
+          "out_iBest",
+          "out_n_csteps",
+          "out_best",
+          "out_quan",
+          "out_n_obs"
+        ],
+        "clase": "E",
+        "tol_etapa": "exacto",
+        "tol_extremo": "exacto (salvo divergencia R1, seccion 6)",
+        "justificacion": "discretos"
+      },
+      {
+        "cantidad": "medianas (vmx, centros de doScale, colMedians, cutoffrho)",
+        "intermedios": [
+          "std_vmx",
+          "r6_center",
+          "is_colmed_k*",
+          "rs_cutoff"
+        ],
+        "clase": "E",
+        "tol_etapa": "exacto",
+        "tol_extremo": "exacto",
+        "justificacion": "seleccion + media de 2 en IEEE"
+      },
+      {
+        "cantidad": "Qn, vsd, r6.scale, U de OGK",
+        "intermedios": [
+          "std_vsd_raw",
+          "std_vsd",
+          "r6_scale",
+          "r6_U"
+        ],
+        "clase": "E",
+        "tol_etapa": "exacto (endurece 1e-14)",
+        "tol_extremo": "vsd y U exactos; lambda ver abajo",
+        "justificacion": "qn0 = restas, comparaciones, 2 operaciones finales"
+      },
+      {
+        "cantidad": "lambda de initset",
+        "intermedios": [
+          "is_lambda_k*"
+        ],
+        "clase": "E dada su entrada",
+        "tol_etapa": "exacto",
+        "tol_extremo": "rtol 2^-23 (~1.19e-7) si la proyeccion data %*% P no es bit a bit",
+        "justificacion": "T1/T2: Qn salta entre d y f32(d) ante cambios de 1 ulp"
+      },
+      {
+        "cantidad": "mU, x de doScale, x.nrmd, znorm, rangos",
+        "intermedios": [
+          "std_mU",
+          "r6_x",
+          "r6_xnrmd",
+          "r6_znorm",
+          "r6_rank"
+        ],
+        "clase": "E",
+        "tol_etapa": "exacto (endurece 1e-13)",
+        "tol_extremo": "exacto",
+        "justificacion": "resta/division/sqrt IEEE"
+      },
+      {
+        "cantidad": "y1, cortmp_sin, y3 (libm / AS241)",
+        "intermedios": [
+          "r6_y1",
+          "tgt_cortmp_sin",
+          "r6_y3"
+        ],
+        "clase": "L",
+        "tol_etapa": "rtol 1e-15",
+        "tol_extremo": "rtol 1e-15",
+        "justificacion": "math.* y AS241 portado: <= 4 ulp entre libm"
+      },
+      {
+        "cantidad": "R1, R2, R3, covx, constcor, cortmp, R target",
+        "intermedios": [
+          "r6_R1",
+          "r6_R2",
+          "r6_R3",
+          "r6_covx",
+          "tgt_cortmp_rank",
+          "tgt_constcor",
+          "tgt_R"
+        ],
+        "clase": "E (L si entra y1)",
+        "tol_etapa": "exacto sobre entradas de R (endurece 1e-12)",
+        "tol_extremo": "rtol 1e-12, atol 1e-14",
+        "justificacion": "formula secuencial [S3]"
+      },
+      {
+        "cantidad": "SCM",
+        "intermedios": [
+          "r6_SCM"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-12, atol 1e-14",
+        "tol_extremo": "rtol 1e-12, atol 1e-14",
+        "justificacion": "dsyrk; bit a bit con mismo BLAS"
+      },
+      {
+        "cantidad": "productos dgemm (proj, sqrtcov, mS, W, G...)",
+        "intermedios": [
+          "is_proj_k*",
+          "is_sqrtcov_k*",
+          "is_sqrtinvcov_k*",
+          "is_estloc_k*",
+          "is_centeredx_k*",
+          "is_dist_k*",
+          "rs_mS_k*",
+          "fin_W",
+          "fin_mE",
+          "cs_mS_k*_it*",
+          "cs_smwG_k*_it*",
+          "fin_smwG",
+          "eq_mW"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-12, atol 1e-14*max|ref|",
+        "tol_extremo": "rtol 1e-12, atol 1e-14*max|ref|",
+        "justificacion": "error de dgemm <= k*eps*(|A||B|)"
+      },
+      {
+        "cantidad": "autovalores",
+        "intermedios": [
+          "r6_ev1",
+          "r6_ev2",
+          "r6_ev3",
+          "r6_ev4",
+          "r6_ev5",
+          "r6_ev6",
+          "rs_veigen_k*",
+          "rs_e1_k*",
+          "rs_ep_k*",
+          "eq_values"
+        ],
+        "clase": "B",
+        "tol_etapa": "atol 10*p*eps*lambda_max (<= 1e-10*lambda_max para p <= 4.5e4)",
+        "tol_extremo": "idem",
+        "justificacion": "dsyevr es estable hacia atras: O(p*eps*||A||)"
+      },
+      {
+        "cantidad": "autovectores",
+        "intermedios": [
+          "r6_P1",
+          "r6_P2",
+          "r6_P3",
+          "r6_P4",
+          "r6_P5",
+          "r6_P6",
+          "eq_mQ"
+        ],
+        "clase": "B",
+        "tol_etapa": "solo autoespacios con gap relativo > 1e-8, modulo signo, ||v-v_R|| <= 10*p*eps*lambda_max/gap; ademas comparar signos (T3)",
+        "tol_extremo": "idem",
+        "justificacion": "sensibilidad eps/gap"
+      },
+      {
+        "cantidad": "scfac",
+        "intermedios": [
+          "scfac",
+          "scfac_q",
+          "scfac_pg",
+          "out_cnp2"
+        ],
+        "clase": "-",
+        "tol_etapa": "rtol 1e-14",
+        "tol_extremo": "rtol 1e-14",
+        "justificacion": "medido 6.5e-15 [S5]; exacto si se porta nmath (P3)"
+      },
+      {
+        "cantidad": "rho_k, rho (uniroot o rejilla)",
+        "intermedios": [
+          "rs_rhok_k*",
+          "rs_root_k*",
+          "rs_irho_k*",
+          "rs_estimprec_k*",
+          "rs_flower_k*",
+          "rs_fupper_k*",
+          "rs_rho6",
+          "rs_rho",
+          "out_rho"
+        ],
+        "clase": "E dada (e1, ep)",
+        "tol_etapa": "exacto (endurece 1e-12)",
+        "tol_extremo": "atol 1e-12",
+        "justificacion": "R_zeroin2 es escalar puro"
+      },
+      {
+        "cantidad": "medias por rowMeans (vMu, mu_std)",
+        "intermedios": [
+          "rs_mu_k*",
+          "cs_vMu_k*_it*",
+          "fin_mu_std"
+        ],
+        "clase": "E dado el indice",
+        "tol_etapa": "exacto",
+        "tol_extremo": "exacto",
+        "justificacion": "suma secuencial"
+      },
+      {
+        "cantidad": "rcov, inv_rcov, vdst de C-step; cov/inv estandarizados",
+        "intermedios": [
+          "cs_rcov_k*_it*",
+          "cs_inv_k*_it*",
+          "cs_vdst_k*_it*",
+          "cs_smwTemp_k*_it*",
+          "fin_smwTemp",
+          "fin_cov_std",
+          "fin_icov_std"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-12, atol 1e-14*max|ref|; vdst rtol 1e-12",
+        "tol_extremo": "idem",
+        "justificacion": "dgemm/dpotrf/dpotri con cond <= maxcond en espacio estandarizado"
+      },
+      {
+        "cantidad": "obj / det por conjunto",
+        "intermedios": [
+          "cs_obj_k*",
+          "cs_det_k*"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-12",
+        "tol_extremo": "rtol 1e-12",
+        "justificacion": ""
+      },
+      {
+        "cantidad": "center (target=0)",
+        "intermedios": [
+          "out_center",
+          "fin_center"
+        ],
+        "clase": "E dado hindex",
+        "tol_etapa": "exacto",
+        "tol_extremo": "exacto",
+        "justificacion": "rowMeans + escalado exacto (T9)"
+      },
+      {
+        "cantidad": "center (target=1), cov, icov, target",
+        "intermedios": [
+          "out_center",
+          "out_cov",
+          "out_icov",
+          "out_target",
+          "fin_center",
+          "fin_cov",
+          "fin_icov",
+          "fin_target"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-9, atol 1e-11",
+        "tol_extremo": "rtol 1e-9, atol 1e-11",
+        "justificacion": "se mantiene el plan; informar error relativo a max|ref|"
+      },
+      {
+        "cantidad": "mah",
+        "intermedios": [
+          "out_mah",
+          "fin_dist_detmrcd"
+        ],
+        "clase": "B",
+        "tol_etapa": "rtol 1e-9",
+        "tol_extremo": "rtol 1e-9",
+        "justificacion": ""
+      },
+      {
+        "cantidad": "crit",
+        "intermedios": [
+          "out_crit",
+          "fin_crit"
+        ],
+        "clase": "B",
+        "tol_etapa": "atol 1e-9",
+        "tol_extremo": "atol 1e-9",
+        "justificacion": "log-det"
+      },
+      {
+        "cantidad": "alpha",
+        "intermedios": [
+          "pre_alpha",
+          "out_alpha"
+        ],
+        "clase": "E",
+        "tol_etapa": "exacto",
+        "tol_extremo": "exacto",
+        "justificacion": "IEEE"
+      }
+    ],
+    "nota_escala": "El atol absoluto de cov/icov depende de la escala de los datos; informar tambien el error relativo a max|ref|."
+  },
+  "tiempo_CovMrcd_s": 0.913999999999998,
+  "tiempo_detmrcd_s": 0.879999999999999,
+  "max_dif_CovMrcd_vs_detmrcd": 0,
+  "max_dif_mah_CovMrcd_vs_detmrcd": 3.63797880709171e-12,
+  "resultado": {
+    "rho": 0.158392936075792,
+    "h": 25,
+    "iBest": 5,
+    "n_csteps": [
+      0,
+      0,
+      1,
+      0,
+      1,
+      0
+    ],
+    "crit": -205.050794067794
+  },
+  "intermedios": {
+    "directorio": "intermedios",
+    "indice": "intermedios/indice.json",
+    "sha256_indice": "1db87763ea8f1752b37e5ea26655fa6f25d4aca6009ffe01ff54bba304034d52",
+    "n_archivos": 249,
+    "bytes": 15316907,
+    "metodo": "tools/r/exportar_intermedios.R sobre tools/r/detmrcd_instrumentado.R (copia de rrcov 1.7-7 con capturas; identical a rrcov::CovMrcd, ver tools/r/verificar_instrumentado.R)",
+    "nota": "sha256 de cada archivo en intermedios/indice.json",
+    "matrices_pxp_de_csteps": "no exportadas (p > 40, especificacion seccion 10: solo fixtures pequenos); si los vectores/indices de cada paso"
+  },
+  "salidas_inyeccion_initHsets": {
+    "archivo": "hsets_init.csv.gz",
+    "uso": "pasar como initHsets a CovMrcd (h x 6, base 1) para pruebas extremo a extremo nivel (ii); tools/r/instrumentacion.R::correr_instrumentado(initHsets=)"
+  }
+}

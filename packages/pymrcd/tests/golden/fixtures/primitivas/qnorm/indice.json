@@ -1,0 +1,163 @@
+{
+  "funcion": "qnorm",
+  "descripcion": "stats::qnorm(p) (AS241 de Wichura, qnorm.c:47+). Entrada p (vector), salida q.",
+  "referencia": "qnorm.c",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla_amplia",
+      "descripcion": "rejilla uniforme 0.0005..0.9995, potencias de 10 hasta colas denormales, fronteras de ramas (r=5 y |q|=0.425), 0, 1",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_rejilla_amplia.csv.gz",
+          "forma": [2640, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8c8c9ed780669703792604a2b4c97ca046947d182e13d83ed8dead6b38e3c607"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_rejilla_amplia.csv.gz",
+          "forma": [2640, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6d6980db854fcdc6d5db4ec5d92d6e43d27b1ff8a63b8728d78ddd4d12b31ad4"
+        }
+      }
+    },
+    {
+      "id": "tukey_n20",
+      "descripcion": "puntos (i-1/3)/(n+1/3), n=20",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_tukey_n20.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "90f2e1331e135e7080002eafc08c71ff5e6dc47483aa4fc34b05a18f4c4462b9"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_tukey_n20.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e3beae43b922b0d56579b7e9cb7f4c0ab403ab5ec864bc653fb16bc5041e8347"
+        }
+      }
+    },
+    {
+      "id": "tukey_n50",
+      "descripcion": "puntos (i-1/3)/(n+1/3), n=50",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_tukey_n50.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b9418ec89a5db7ff6a8514a63f0f3557225dfa4d386d6a8f64c55a3a680f7ae6"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_tukey_n50.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a2d32b04faeefe1c2d2f880224534162372eb1f53d604252fc0245205400f6c3"
+        }
+      }
+    },
+    {
+      "id": "tukey_n100",
+      "descripcion": "puntos (i-1/3)/(n+1/3), n=100",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_tukey_n100.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "88ab80ed0186a8a1b7bf275ddbe31a44aa1c767985eefe0e3d1b280cfdb33d22"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_tukey_n100.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "87518aeb6c1d0077cf64cf151ad79e64ae7d347ef64bff63dbc039df13b34c65"
+        }
+      }
+    },
+    {
+      "id": "tukey_n200",
+      "descripcion": "puntos (i-1/3)/(n+1/3), n=200",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_tukey_n200.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "f6255eef7871c1663da6e1298044a0a440cb032b7aad9af0c0ad785e7935b6d8"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_tukey_n200.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8a5f4538f658aa8a6818719456c8d726e376b347bf642f80015c845aebab6fdb"
+        }
+      }
+    },
+    {
+      "id": "tukey_n250",
+      "descripcion": "puntos (i-1/3)/(n+1/3), n=250",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_tukey_n250.csv.gz",
+          "forma": [250, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "262b5c9a71db4d41cbc9a240e030b5c79038175284a26c003a25e01fd8355933"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_tukey_n250.csv.gz",
+          "forma": [250, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8b58bfe259ff2e346839563391e55574e36b9a9fe4a68acc117e023a35cab950"
+        }
+      }
+    },
+    {
+      "id": "aleatorio",
+      "descripcion": "2000 uniformes",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_aleatorio.csv.gz",
+          "forma": [2000, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "0c8aabebbe577f287a672b3da9d1077a5294db571612cfef57940d42b1a4bc4f"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_aleatorio.csv.gz",
+          "forma": [2000, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "30e050bf4a31863d2b663915d7692cd869a543967356f06c630e89e6717564a2"
+        }
+      }
+    }
+  ]
+}

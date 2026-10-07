@@ -1,0 +1,241 @@
+{
+  "funcion": "quantile7",
+  "descripcion": "stats::quantile(x, probs, type=7, names=FALSE); entradas x y probs.",
+  "referencia": "quantile.R:57-67",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "n=5 probs c(10:19,19.75)/20 (non0Q)",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_01.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "53906f73963f80aaa679b07d27b965081ecdce8ed9db41287948717e3537a0de"
+        },
+        "probs": {
+          "archivo": "entrada_probs_01.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_01.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7e879e4a234a73e79bf6863109c13af951648af85d018fad619d21264544c1ed"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "n=10 probs c(10:19,19.75)/20 (non0Q), 50% ceros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_02.csv.gz",
+          "forma": [10, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e780b8fb5ae8d9246f1356f7772338b1a78482bd3ece1df273aa3748c7bc712a"
+        },
+        "probs": {
+          "archivo": "entrada_probs_02.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_02.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6d6d95dacde17653f35b806c8a7939c2ddba9adc5408653d05c54a7bcce2ccdc"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "n=11 probs c(10:19,19.75)/20 (non0Q)",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_03.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "028af8cc4291e09bfe62d11111eedddab9f6083639bd586c5720a5408832c80b"
+        },
+        "probs": {
+          "archivo": "entrada_probs_03.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_03.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "3cb2615ed4b09fa259cc52f82883721696bee2030acaf0ff6f90f88af1aa3bde"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "n=20 probs c(10:19,19.75)/20 (non0Q), 50% ceros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_04.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "61dd7b4ac7fe98a6e734b622d36e9987f9cf2ea0dee55594e1d8336d05092252"
+        },
+        "probs": {
+          "archivo": "entrada_probs_04.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_04.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ef4cd1b778a813c920212a49becf1f57888b615e1ba896ce7cb086a63289ca6d"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "n=21 probs c(10:19,19.75)/20 (non0Q)",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_05.csv.gz",
+          "forma": [21, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b0ae7361c85ba4ace6c754a8e6923aefc5f5f796460cb13ac185d2519ca87ca2"
+        },
+        "probs": {
+          "archivo": "entrada_probs_05.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_05.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "dc330e44dc0752627f6c203deb6f0d0614cd85f03cbd36686497d5bf977dff9d"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "n=51 probs c(10:19,19.75)/20 (non0Q), 50% ceros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_06.csv.gz",
+          "forma": [51, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "c13e5ff133b0cead998037c21985d71db35655e134a642f1d03ee7f7d45461a0"
+        },
+        "probs": {
+          "archivo": "entrada_probs_06.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_06.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ac2faf25375694e1bb43527789a6f7ee2b1144cfbc26049fd656921fcaa2984d"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "n=100 probs c(10:19,19.75)/20 (non0Q)",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_07.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "d4ca45092775b88d741c5a211b079edd71d5bea1320b0c34b3fa81262e1c1ba5"
+        },
+        "probs": {
+          "archivo": "entrada_probs_07.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31484b82b6eba766858643d6c11858ea99e51f2197e9db5677642c413f3d2321"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_07.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "146f24fdf9c86cb15fa8bf50d36886dfba6058ab5b9de160058cb1579779a01d"
+        }
+      }
+    },
+    {
+      "id": "general",
+      "descripcion": "n=37, probs variadas",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_general.csv.gz",
+          "forma": [37, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "09ce1d2e449fda6770816c8cd39a9e64dfc4e540801777c8e96e3163e8d73da9"
+        },
+        "probs": {
+          "archivo": "entrada_probs_general.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e72ce9f55c4ae15f680d822974e59f58a66daa96f927161049b3b264a0d42103"
+        }
+      },
+      "salidas": {
+        "q": {
+          "archivo": "salida_q_general.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b0d04a5af82c509a361df87fdce29c12721657ef3b5bdaf4d2c3dada879de277"
+        }
+      }
+    }
+  ]
+}

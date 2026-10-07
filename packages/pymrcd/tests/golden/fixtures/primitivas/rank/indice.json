@@ -1,0 +1,273 @@
+{
+  "funcion": "rank",
+  "descripcion": "base::rank(ties.method='average') por vector; salida = rangos (semienteros exactos).",
+  "referencia": "rank.R:19-50",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "n=1 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7548af9d464140392a47961c1d64041e62ffc859d2c65373d3daf220e5025e85"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "n=2 decimales con empates",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_02.csv.gz",
+          "forma": [2, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e78de1190befec214866ed0e1497f6607de72bb142ef7562fd2be47076c50d9c"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_02.csv.gz",
+          "forma": [2, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ea65522db136332ee97988fd150a27e04f20019035f5fc5b5c6b7f4eb1874158"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "n=3 con empates enteros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_03.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "333eca1eb2fa834d014bea0748dafec6ca495909a4068d4fe71c97d4c2eaa1cd"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_03.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "699549b80a129b9439f3056747b2316015f12c01e5fc6deb9c8d2e6ba803fc71"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "n=5 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_04.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6a7e6dbb7ab174002ba3c339c57ab20286efae10cae8760b5bfb676d02150954"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_04.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8c6605667e0511c77a6f0e7fbc9178dc6edce14cf0ef30524ebeeb14a7ee8cd4"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "n=10 decimales con empates",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_05.csv.gz",
+          "forma": [10, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "136e98abe6467f721a5fe581b4e16456e981bb5ab24b2ce3f7b437361df069cc"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_05.csv.gz",
+          "forma": [10, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "42eded22c1872c4315e0bb6e62d46959b99556515c73de6e577b6edbda5c55cc"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "n=11 con empates enteros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_06.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "7a62dc003c566edea3f6d668e824856a04fef53933900d2111d0fb2f969069be"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_06.csv.gz",
+          "forma": [11, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "d50db87e6dd59655eb8e06904899036743193725a8596b5db0e90b28ff0f4e29"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "n=25 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_07.csv.gz",
+          "forma": [25, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "2adda22bb62c8da76346786f9baecc04072e2ea538e4a625b61ddd76632be453"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_07.csv.gz",
+          "forma": [25, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a5efd4b509b8ed2e85e6ecc3400c7f65e545dc429b6a60d9de2e5793927f2191"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "n=50 decimales con empates",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_08.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "788afa90e5bc8fb5baa7b4ccd214f26e7b3d14aaaa4064a6d86ef73a45feb8f4"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_08.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "0d5b6a132e7978c7d359a0dc91c76c23a38986f557fbc73df5bc139af246cf29"
+        }
+      }
+    },
+    {
+      "id": "09",
+      "descripcion": "n=100 con empates enteros",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_09.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "int",
+          "sha256": "827a47c506a201461e116871c7d3525e970d581e186974e79560eb5e317d5435"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_09.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "37902d0a15ee4a3464426694c3301090953bb7a74438bc626b3f7d16f38bedee"
+        }
+      }
+    },
+    {
+      "id": "10",
+      "descripcion": "n=200 normal",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_10.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "59a90b169f3dcb896f0051ce395bf8f6690d0c2ef2a0890a0a6c31f2085440fb"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_10.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "3cb2749337dc964714487eacc47f2454017a73ec360b3cf875519fc5fae99b47"
+        }
+      }
+    },
+    {
+      "id": "cero_negativo",
+      "descripcion": "-0 y 0 empatan",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_cero_negativo.csv.gz",
+          "forma": [6, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "beb09225344a5509fffde330ae78688b62ce6a876d45fd83c527cc721c84db96"
+        }
+      },
+      "salidas": {
+        "rango": {
+          "archivo": "salida_rango_cero_negativo.csv.gz",
+          "forma": [6, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "330ff72f30832f94172dbd0206fa5c939a5f5c6ae4a8f102295626dc0e03f12b"
+        }
+      }
+    },
+    {
+      "id": "columnas",
+      "descripcion": "apply(X, 2, rank) sobre 40x6",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_columnas.csv.gz",
+          "forma": [40, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "883e94a5ea8b127ffbeafe56236bf86426f0b4fe18c58c027c241fc7b35892dd"
+        }
+      },
+      "salidas": {
+        "rangos": {
+          "archivo": "salida_rangos_columnas.csv.gz",
+          "forma": [40, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "df8a6f6e0d2bae5e7feb80a2791a50dcb0a4ec25c0c106579536c577bfcda77d"
+        }
+      }
+    }
+  ]
+}

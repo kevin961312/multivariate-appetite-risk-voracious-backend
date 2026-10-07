@@ -1,0 +1,229 @@
+{
+  "funcion": "chol2inv_chol",
+  "descripcion": "base::chol2inv(chol(A)) (dpotrf+dpotri 'U' + espejo).",
+  "referencia": "Lapack.c:1139-1182",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "SPD 2x2",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [2, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "00c2840b1cfcde9d71a7f03bffbcfed573b230d65318c611b240843e71c58558"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_01.csv.gz",
+          "forma": [2, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6a2a60e88ddcfcb2ab210f10c9d5197477409e7dbb58adfa6eb44828d188f792"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "SPD 3x3",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "314cf78923d029ca5bc66873fce5b30a82eefcd4b71a059f079d190ac5cc5ec2"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_02.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f427f44aa4e77f9520037893b5eed63477f8dffbb87acd8114fec5f06050957c"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "SPD 5x5",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8845f1efad21f04824ffe8802e86ecb1317df493ae50d8f6516e88236982b0e2"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_03.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a04c21948d3371ac5b43a2911d35ec38ea8d5317dcb95530cb5286e133ea89ef"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "SPD 10x10",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f4589a96c0587985f1a8ff4307d115f7ed23817d0b3a2c9069b74721e26cb4bf"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_04.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ad7ebd3ff9435c9cfe22d2340f5470e9f0d146c8d9082cc004c57ac6ca5b6d09"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "SPD 25x25",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [25, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "7687e3af9ada6f624f39af2e7f8a1b9eae306e8679707ac6e75526e923b6d550"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_05.csv.gz",
+          "forma": [25, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "19c075d291640b038f1976bd110a8a7e86548759d2148f91823036e2af17bd27"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "SPD 50x50",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [50, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "04bab8651ea3646a8c5c8e633f854ef9f88b650bccaaf73b0660e08f09977631"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_06.csv.gz",
+          "forma": [50, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "deaae663009b6a4a86388deb0b3234fdbd0431fc249015d16b2fa5fb994db177"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "SPD 100x100",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "3a826d242cc7140b87a8bf2da0b8b72f534ed32525a57724b14eeffad6f7dfff"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "706439f127c3546837a45bbf5a77deb6b798639b231f1f801494af775e3fdb24"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "SPD 200x200",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8b13404ce9a492e4949872d1502f78a817e634ce12312e402afea2510b8c4e16"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "31ccd87529388380c1138a30a9fc476612b7184e8e84e0b3b12e64b96ef16d4e"
+        }
+      }
+    },
+    {
+      "id": "rcov30",
+      "descripcion": "rho*I + (1-rho)*scfac*S, S rango 10, p=30",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_rcov30.csv.gz",
+          "forma": [30, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ceb0166f442c718301d38a88e92ce2f4af89089f44ff494d1442a279019f9369"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_rcov30.csv.gz",
+          "forma": [30, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "60a72580d6a67409f572f72d1cd7d9f7c42acc284d296ae2f23d0e8ad9a575b5"
+        }
+      }
+    },
+    {
+      "id": "rcov60",
+      "descripcion": "rho*I + (1-rho)*scfac*S, S rango 10, p=60",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_rcov60.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8da14188176b38ec59e8d8e82e0a4d5525dcd23c78b7b1a20f2a77fa66d937ab"
+        }
+      },
+      "salidas": {
+        "inv": {
+          "archivo": "salida_inv_rcov60.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "dfe858c4c5cfca085450348dec24197b48fa968327cf43150bb61de4b0bdc9ea"
+        }
+      }
+    }
+  ]
+}

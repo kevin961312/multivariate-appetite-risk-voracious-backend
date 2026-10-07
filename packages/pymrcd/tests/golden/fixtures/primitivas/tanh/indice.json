@@ -1,0 +1,53 @@
+{
+  "funcion": "tanh",
+  "descripcion": "base::tanh(x) (libm).",
+  "referencia": "detmrcd.R:132",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "rejilla -10..10 paso 0.01, normales, magnitudes pequenas y extremos",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_rejilla.csv.gz",
+          "forma": [7047, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "dd528577d87290654bb7e33f752ee54b1f4b19ae9c6390b0a942acf447643f29"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_rejilla.csv.gz",
+          "forma": [7047, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7f112d367c6d1cfd6e0465eaff0e56eebd5c899bc45a26cff660512f6020be7d"
+        }
+      }
+    },
+    {
+      "id": "datos_std",
+      "descripcion": "matriz 100x20 normal estandar",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_datos_std.csv.gz",
+          "forma": [100, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6fa03791dcc610d52ef2f8fa27f1cde309fe64fcc4b6f8258f85c9dc75f0eb6c"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_datos_std.csv.gz",
+          "forma": [100, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d295ee312ada5778021f85aa6e9e83c4a0f9d2061f1451df66d704e4afc4cc56"
+        }
+      }
+    }
+  ]
+}

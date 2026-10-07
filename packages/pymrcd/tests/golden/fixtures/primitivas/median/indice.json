@@ -1,0 +1,515 @@
+{
+  "funcion": "median",
+  "descripcion": "stats::median (media de dos pasadas para n par; summary.c:479-518). Cada caso: matriz M (filas = vectores de igual longitud); salida = apply(M,1,median).",
+  "referencia": "median.R:21-33",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "30 vectores de longitud 1 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_01.csv.gz",
+          "forma": [30, 1],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ab57e7fdc326a1804e0f17b2cfb836747a6fc76fd9268a499134fbdd5437c6f6"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_01.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ab57e7fdc326a1804e0f17b2cfb836747a6fc76fd9268a499134fbdd5437c6f6"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "30 vectores de longitud 2 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_02.csv.gz",
+          "forma": [30, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9574067d5cd2e75553a8869b54bbe50c5d005fa1a38f20d487453c103379aeec"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_02.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "77342be3e838634c4efe37acecd4500e907c00d5d90243fc3f25fa72c7ee3e20"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "30 vectores de longitud 3 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_03.csv.gz",
+          "forma": [30, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "91a8d7d513f4c4bcb37ac1a60d66d7e4862d87e0d4c94f95e13dbd5721420569"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_03.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "5387906f2fcc27e768ab512f6d2ad343bbe083f25835392bd018d58d67a7ba53"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "30 vectores de longitud 4 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_04.csv.gz",
+          "forma": [30, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f04a43c2bf1e77b56b6015b9b039ab2217adda060fa1eabafeec92e23157e388"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_04.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8f96bd11a5522eeae750de6e230f6dea1ed73e1b510e4802a4f791b83e0c6c71"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "30 vectores de longitud 5 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_05.csv.gz",
+          "forma": [30, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "1d24c1051a2db8975517139fc1337cc7ae2cb1b518912bb390ddea59ed3545e2"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_05.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a102f4496f078adc811fa5015bbbca237dc184984aebc4b4607b55c5ebba388a"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "30 vectores de longitud 6 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_06.csv.gz",
+          "forma": [30, 6],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d9f92758ee3729694eec6c5b7c93fba68844c477cfe95e4a8971a55d3955ddaf"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_06.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "633059e2cb116f178fddc7691bd6eae26cc327a2f1e61518059ac815607ed035"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "30 vectores de longitud 7 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_07.csv.gz",
+          "forma": [30, 7],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "fd9ee21ba3a40bddcf6a79dbb5986967197b3fb7a0ce1c3271f67fd35eef4a47"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_07.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "426361cd3c1837dbd4e9ba8efa6fe629ebb752fce83aed6bdb17e0e3603b0988"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "30 vectores de longitud 8 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_08.csv.gz",
+          "forma": [30, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c0815c908ccfc6453fd0fadd10f81d436351dcf9a386de4923533477f2fd57d8"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_08.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "258d543add1bcaf84136e1766dda45b24d4b7ab43983e2766add235f7c2404b7"
+        }
+      }
+    },
+    {
+      "id": "09",
+      "descripcion": "30 vectores de longitud 9 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_09.csv.gz",
+          "forma": [30, 9],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2440cccf0ba643b2ef8c9ab721964b5ff1221ee79aeb630a8f9bb3795a82cc3f"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_09.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "58d3b774c8142928c53e5179d8cc4590f0f9207ecf50ca3ba37b573c3ee784f8"
+        }
+      }
+    },
+    {
+      "id": "10",
+      "descripcion": "30 vectores de longitud 10 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_10.csv.gz",
+          "forma": [30, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "09b93c4734669aaa60ec0f3854bf250c77929d4e417eefaaed831eccc5453514"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_10.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "e26bc820ec2597e083302bf60e4b267b3a1b3620440c6568dc1329cd8e035c39"
+        }
+      }
+    },
+    {
+      "id": "11",
+      "descripcion": "30 vectores de longitud 11 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_11.csv.gz",
+          "forma": [30, 11],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ebafc913f6a4c22b44c08fa868b7bf7e2c94c60f94ca194c946bdd6ff72be6f7"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_11.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "f1d6723b437c51fd1f281cb695f7e6ae78c6eb7ed8c65fe8c14b2d70a6521dc8"
+        }
+      }
+    },
+    {
+      "id": "12",
+      "descripcion": "30 vectores de longitud 12 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_12.csv.gz",
+          "forma": [30, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f00aadac28c80333d7d862e8b9873a93de812692d6794f044fdd210fab41be0c"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_12.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b1c73b89188b655949d28efee623ed4ed9b59a37b4305af2c2851736f71900ef"
+        }
+      }
+    },
+    {
+      "id": "13",
+      "descripcion": "30 vectores de longitud 15 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_13.csv.gz",
+          "forma": [30, 15],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6420fd7450653899b6c65a6bc68c58610213f930cc0ca254e93719341582d2b0"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_13.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "53992c2fa74fe1e7ba9a7aee92b8fdd42d81ff50065114c21cdba58462be6449"
+        }
+      }
+    },
+    {
+      "id": "14",
+      "descripcion": "30 vectores de longitud 20 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_14.csv.gz",
+          "forma": [30, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "66eed6eac42e4051546c679d566ac15107a5e86ce162895dc9386afa0d642610"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_14.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "5bdf835b7d10476ac34a6041151c336966899533fcdd1c4b5c6de31a4513d428"
+        }
+      }
+    },
+    {
+      "id": "15",
+      "descripcion": "30 vectores de longitud 21 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_15.csv.gz",
+          "forma": [30, 21],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d4482801d81de526049827a9d6839622d20378dc9d6a71eaeadc481fb2dde923"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_15.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8e89e9ca89889be18c7e0cfd45e6fbe6aa7735130f1ec214309b2fc4cc0e064a"
+        }
+      }
+    },
+    {
+      "id": "16",
+      "descripcion": "30 vectores de longitud 50 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_16.csv.gz",
+          "forma": [30, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9833ca4038f88c0ed247ed556330bf779812339851391c96241661c5e683b669"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_16.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "f93dc7b98ed5719dda135c1deeb8bca7b664b59020b383189bf8bce02bcdf46b"
+        }
+      }
+    },
+    {
+      "id": "17",
+      "descripcion": "30 vectores de longitud 51 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_17.csv.gz",
+          "forma": [30, 51],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "4f8021f28a0cb65cd7c5411d792aee2e16289f16af19a28d23781171f4427173"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_17.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "c25eafcc28edbe48565fb2d4eb26d75f1ac9024424af47c06e070977e6fd289c"
+        }
+      }
+    },
+    {
+      "id": "18",
+      "descripcion": "30 vectores de longitud 100 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_18.csv.gz",
+          "forma": [30, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8d4fca43ba5c232de4d82730568df920e35c5b871c3004cf0eca48efc2ae91eb"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_18.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7abf171346dc0e644946418de22d8cdb8224bfee0f09dfe9da4275589b5331d6"
+        }
+      }
+    },
+    {
+      "id": "19",
+      "descripcion": "30 vectores de longitud 101 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_19.csv.gz",
+          "forma": [30, 101],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "cb13cdee8d36ca643988fca974cbf8e2e61848160f5ca2b7c3bdb03eac5b76eb"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_19.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "78f5de60944821f8473ab33c21959e252436a864724adc6cd2dc85cba375af2c"
+        }
+      }
+    },
+    {
+      "id": "20",
+      "descripcion": "30 vectores de longitud 200 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_20.csv.gz",
+          "forma": [30, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "db33c4ef2239ed8e850bbe7beeaf37648541ab8a824f6743b52e46f952737778"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_20.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "935f47619a1cbd349b81c0fcb95a3feeb49aa6aa95ecb183040cf1120967f435"
+        }
+      }
+    },
+    {
+      "id": "21",
+      "descripcion": "30 vectores de longitud 201 (10 decimales .1-.9, 10 normales, 5 enteros, 5 escala 1e-2)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_21.csv.gz",
+          "forma": [30, 201],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "4cce3811760f6d1de3d17987385b698fa9fa6b29e9efdbafb9621747accd91f6"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_21.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6b89a234ff04c83bd63eccbbb91e290d8be1067ec7b3839e0331b4f4d09bc5e6"
+        }
+      }
+    },
+    {
+      "id": "pares_decimales",
+      "descripcion": "mediana de todos los pares (i/10, j/10), i,j en 1..9: caso medida S1b 0.1,0.7",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_pares_decimales.csv.gz",
+          "forma": [81, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "e3d53d39ab996dc036e43a85a79c1bad38702adb82d67ca5ad1244119836cf08"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_pares_decimales.csv.gz",
+          "forma": [81, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "62587e4793c360e1763a01b2f7bdb1bf9f504e04a16f6df3114c85404a413d90"
+        }
+      }
+    },
+    {
+      "id": "s1b",
+      "descripcion": "median(c(0.1,0.7,5,-3)) = 0.40000000000000002 distinto de (0.1+0.7)/2 (spec S1b)",
+      "entradas": {
+        "M": {
+          "archivo": "entrada_M_s1b.csv.gz",
+          "forma": [1, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "68170ee4dd3229863c6d7bc909952aa27fe32706c08629f3b52eccf2866b4ff3"
+        }
+      },
+      "salidas": {
+        "mediana": {
+          "archivo": "salida_mediana_s1b.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "037139c846d70550b59835e009cfc8c45fa6ca4547a5cf85ec3655feb0c8fe1d"
+        }
+      }
+    }
+  ]
+}

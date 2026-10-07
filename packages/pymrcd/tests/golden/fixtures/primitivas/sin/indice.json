@@ -1,0 +1,31 @@
+{
+  "funcion": "sin",
+  "descripcion": "base::sin(x) (libm). Entrada: correlaciones en [-1,1]; salida sin(0.5*pi*x) (detmrcd.R:218, 1/2*pi == 0.5*pi exacto).",
+  "referencia": "detmrcd.R:218",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "sin(1/2*pi*r) en [-1,1]",
+      "entradas": {
+        "r": {
+          "archivo": "entrada_r_rejilla.csv.gz",
+          "forma": [5001, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "4472c2fc5e584836cb3eb3e5de42442b55828684fb600ac7a8b66a6517ded55e"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_rejilla.csv.gz",
+          "forma": [5001, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b75951de0d32fc747279af7592c653386372a932c359b7ef1636192841616d9c"
+        }
+      }
+    }
+  ]
+}

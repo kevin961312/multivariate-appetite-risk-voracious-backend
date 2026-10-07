@@ -1,0 +1,38 @@
+{
+  "funcion": "r_pow",
+  "descripcion": "x^y con R_POW: y==2 -> x*x; x^(-1); det^(1/p). Entradas x, y alineadas.",
+  "referencia": "arithmetic.c:204-247",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "rejilla x en valores variados, y en {2,-1,0,1/3,1/20,...}",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_rejilla.csv.gz",
+          "forma": [108, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "4d2d312145d81e63bf4ce831f697e2d6062a96a6286f3718b43cf13cabde9be3"
+        },
+        "y": {
+          "archivo": "entrada_y_rejilla.csv.gz",
+          "forma": [108, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6ba8a3dfcdb81bb6a6b759cbdab7650298c4b10d0b81b71dc47a92eccecf97c4"
+        }
+      },
+      "salidas": {
+        "z": {
+          "archivo": "salida_z_rejilla.csv.gz",
+          "forma": [108, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "fb756b88e4b8406b5717c43bc6091f8fe9a71d0e2eccdc492a58662307a57a99"
+        }
+      }
+    }
+  ]
+}

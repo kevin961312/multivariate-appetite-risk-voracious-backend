@@ -1,0 +1,207 @@
+{
+  "funcion": "colMedians",
+  "descripcion": "robustbase::colMedians (par: (a+b)/2 sin correccion; rowMedians_TYPE-template.h:138). Salida = colMedians(X).",
+  "referencia": "comedian.R:21-22",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "matriz 10x4 normal",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_01.csv.gz",
+          "forma": [10, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2bea640a8f0335c36a93304044b980a77eb190b7076029d6f1ea5b4ac2c76516"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_01.csv.gz",
+          "forma": [4, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "f1bff3eeaf187410e4cea2dce94d0a77e067a23ca7699a0a726183c3280cba7e"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "matriz 11x4 con decimales tipo 0.1-0.9",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_02.csv.gz",
+          "forma": [11, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6cc4a1963d9e39e3cdd0f21122aad8dd4e89f9388f79ab08d9e471e5744a1a98"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_02.csv.gz",
+          "forma": [4, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "21ddcd38d74ce7632170629755817ff300f3a4ba813cf1c77c29d0f28eeb6518"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "matriz 2x3 normal",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_03.csv.gz",
+          "forma": [2, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "767c21a36be3991eec03d9c59ff4796d955ed7bd30649f360267ab81c1ad9836"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_03.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "508ef402b051a6e050f77e63c4dd141e8c84e7169c71a677c4974ce939c87b67"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "matriz 3x3 con decimales tipo 0.1-0.9",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_04.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "911a50ead3a2b9792b015cc87970d77ae2138391758405502a85eda0bc871a51"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_04.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "66d1e3055b2933151d6df4a462586b917b1274431e49ed5e228444741cf12fe4"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "matriz 50x20 normal",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_05.csv.gz",
+          "forma": [50, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b642be5da8d54f0169da62145ec2f136c28866635e21529a785ebddb92e260ff"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_05.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "3538d94294e600d5054524b81af69970ad7fdf6fd13ce5289f0921578acabc52"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "matriz 51x20 con decimales tipo 0.1-0.9",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_06.csv.gz",
+          "forma": [51, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "22082e751c4d1c5b53e63e58d77f2bd7ad3b8880f660c7c5c9a30a3e0d8d77ad"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_06.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6ea017f8c6429ccf7d161769f6926a48e4df1170feb4417e95df893b25696579"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "matriz 100x7 normal",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_07.csv.gz",
+          "forma": [100, 7],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9dce6739f20420c3e8bf5a466163186c1c820b296983ea9a1a62d394cccfdaf4"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_07.csv.gz",
+          "forma": [7, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "9ad7387601821ddcc3017c87e0986d984114cf8c85ace3b8259ee95a97ada37d"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "matriz 25x200 con decimales tipo 0.1-0.9",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_08.csv.gz",
+          "forma": [25, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6eb93f8422e65f2b61bea65fa5117d223fa0985865b28f7324ca8eadd7826b33"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_08.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "0fff649d590b5f40abd4e6c0713c84aadebaf6bb894ba054089c71c623d1d357"
+        }
+      }
+    },
+    {
+      "id": "09",
+      "descripcion": "matriz 26x200 normal",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_09.csv.gz",
+          "forma": [26, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "fc214beb846ce8239c87f25cf2f05739c9920e1f75a6f5908c523a35b8049098"
+        }
+      },
+      "salidas": {
+        "colmed": {
+          "archivo": "salida_colmed_09.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "3667ad5e61edb4ea041d11ad2c2e253c81898ffccab44f96b055efe23d608a90"
+        }
+      }
+    }
+  ]
+}

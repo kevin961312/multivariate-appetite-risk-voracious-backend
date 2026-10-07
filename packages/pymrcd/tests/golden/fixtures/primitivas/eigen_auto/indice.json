@@ -1,0 +1,241 @@
+{
+  "funcion": "eigen_auto",
+  "descripcion": "eigen(A) sin symmetric= (isSymmetric tol 100*eps => La_rs jobz='V'); A = mE %*% t(mE)/(h-1) no exactamente simetrica. Salida valores y vectores.",
+  "referencia": "eigen.R:22-74",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 3x3",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "296a4d2618dd7cc8b855c72f3c5621633b61d636a4a58de120e97470f86649aa"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_01.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "df83826d9f1e7d7fbd7a682e1d1ac3947abebee10117123214349130e56a4bee"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "062d9536e2fec327cdc61cb2091a9b7236cc8c4329ad2c11a6e0220cfd86ca7a"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 5x20",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "0b20842c143a882754828d2154d5e8079133dd6d8d75f9721ee1b2b8926911ed"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_02.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "84ad6f80dff2afd28226f145016fc7228bd4ac48089189f52aefecc4d1cbbd33"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_02.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2391f7a298158ff4259ea562f23d6a411e2411147446baf279953ff6c80b7a12"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 12x40",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "0fa8c9e2b0c381da875b69110fa477c090db34ff4cfda8a09b87acb93d028781"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_03.csv.gz",
+          "forma": [12, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "37196246daa8e17881da960d5c4053236e8cc1ce1d3f6a9ee77e93da7b47e858"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6cbbb555082586e637c3830128f3bf2030c533268cad29c1494a3739bdb81fd5"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 20x100",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "45e50fc099508e06e2a2adfc96bd381d2cec0ad5134fdec4640a7ded11af895b"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_04.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ff831e0d0ef8afc1df9910ab055ab33c68da504ddc4267ce21d63cec80b06d1f"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_04.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "95bf155f7cf3bac24b11af968eee8691b590c3938aaf93abbafa315e1f2f18fa"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 40x60",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d6be25e95d795dce3056f1e2b60eab8c463e8179a0064998531a1a0dd3b77182"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_05.csv.gz",
+          "forma": [40, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b0668ec7e2bb63a15cfacf59ea4448fe346df5ecb1dcc20bc84f460a0b896070"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_05.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "86db0c629ac291e814935a10ed8f8e1acdd3f00ab8c910eb482c826858f2a2f1"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 60x30",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b8b248e025e424ef07850a1337a7ac665248d40494bf7c5d3c4963e2aab2f85e"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_06.csv.gz",
+          "forma": [60, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "31357b527619bb2d28fd40d5685e35bd43795a60af43c4203cfa99f920f0f05f"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_06.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "933bed629039e174dba82d39a7805a16a014cc3891740f28342b05fe6f255b4b"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 100x50",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ab1ca39f5c5a51964effdccfeb0fcdbea7f968d93f2100c71f52f5454337a4de"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_07.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "8b7cbe18ed70c06eefd68442124989509fbd70a2af309e1f07b4e7de4c456381"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "5d0e97b7d861db74d4fdd27979b4412aad0f53f39d327802a0f97420e654ef51"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "1.3 * mE %*% t(mE)/(h-1), mE 200x50",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8394b11d46af8ca0bf6785e4f3ad6f21e89cd253d1b68a27e8230f5500c0d8d4"
+        }
+      },
+      "salidas": {
+        "valores": {
+          "archivo": "salida_valores_08.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6def1a4a4b030e3f4a1d0f45c1fe52e946c17d56029f0594071356ff72804cff"
+        },
+        "vectores": {
+          "archivo": "salida_vectores_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "0af15365d2bd972fd7d18755f6ac522b3c73581ce591fd45d0d48c20ebb220dc"
+        }
+      }
+    }
+  ]
+}

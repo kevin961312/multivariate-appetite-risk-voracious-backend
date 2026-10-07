@@ -1,0 +1,119 @@
+{
+  "funcion": "crossprod",
+  "descripcion": "crossprod(X) (dsyrk 'U','T' + espejo).",
+  "referencia": "array.c:983-1020",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "crossprod de 10x4",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_01.csv.gz",
+          "forma": [10, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a7cf607d2c3e2f7f5bcf43613bd9f8edf6dde7576df1e8acb5e1063f9d0ab014"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_01.csv.gz",
+          "forma": [4, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "48bcc0fe51f3227d4e61d7f397160b4e34db21e7c3f8561c9f4e8d213acf72fd"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "crossprod de 50x20",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_02.csv.gz",
+          "forma": [50, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2305947beab04eae9e9cc9b29e1083f1210f8c13c775494399e76003e47cad6e"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_02.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "3100eaee9bc9a764b6f278adfd2b741f9d87bc30813c94c794e929f17b47bad8"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "crossprod de 200x40",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_03.csv.gz",
+          "forma": [200, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "fee67c667f30292c7a9815c49f116f52ea8fc1ad52dcda50799f3e6fe913f766"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_03.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9c905dd5dcfa69a601b5919931f014380ebe7565cae734ecbcd7ca76081caed5"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "crossprod de 100x250",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_04.csv.gz",
+          "forma": [100, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "13bf90afe5a1f517e250b253ba74be5b9f687c5044fb47950707729f8ffe6866"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_04.csv.gz",
+          "forma": [250, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "82eb029714e14895a80baca054d7fbf7c31fdfc5f464fd69f93a09a4851b647a"
+        }
+      }
+    },
+    {
+      "id": "n_menor_p",
+      "descripcion": "crossprod 30x80 (rango deficiente)",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_n_menor_p.csv.gz",
+          "forma": [30, 80],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "86b5d2736c1a59a3f157433e0ba5429e7672fec78fc1cb4438393fc03aa8de78"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_n_menor_p.csv.gz",
+          "forma": [80, 80],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b48a96347ba0023636209a9a1e54d76a3ee299811c4ff75ed21a4a800fc0ab3b"
+        }
+      }
+    }
+  ]
+}

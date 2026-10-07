@@ -1,0 +1,386 @@
+{
+  "funcion": "matprod",
+  "descripcion": "A %*% B (dgemm 'N','N'); B se entrega MATERIALIZADA (p.ej. t(A)).",
+  "referencia": "array.c:788-843",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "(5x3)(3x4)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [5, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "256cda9b449433ea8dd35b2a264b9f39c7d8178bb2942cff92bc53a22a4d63fc"
+        },
+        "B": {
+          "archivo": "entrada_B_01.csv.gz",
+          "forma": [3, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2411fc21060b51173b509c27bb2780150fdad5fc3340fa7d3015c2dc0d558c44"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_01.csv.gz",
+          "forma": [5, 4],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "855eb1d76b5f5f01e248c594a1e32ebe8afd082440456189110e5e62287aa062"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "(20x12)(12x9)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [20, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a13529d21d07eeda4d9fcb905c3e4f1f69293f47f433db014161e1ada7670ded"
+        },
+        "B": {
+          "archivo": "entrada_B_02.csv.gz",
+          "forma": [12, 9],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "26857a974b99b31d160f72948c4d8e2dfc2d89057294152fe7a43df711bb915c"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_02.csv.gz",
+          "forma": [20, 9],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c37e70ba66b3a8f69dfff8cffefb81cf7bee7a80586bf9c1be802fcf89c58744"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "(40x12)(12x12)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [40, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "35c092c51b9ca8a7c3b92bc703bbc15caff57d4678fe55b9669447769018ba09"
+        },
+        "B": {
+          "archivo": "entrada_B_03.csv.gz",
+          "forma": [12, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "368053e06717b9ca01fefb93a4db432cf8af0bca249d10e7240b01b910fe5341"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_03.csv.gz",
+          "forma": [40, 12],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "290c95554b08458d368c997b0314547e25db81ca2e300c0a7dcd0272a8f2ab21"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "(100x50)(50x50)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [100, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6d9df83948286eb46bfbc554cff29221ce40c8477d7166855eade60fdd81cb13"
+        },
+        "B": {
+          "archivo": "entrada_B_04.csv.gz",
+          "forma": [50, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a2f15b066fef9ae9479040b4f8fb6231cb29b74a6335c4936bd0ea43cd5af0cc"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_04.csv.gz",
+          "forma": [100, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c1c3161729373e57daa11a6d3068f24f6d164de5232a7fbb07225afcb087b850"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "(50x200)(200x200)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [50, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6f7d240c2e717de8785f08adb2f7db92670c5304745e937a3c394c6cece7b634"
+        },
+        "B": {
+          "archivo": "entrada_B_05.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bce3e9cd05e7c822f7970bb36188b8bc9c80835f8fac39ba6dc5309995e70366"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_05.csv.gz",
+          "forma": [50, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f6971e36c9a512db7e6763aba611157101360aa0c074bbefd6e6a2570510fb64"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "(15x5)(5x15)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [15, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ac67f72822d83da6a598ed3ab0792a4868517f72a9dc5dfb8194f97edd6c9567"
+        },
+        "B": {
+          "archivo": "entrada_B_06.csv.gz",
+          "forma": [5, 15],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "012baf48b1bd6123b752a3950348270e8e408fbc583f7f6c8796e23bf6baf086"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_06.csv.gz",
+          "forma": [15, 15],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bd7d319455b4161c0d895ff509e5aec7f06cc1dc33cbd7c9577dce1dbbe7c5aa"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "(200x40)(40x40)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [200, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ce4854f6a41900be9fb0fd2a408da23bb78063f3ba76cc31ae1b20aa975b37c0"
+        },
+        "B": {
+          "archivo": "entrada_B_07.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b1f8e15d8ceceb38c5835877c48140c83fae1ce5e99a34f6eae26bb9f4318cdb"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_07.csv.gz",
+          "forma": [200, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "aa28ea968b06d0c9c9d407dbd113275d89e386b2b3d560a14d87cb765787e715"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "(100x250)(250x250)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_08.csv.gz",
+          "forma": [100, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bd07fad127769ce4c06ceb6b798c5383510ce2ec2c625e581c8072335b015802"
+        },
+        "B": {
+          "archivo": "entrada_B_08.csv.gz",
+          "forma": [250, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bdb5b6a97dcabf4ef7e9294305eed3069bfc829a688f1a4bd5042bfe1cb4a453"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_08.csv.gz",
+          "forma": [100, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "547a06332253791271cbe04cc3da656a6df05d822513741cba6d1aa69d7fe470"
+        }
+      }
+    },
+    {
+      "id": "09",
+      "descripcion": "mE %*% t(mE) con mE 5x15 (S7: no exactamente simetrica)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_09.csv.gz",
+          "forma": [5, 15],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "700649e313d737296e9bbcf2f9e25a5673df3a158ac74cbba08ce34b16fad79e"
+        },
+        "B": {
+          "archivo": "entrada_B_09.csv.gz",
+          "forma": [15, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f9984f517cae0816cd58ca0eb9d3ce68117bd678cf5acd0bd337d3f95799ece3"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_09.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ff429cb1764243e5f42f484f34dd5f20d9ca1380315922d54d9f3e79a2b771b3"
+        }
+      }
+    },
+    {
+      "id": "10",
+      "descripcion": "mE %*% t(mE) con mE 10x25 (S7: no exactamente simetrica)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_10.csv.gz",
+          "forma": [10, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "befb6e9aca71e0d9c00719f80f6da456a047ddcc40407393ab9971184992d9c9"
+        },
+        "B": {
+          "archivo": "entrada_B_10.csv.gz",
+          "forma": [25, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "31c18d39b8ffdd31bef5207f8293da4445cc980ea56aa28affa3911e28b02700"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_10.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "25ca4bde302d8ba1eced5316441cbdcb429bf6be0637a6ad5e9ce0297f057a84"
+        }
+      }
+    },
+    {
+      "id": "11",
+      "descripcion": "mE %*% t(mE) con mE 40x25 (S7: no exactamente simetrica)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_11.csv.gz",
+          "forma": [40, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "5bdff8ea748484aa39d891d67f5cbfcf0973130147ea2574a88321d997f0b188"
+        },
+        "B": {
+          "archivo": "entrada_B_11.csv.gz",
+          "forma": [25, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "039ea626bee52853d13278e07a0ad2060fbda11b63b5242183277c51dea5a149"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_11.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ed083b3f0cc60d97a883c34e6bb62ea14a727d4f2f24ab9814e60d92973c2eec"
+        }
+      }
+    },
+    {
+      "id": "12",
+      "descripcion": "mE %*% t(mE) con mE 200x50 (S7: no exactamente simetrica)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_12.csv.gz",
+          "forma": [200, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "6c0ad8d8f10f181d17380f0dc169158228873ee0cb3524e4d1e1310daf6d82fd"
+        },
+        "B": {
+          "archivo": "entrada_B_12.csv.gz",
+          "forma": [50, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "30dcbb8f9dbacb70fddcdef1fd38a709cb0e0d15e2e605e40fe6e641c70f5225"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_12.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b066e7aa63fe16c0d471e65ffabd3bd1c79502d53b10afb0450e890f89aa20d1"
+        }
+      }
+    },
+    {
+      "id": "13",
+      "descripcion": "mE %*% t(mE) con mE 250x50 (S7: no exactamente simetrica)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_13.csv.gz",
+          "forma": [250, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f96a698f45a0605d0211550f3073d53f1e1bad9e0e20e1780e2c8dafe9eff828"
+        },
+        "B": {
+          "archivo": "entrada_B_13.csv.gz",
+          "forma": [50, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "030fb96692e4f03abe27a0b7160ace47fc473103c00525d9427717eacd6d8a70"
+        }
+      },
+      "salidas": {
+        "C": {
+          "archivo": "salida_C_13.csv.gz",
+          "forma": [250, 250],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "56b7faa01c2234986c79b37fb345b177b3c3873cada7c26ea72bf39157bf8ac1"
+        }
+      }
+    }
+  ]
+}

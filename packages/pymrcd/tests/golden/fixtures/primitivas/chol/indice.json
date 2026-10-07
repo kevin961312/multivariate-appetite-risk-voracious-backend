@@ -1,0 +1,229 @@
+{
+  "funcion": "chol",
+  "descripcion": "base::chol(A) (dpotrf 'U'): factor triangular superior.",
+  "referencia": "chol.R:21-29, Lapack.c:1090-1104",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "SPD 2x2",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [2, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "00c2840b1cfcde9d71a7f03bffbcfed573b230d65318c611b240843e71c58558"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_01.csv.gz",
+          "forma": [2, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ec977daf05900eb379f829e90d81e1678bda8ac479d668ba52fa4c3a0837849a"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "SPD 3x3",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "314cf78923d029ca5bc66873fce5b30a82eefcd4b71a059f079d190ac5cc5ec2"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_02.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "82489dd6be243945ab01e7c1bde7651c791a096672c733498d667be8e5f090a5"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "SPD 5x5",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8845f1efad21f04824ffe8802e86ecb1317df493ae50d8f6516e88236982b0e2"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_03.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "06fb6c3b0f0311786a514c028d6263f6e5f29085816543c3933d837bbeb4994b"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "SPD 10x10",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f4589a96c0587985f1a8ff4307d115f7ed23817d0b3a2c9069b74721e26cb4bf"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_04.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a8ded7c6614f954424995c441065986f846fa69917daaf6b1a58a8b7b984cf84"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "SPD 25x25",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [25, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "7687e3af9ada6f624f39af2e7f8a1b9eae306e8679707ac6e75526e923b6d550"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_05.csv.gz",
+          "forma": [25, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "cd80925cd3c10139e5a06f8229b3c162e6d5cf57854040b26c4560454737ad5f"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "SPD 50x50",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [50, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "04bab8651ea3646a8c5c8e633f854ef9f88b650bccaaf73b0660e08f09977631"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_06.csv.gz",
+          "forma": [50, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9ddeeefe6dfdfa7e37f0e28764ef34d127ff8424c48153184ebf573067f62ac8"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "SPD 100x100",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "3a826d242cc7140b87a8bf2da0b8b72f534ed32525a57724b14eeffad6f7dfff"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "a5f2244efee2c8bfce037ba834e3148da11dc0a537a902e4a3a426941af37438"
+        }
+      }
+    },
+    {
+      "id": "08",
+      "descripcion": "SPD 200x200",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8b13404ce9a492e4949872d1502f78a817e634ce12312e402afea2510b8c4e16"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_08.csv.gz",
+          "forma": [200, 200],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "367af45823bd1ad004dbf0841ef6d492469c4b0c3cca1653439ba0f7aa338849"
+        }
+      }
+    },
+    {
+      "id": "rcov30",
+      "descripcion": "rho*I + (1-rho)*scfac*S, S rango 10, p=30",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_rcov30.csv.gz",
+          "forma": [30, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "ceb0166f442c718301d38a88e92ce2f4af89089f44ff494d1442a279019f9369"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_rcov30.csv.gz",
+          "forma": [30, 30],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d1f5bfc4c4dbd777bc1459f6524200923b8e0b7585accbc5b8c921e0e545e223"
+        }
+      }
+    },
+    {
+      "id": "rcov60",
+      "descripcion": "rho*I + (1-rho)*scfac*S, S rango 10, p=60",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_rcov60.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8da14188176b38ec59e8d8e82e0a4d5525dcd23c78b7b1a20f2a77fa66d937ab"
+        }
+      },
+      "salidas": {
+        "R": {
+          "archivo": "salida_R_rcov60.csv.gz",
+          "forma": [60, 60],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "2c5d1730a9237b786beeeaf9b022d1c4bdd30cf73476a921f8958795da7a9c23"
+        }
+      }
+    }
+  ]
+}

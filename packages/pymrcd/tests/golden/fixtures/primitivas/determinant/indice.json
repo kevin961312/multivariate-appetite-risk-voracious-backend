@@ -1,0 +1,396 @@
+{
+  "funcion": "determinant",
+  "descripcion": "base::determinant(A)$modulus (log|det|, dgetrf) y sign; ademas det(A) y obj = det(A)^(1/p) como detmrcd.R:410-413.",
+  "referencia": "det.R:25-29, Lapack.c:1403-1458",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "SPD 2x2",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_01.csv.gz",
+          "forma": [2, 2],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b6d354c81b67b8b9ff1b53e986576d49e4e8ac31f930115e8ee96d25cf001b55"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "ba85ad313f9aec520a6c5a84f801858b6240f6c0120486cbc06581b3008227f2"
+        },
+        "sign": {
+          "archivo": "salida_sign_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b5f1f8e2212dd9b4084c91706fce2ca6021f3abf1e95998edeba7b6743d339f6"
+        },
+        "obj": {
+          "archivo": "salida_obj_01.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "3b3b6bece6acf28574429dce676b5e03975e274fe868c0f04986709e9eb9c877"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "SPD 3x3",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_02.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d7231be2502f4a9f1f6040c95557dfd32cc20516d7005f0969a5ed939ad2aeba"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1e97e57c4dacd1b59a02130b8c33924e45a971152a06e81e8e4703a7a7d1d878"
+        },
+        "sign": {
+          "archivo": "salida_sign_02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f0409c24d3443717adc7c1289a9e7ee7a3e4c0b04894fe46b809300376866c17"
+        },
+        "obj": {
+          "archivo": "salida_obj_02.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "2274e9096f9f023e08aa39b2b61cd4f829570428ee15ab19ef08084707f81436"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "SPD 5x5",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_03.csv.gz",
+          "forma": [5, 5],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "29e11e8e1f8557322e9903b2ce2981d38c962e4d3faf20729e1ea94564f15275"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b0449294aaba74b3776d6c66d2e85a5a3ae55f1a767780d6c11fe4861ac45bec"
+        },
+        "sign": {
+          "archivo": "salida_sign_03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0ea190dd91e640b9499a8952ed868ae78876293c3c0afb65721fe9f6095339e7"
+        },
+        "obj": {
+          "archivo": "salida_obj_03.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "a8a228eb5fc3d9e959f1d0d7611a5575d9cc74a43bf03e790b5108704f0f2598"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "SPD 10x10",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_04.csv.gz",
+          "forma": [10, 10],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "39ad18e24492987171258ba85180cb2917e92135efdd5a28aaca33d5b1973617"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "20bb02ab3ec200e3c6877b7b76e682dfed32262dce0430789a71a602390939bc"
+        },
+        "sign": {
+          "archivo": "salida_sign_04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "85f192077af263e5cfa25205cd7e80ec6d620405abf6da48b59b1ac0a1565cbf"
+        },
+        "obj": {
+          "archivo": "salida_obj_04.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "94d026643007acce14ab626f1f2878a5d1ed54bb4651cc7d9c8186b3dfc06cd4"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "SPD 20x20",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_05.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "3448d29126ca2e5311fb0ac680f56af71251e378a18ca0b0f1ff7d15ddaca696"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "515d3931053e7e5d9226e3952e1dc1e75e2369006d1e0150a7cc5ef212a60d5e"
+        },
+        "sign": {
+          "archivo": "salida_sign_05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "6108e121aab3cc17a6ff3a9e8d79295ace3835e2760ac8a2a6084ed8f6913b4b"
+        },
+        "obj": {
+          "archivo": "salida_obj_05.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "1fe836ab5d509ed12414cbdae8c1df685ac0c117599ef8a240223713c4545d23"
+        }
+      }
+    },
+    {
+      "id": "06",
+      "descripcion": "SPD 40x40",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_06.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "94c72f31bd6c6ed3adad53e9e369f21cec57aefc912903086c4babb68fc541ec"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "0d0006912cf45b37f687617cd0b539e82f048ea4a75a6eee31e574918217e09e"
+        },
+        "sign": {
+          "archivo": "salida_sign_06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "bceef47467592b13347ced717093fe23fe1f2934a85745129b47763bb0b7153b"
+        },
+        "obj": {
+          "archivo": "salida_obj_06.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "f9aae6cebf1735a806a93aa96bbd7e7a963bd32e848e00f104a9292287e6d33d"
+        }
+      }
+    },
+    {
+      "id": "07",
+      "descripcion": "SPD 100x100",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_07.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b1c95ea5fb3c54ec9fa7c0b0c07ee4c748c6892f92adf2a7df45743a721c502b"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "7d1445348c3dd28fe6a7aa1fad6859194b64281892472c4c2e21464ff3e5db22"
+        },
+        "sign": {
+          "archivo": "salida_sign_07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "9d511de6301b4a2a64f599df43edc208040f886b8fa6e0457c2a54d7b80a6d91"
+        },
+        "obj": {
+          "archivo": "salida_obj_07.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "b03019b8abaad07d4b1a6c784989ce2200fef8556ff79506a0c31cf4ddb1a708"
+        }
+      }
+    },
+    {
+      "id": "general",
+      "descripcion": "general 7x7 (signo variable)",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_general.csv.gz",
+          "forma": [7, 7],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "cc3323a64d8b7251c4606fa38d3503ef71830d61a7b8d8b25de304303365c0a7"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_general.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "537a824e9ff8e955edcef7397ec32f8eb095d1af6f5df6286bebc313c0187924"
+        },
+        "sign": {
+          "archivo": "salida_sign_general.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "222a1eeeb0126cfb9933a498fc98be36b010528dc1e41b13c04e56cfcdb3a1d0"
+        },
+        "det": {
+          "archivo": "salida_det_general.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "fe81639b1378f1df8b31c1271045e217be9fdb289982a500f7466be85701bce5"
+        },
+        "obj": {
+          "archivo": "salida_obj_general.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "05fb43522010e6a9cfa367a6627ef973934112242f7f772b1cc96a2c0c5d439c"
+        }
+      }
+    },
+    {
+      "id": "subdesborde",
+      "descripcion": "diag(1e-10) 40x40: det subdesborda a 0 (T19) pero modulus finito",
+      "entradas": {
+        "A": {
+          "archivo": "entrada_A_subdesborde.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9c595db13f6f127fe3e294c6fa9ddc891a423e5b0b90258310c8725cf200cc46"
+        }
+      },
+      "salidas": {
+        "modulus": {
+          "archivo": "salida_modulus_subdesborde.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "5b55940d7a216a699021df8ad0fd473ccc30da2ffaea1f400d8f589697a17bf7"
+        },
+        "sign": {
+          "archivo": "salida_sign_subdesborde.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "int",
+          "sha256": "288118306e4c7cb89d91b48edff339671496aa31d362532219909f9c370e0f78"
+        },
+        "det": {
+          "archivo": "salida_det_subdesborde.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        },
+        "obj": {
+          "archivo": "salida_obj_subdesborde.csv.gz",
+          "forma": [1, 1],
+          "clase": "escalar",
+          "tipo": "double",
+          "sha256": "de76e512a414e118fc8bc46cc3043f18cb60a7aa7b997d9564d30aae0cac9eee"
+        }
+      }
+    }
+  ]
+}

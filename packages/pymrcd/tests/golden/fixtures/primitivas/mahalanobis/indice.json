@@ -1,0 +1,189 @@
+{
+  "funcion": "mahalanobis",
+  "descripcion": "stats::mahalanobis(x, center, icov, inverted=TRUE) = rowSums((xc %*% icov) * xc).",
+  "referencia": "mahalanobis.R:30-43",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "x 10x3, icov SPD 3x3",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_01.csv.gz",
+          "forma": [10, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "8dbe480fefef646f32c1aec168e8062b9294671f08563e51ebbf133ffbd9b3de"
+        },
+        "center": {
+          "archivo": "entrada_center_01.csv.gz",
+          "forma": [3, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "99066818f9139c1cd08fe3712637858041453e43cf9876e8dc74ed9e8ad561ce"
+        },
+        "icov": {
+          "archivo": "entrada_icov_01.csv.gz",
+          "forma": [3, 3],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "bb325bf28bbd117277d31d7219f41d185c4a3f07a983d13b3a3b68e247ba71c2"
+        }
+      },
+      "salidas": {
+        "d2": {
+          "archivo": "salida_d2_01.csv.gz",
+          "forma": [10, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "643ea2ef01abe2a9898d12927c033d6f11a4761bbeafe25fcc0676cbf77bbc46"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "x 30x8, icov SPD 8x8",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_02.csv.gz",
+          "forma": [30, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b6147ac8d19060f47f1257e9bff0f51ab7a505ddd8e6e47ab149e3e2fa3defa7"
+        },
+        "center": {
+          "archivo": "entrada_center_02.csv.gz",
+          "forma": [8, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a0b53268ba6ca4cfeef21fa6b4ecd4ee9749f4a04f02687d018740135d09091b"
+        },
+        "icov": {
+          "archivo": "entrada_icov_02.csv.gz",
+          "forma": [8, 8],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "68e85c1466b5e83e4417a5013d578924ef1570e4a18ff7a8402a51b786408045"
+        }
+      },
+      "salidas": {
+        "d2": {
+          "archivo": "salida_d2_02.csv.gz",
+          "forma": [30, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "d617e25e3a8253cefeb14dbeee6db93606758d6685748c028e7ee71aa1b87c3d"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "x 50x20, icov SPD 20x20",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_03.csv.gz",
+          "forma": [50, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c4b56051dfc3e847a9aae64707061e44a8ebfb499c203f48555f2169870ed53b"
+        },
+        "center": {
+          "archivo": "entrada_center_03.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "edad27fc6956d37716ee98c018d229c49ba925ddbd6500429e230319463af46a"
+        },
+        "icov": {
+          "archivo": "entrada_icov_03.csv.gz",
+          "forma": [20, 20],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "9b14eb33e4db7cdaf1dd5f34d8d720ce4230ee283b643e67627819fb6a7d7777"
+        }
+      },
+      "salidas": {
+        "d2": {
+          "archivo": "salida_d2_03.csv.gz",
+          "forma": [50, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "0fc5974717599b4a5434dc47cc4aba27ed4ffa538645541802c517410b6129b0"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "x 100x40, icov SPD 40x40",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_04.csv.gz",
+          "forma": [100, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "94c2037151da9e9982943c453057367abb76d17aae4ae98a95060c3fd8ea3a5f"
+        },
+        "center": {
+          "archivo": "entrada_center_04.csv.gz",
+          "forma": [40, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "80ef1af59450e8fa7b24bd527276fe7c3c94e660c3ada8fd3e5caf83d4eec6cb"
+        },
+        "icov": {
+          "archivo": "entrada_icov_04.csv.gz",
+          "forma": [40, 40],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "f17f1306acf79e0445e69bd4b1ca12912cf538b5bfe707e083de2433179b25ce"
+        }
+      },
+      "salidas": {
+        "d2": {
+          "archivo": "salida_d2_04.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "ba8195e8659ddb15c756923410b39d06ca152bbcf14ce0c1bde87ac9eaf0c21c"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "x 40x100, icov SPD 100x100",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_05.csv.gz",
+          "forma": [40, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "730aeb2da0983be494d0c5adf72a9f352690f1c79064edf476bc3d51f47cf313"
+        },
+        "center": {
+          "archivo": "entrada_center_05.csv.gz",
+          "forma": [100, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "fb17506943af797b240684c00f28d66bb8aceea784181ad0f98e0b98331e813c"
+        },
+        "icov": {
+          "archivo": "entrada_icov_05.csv.gz",
+          "forma": [100, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "c899901f0d998e779e03a2f87adeb6c37686252ef88fca53aeeee3cf013f234f"
+        }
+      },
+      "salidas": {
+        "d2": {
+          "archivo": "salida_d2_05.csv.gz",
+          "forma": [40, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "09febded254ba42caf3997e66caa35b57dd75041fc44f39132f133eabfa9ee07"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "funcion": "pgamma",
+  "descripcion": "stats::pgamma(q, shape); pares alineados.",
+  "referencia": "nmath/pgamma.c",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "q = qchisq(alpha,p)/2, shape = p/2+1",
+      "entradas": {
+        "shape": {
+          "archivo": "entrada_shape_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "6597c6af2320ed6b650ffa874768ff671bef45b3a27369334974fad7443527b4"
+        },
+        "q": {
+          "archivo": "entrada_q_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "bd43f8665d4f90ead48bd434fa178f1aad327730e81274ceba9c0602230d322a"
+        }
+      },
+      "salidas": {
+        "pg": {
+          "archivo": "salida_pg_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "1ce815d3840f33e97ecb3488cf17c82fa9084cdfa247cd792c4db3393ba5f20e"
+        }
+      }
+    }
+  ]
+}

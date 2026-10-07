@@ -1,0 +1,38 @@
+{
+  "funcion": "MCDcons",
+  "descripcion": "robustbase:::.MCDcons(p, alpha) = 1/(pgamma(qchisq(alpha,p)/2, p/2+1)/alpha); pares (p, alpha) alineados.",
+  "referencia": "covMcd.R:602-607",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "rejilla p en 1..1000 x alpha en {0.5,...,0.975}",
+      "entradas": {
+        "p": {
+          "archivo": "entrada_p_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "7758cae6491e477ebca956b336ff65873ccad4a0bb84f57a4be16d21d79e00d0"
+        },
+        "alpha": {
+          "archivo": "entrada_alpha_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "0e6e810033d5df1d18c1c3a3b84fc402d748069acfedfbe2800468f1a8ef8655"
+        }
+      },
+      "salidas": {
+        "scfac": {
+          "archivo": "salida_scfac_rejilla.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "5c41eaad84de3316c0a7f9d52f16bc476e33eb485568e1a594450bcf75a9515d"
+        }
+      }
+    }
+  ]
+}

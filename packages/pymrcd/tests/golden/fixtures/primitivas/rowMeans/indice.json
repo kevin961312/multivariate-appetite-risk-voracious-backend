@@ -1,0 +1,119 @@
+{
+  "funcion": "rowMeans",
+  "descripcion": "rowMeans(X) (suma secuencial por columnas, luego /m).",
+  "referencia": "array.c:2001-2098",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "01",
+      "descripcion": "5x7 con magnitudes mezcladas",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_01.csv.gz",
+          "forma": [5, 7],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "06955c7998f641036c41df7e8be4ebb5f7ae462ec539fe7cd4d668335cebb0f3"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_01.csv.gz",
+          "forma": [5, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "69543974092f23e0799c180a370186d7c1c2903092fbf08cac86627bf5ab0638"
+        }
+      }
+    },
+    {
+      "id": "02",
+      "descripcion": "20x25 con magnitudes mezcladas",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_02.csv.gz",
+          "forma": [20, 25],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d5a84d810c6daef18026ba4b44bcb2256173e5470642118079611c6da5eea7d4"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_02.csv.gz",
+          "forma": [20, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "c1faf5f840b9801aebff4aa4b17caef432388232eb8c265715b5cc8b1bfcfa98"
+        }
+      }
+    },
+    {
+      "id": "03",
+      "descripcion": "200x50 con magnitudes mezcladas",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_03.csv.gz",
+          "forma": [200, 50],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "d01eddd50c9d7ff1f3595b32d10b0f620074a34d38e4f75412f0b66f0a11317d"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_03.csv.gz",
+          "forma": [200, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "a3bb040884354e9f8ca13e51f7d19bded8a3267277a3c61855c4d96dbdf5030d"
+        }
+      }
+    },
+    {
+      "id": "04",
+      "descripcion": "250x100 con magnitudes mezcladas",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_04.csv.gz",
+          "forma": [250, 100],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "fefbfa5e3d9df935237a01674f94ce7f08a735863b6e73212e2d3d07dc1e5595"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_04.csv.gz",
+          "forma": [250, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "77fb8114992378310db6024eff88e1744f6e1f3ccadfcef9b2cbb5deda286239"
+        }
+      }
+    },
+    {
+      "id": "05",
+      "descripcion": "40x1000 con magnitudes mezcladas",
+      "entradas": {
+        "X": {
+          "archivo": "entrada_X_05.csv.gz",
+          "forma": [40, 1000],
+          "clase": "matriz",
+          "tipo": "double",
+          "sha256": "b1e1f4e7c20b409ab24200e44ac20b9ad70691af4a54cc56c4f2a13790bf3bfd"
+        }
+      },
+      "salidas": {
+        "m": {
+          "archivo": "salida_m_05.csv.gz",
+          "forma": [40, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "b64e275682cfc6d5002e8e482fff1bcfa86a10c324a6bea4a50c66769b0b8b8f"
+        }
+      }
+    }
+  ]
+}

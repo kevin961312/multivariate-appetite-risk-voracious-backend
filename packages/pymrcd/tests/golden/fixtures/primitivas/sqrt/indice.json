@@ -1,0 +1,31 @@
+{
+  "funcion": "sqrt",
+  "descripcion": "base::sqrt(x) (IEEE).",
+  "referencia": "",
+  "semilla": 20261100,
+  "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
+  "casos": [
+    {
+      "id": "rejilla",
+      "descripcion": "sqrt",
+      "entradas": {
+        "x": {
+          "archivo": "entrada_x_rejilla.csv.gz",
+          "forma": [2005, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "afd52b56e0005cae4dccc297a277c5ea45c8757fec4e56f2488434248f2147dc"
+        }
+      },
+      "salidas": {
+        "y": {
+          "archivo": "salida_y_rejilla.csv.gz",
+          "forma": [2005, 1],
+          "clase": "vector",
+          "tipo": "double",
+          "sha256": "23695f191ac412d472a553a86987d454ab21e87fd977d7ba205a5bcce46ea79b"
+        }
+      }
+    }
+  ]
+}
