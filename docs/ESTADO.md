@@ -2,7 +2,7 @@
 
 Última actualización: 2026-10-06 (cierre del Paso 1; ajuste por ADR 0004 y 0005).
 
-**Siguiente hito:** Paso 2, dominio extensible y puertos.
+**Siguiente hito:** terminar el port de MRCD (bloque 2) y luego el Paso 2, dominio extensible y puertos.
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
@@ -29,6 +29,25 @@ ambas asíncronas ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). Por eso el plan 
 - **Paso 3:** rutas `/v1/charts/t2mrcd/models…` y `…/monitorings…`; test de que la Fase I termina en
   `failed / MRCD_NOT_IMPLEMENTED`; aislamiento por tenant.
 - **Paso 5:** golden tests por método (MRCD contra `rrcov`; T²MRCD contra su propia referencia).
+
+## Port de MRCD a `pymrcd` (antes del Paso 2) — en curso
+
+El dueño decidió portar primero `rrcov::CovMrcd` **1.7-7 oficial de CRAN** como librería propia
+`packages/pymrcd` (GPL-3, uso privado, solo numpy/scipy); ver [ADR 0006](adr/0006-libreria-pymrcd.md) y
+[`metodos/mrcd-especificacion.md`](metodos/mrcd-especificacion.md). El rrcov modificado del dueño (ogkU.c con
+MAD, hecho para pruebas en paralelo) no se porta.
+
+| Fase | Estado |
+| --- | --- |
+| Especificación línea a línea (analista-port) | hecha; pendiente corregir supuestos que el bloque 1 refutó (FMA, eigen, alineación BLAS) |
+| Oráculo R aislado, simulación C1–C10 + variantes, intermedios y primitivas (ingeniero-r) | hecho; fixtures reducidos versionados (~50 MB), el resto se regenera con `tools/r/` |
+| Workspace uv, esqueleto y compuerta de 7 etapas | hecho |
+| Bloque 1: primitivas de R, Qn, doScale, `.MCDcons`, `uniroot` | hecho, bit a bit con R salvo `eigen` (1–4 ulp, signo) y un punto de borde de `.MCDcons` |
+| Bloque 2: OGK, r6pack, selección de ρ, C-steps, final, extremo a extremo | pendiente |
+
+Decisiones pendientes del dueño: aceptar `eigen` con las tolerancias declaradas (tipo B) y portar
+`qchisq`/`pgamma` de nmath para `.MCDcons`. Decisión abierta: versión canónica determinista de la
+inicialización para p > n (opción `init="canonical"`, con piloto y Monte Carlo antes de un ADR).
 
 ## Paso 1: lo que quedó y por qué se desvió del plan
 
