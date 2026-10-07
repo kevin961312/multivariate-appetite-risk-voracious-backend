@@ -373,3 +373,7 @@ práctica. Por tanto, **un resultado INCONCLUSO es posible aunque las cartas sea
 - **Réplicas:** las del protocolo (n = 50: 2000 por conjunto de evaluación; n ≥ 100: 1000). No se amplían.
 - **Umbrales de `canonical2`:** fijados como en el piloto 2 (V_r: λ_i > λ_1·max(n,p)·eps; complemento: σ_j > σ_1(data)·√eps).
 - El resto de supuestos (S3–S9) se aceptan tal como están escritos.
+
+## Estado (2026-10-07)
+
+Corrida completa **detenida por decisión del dueño** a los pocos minutos de empezar; no hay resultados. Protocolo y script quedan listos por si se retoma.

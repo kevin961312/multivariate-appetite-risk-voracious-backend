@@ -46,8 +46,22 @@ MAD, hecho para pruebas en paralelo) no se porta.
 | Bloque 2: OGK, r6pack, selección de ρ, C-steps, final, extremo a extremo | pendiente |
 
 Decisiones pendientes del dueño: aceptar `eigen` con las tolerancias declaradas (tipo B) y portar
-`qchisq`/`pgamma` de nmath para `.MCDcons`. Decisión abierta: versión canónica determinista de la
-inicialización para p > n (opción `init="canonical"`, con piloto y Monte Carlo antes de un ADR).
+`qchisq`/`pgamma` de nmath para `.MCDcons` (ambas aprobadas el 2026-10-07 y en curso).
+
+## Versión determinista de la inicialización (aparcada)
+
+Con p > n, rrcov no es reproducible: un cambio en el decimal 14 de los datos cambia los subconjuntos
+iniciales y puede cambiar el resultado (y entre plataformas también). Se probó en R una inicialización
+canónica que fija esa elección a partir de los propios datos (`canonical2`):
+[piloto 1](experimentos/2026-10-06-mrcd-canonico-piloto.md) y
+[piloto 2](experimentos/2026-10-06-mrcd-canonico-piloto2.md). Resultado: determinista en 1750/1750 pruebas,
+idéntica a rrcov con n > p, objetivo igual o mejor que rrcov en el 81 % de los casos con p > n y mismo coste.
+
+**Decisión del dueño (2026-10-07): aparcada.** Voracious usa el rrcov original. Adoptar `canonical2` (como
+modo opcional, con ADR propio) exigiría antes el Monte Carlo de la carta T²MRCD ya pre-registrado en
+[`experimentos/2026-10-07-mc-canonico2-protocolo.md`](experimentos/2026-10-07-mc-canonico2-protocolo.md)
+(≈ 11 h en este Mac; la corrida se detuvo a los pocos minutos por decisión del dueño). Si se retoma, conviene
+correrlo en un servidor con más núcleos.
 
 ## Paso 1: lo que quedó y por qué se desvió del plan
 
