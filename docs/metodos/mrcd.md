@@ -12,8 +12,9 @@ Cada decisión del port a Python cita su origen en el código fuente de `rrcov`.
 - **Artículo:** Boudt, K., Rousseeuw, P. J., Vanduffel, S., & Verdonck, T. (2020). *The minimum regularized
   covariance determinant estimator.* Statistics and Computing, 30, 113–128.
 - Los límites de control y la estadística T² no son de este documento: ver [`t2mrcd.md`](t2mrcd.md).
-- Implementación: `pymrcd.cov_mrcd` (`packages/pymrcd/`). La integración en `domain/estimators/mrcd/` es el
-  Paso 2 (objetivo, no existe aún).
+- Implementación: `pymrcd.cov_mrcd` (`packages/pymrcd/`), integrada en `domain/estimators/mrcd/` (Paso 2).
+  `pymrcd` pasó de dependencia de desarrollo a **dependencia de runtime** de `voracious`; solo la importa
+  `domain/estimators/mrcd/` (contrato de `import-linter`).
 
 ## Parámetros
 
@@ -31,6 +32,38 @@ Copia de la §2 de la especificación (archivos de `rrcov` 1.7-7).
 
 Otras diferencias de API del port (base 0, `init_hsets` validado como enteros, entrada 0-d rechazada, mensaje
 de `n = 0`): ver `mrcd-especificacion.md` §12, «Decisiones del dueño».
+
+## API pública de `pymrcd`: `mahalanobis`
+
+Además de `cov_mrcd`, `pymrcd.mahalanobis(x, center, icov)` expone la rutina con la que `cov_mrcd` calcula `mah`
+(`stats::mahalanobis(x, center, cov, inverted=TRUE)`, R 4.5.2, `mahalanobis.R:31-47`; usada en `CovMrcd.R:46`).
+Por qué existe: la carta necesita el T² de filas **nuevas** y no debe reimplementar la fórmula; así
+`mahalanobis(x[ok], center, icov)` es igual bit a bit a `mah`.
+
+- Un vector es **una fila** (`mahalanobis.R:33`); el centro se resta por columnas (`:36`); el resultado es
+  `rowSums(x %*% cov * x)` (`:46`).
+- `icov` debe ser p×p, con los mensajes de R: `non-conformable arguments` si `nrow != p` y
+  `non-conformable arrays` si `nrow == p` pero `ncol != p`. Sin la comprobación, el *broadcasting* de numpy
+  daría un número equivocado sin avisar.
+- **Divergencia deliberada con R:** si `length(center) != p`, R solo avisa (`sweep`, `:36`) y recicla el
+  centro; `pymrcd` lanza `RError`. Un centro reciclado no tiene sentido estadístico.
+
+## Adaptador `domain/estimators/mrcd`
+
+Capa fina sobre `pymrcd`, para que ninguna carta dependa de la librería (ADR 0006, punto 8).
+
+- **`MRCDParams`** (`alpha`, `h`, `maxcsteps`, `rho`, `target`, `maxcond`): los mismos defaults de la tabla
+  «Parámetros», con su cita en el docstring. No valida: las validaciones son las de `rrcov` y llegan vía
+  `pymrcd`.
+- **`MRCDFit`**: slots de `CovMrcd` (`center`, `cov`, `icov`, `rho`, `cnp2`, `crit`, `best`, `mah`, `alpha`,
+  `h`, `n_obs`, `ok`) más los diagnósticos `i_best` y `n_csteps`. **No guarda `x`**: el histórico ya vive en
+  el registro del modelo (`training_data`), así que el ajuste no lo duplica. Los índices (`best`, `i_best`) son **base 0**.
+  `distances(x)` usa `pymrcd.mahalanobis`.
+- **Errores:** un `pymrcd.RError` (lo mismo que haría `rrcov`) se convierte en `EstimationError` con código
+  `MRCD_FIT_FAILED` y `details.r_message`. Sin *fallback* a otro estimador.
+- Las filas no finitas las descarta `cov_mrcd` como `rrcov` (`CovMrcd.R:19-20`) y su máscara queda en `ok`;
+  cada carta decide si las admite (T²MRCD las rechaza, ver [`t2mrcd.md`](t2mrcd.md)).
+- Los subconjuntos iniciales los calcula `pymrcd` (no se inyectan).
 
 ## Pasos del algoritmo
 

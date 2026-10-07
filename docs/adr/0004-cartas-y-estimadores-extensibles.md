@@ -61,3 +61,24 @@ ni sustituto de MRCD», lo que bloqueaba cualquier otro método en `domain/`. Ha
   métodos distintos en un solo schema, y acopla la evolución de unas cartas a la de otras.
 - **Mantener la prohibición total:** impide crecer el producto con otros métodos.
 - **Cartas que heredan unas de otras:** acopla la lógica estadística; un cambio en una carta rompe a otra.
+
+## Enmienda 2026-10-07 (Paso 2): concreción de los puntos 4 y 8
+
+El texto original no se reescribe; esto lo concreta tras implementar el Paso 2.
+
+- **Punto 4 (independencia).** Los contratos `independence` ya existen en `pyproject.toml`: cartas entre sí,
+  estimadores entre sí, `estimators ↛ charts` y `common ↛ charts|estimators`. Además, solo
+  `domain.estimators.mrcd` puede importar `pymrcd` (ADR 0006), de modo que una carta usa MRCD a través del
+  adaptador y no de la librería.
+- **Punto 8 (contrato de carta).** El `Protocol` vive en `domain/common/chart.py` como `ControlChart`, no en
+  `domain/charts/`. Por qué: `ESTADO.md` anotaba el riesgo de que, en `charts/__init__.py`, el contrato quedara
+  acoplado al paquete que contiene a todas las cartas y chocara con `independence`; `common` es el lugar que las
+  cartas ya comparten (ya puede ser importado por todas) y lo verifica `common ↛ charts|estimators`. Firmas definitivas:
+  - `fit_phase1(x, params, *, mapper: TaskMapper) -> Modelo`. `mapper` es **keyword-only**: la carta no sabe
+    cómo se reparten las tareas independientes (réplicas bootstrap); el adaptador lo decide en
+    `infrastructure` (ver [ADR 0007](0007-limites-t2mrcd-por-bootstrap.md)).
+  - `validate_phase2_input(model, x_new) -> None`: validación **síncrona** de la entrada de Fase II, para
+    rechazar con error de entrada antes de encolar (ver enmienda del [ADR 0005](0005-api-fase-i-fase-ii.md)).
+  - `score_phase2(model, x_new) -> Resultado` y la propiedad `chart_id`.
+  - `ControlChart` es genérico en parámetros (contravariante), modelo y resultado (covariante); el registro de
+    cartas de `application` usa `Any` en los tres porque es heterogéneo.

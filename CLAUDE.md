@@ -28,11 +28,21 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
 - **La fidelidad se demuestra con tests golden, por método**: salidas de `rrcov::CovMrcd` en R sobre conjuntos fijos
   (semilla fija; casos n > p, p > n y contaminado) guardadas como fixtures; el port debe coincidir dentro
   de una tolerancia declarada. En el cascarón: script R, carpeta de fixtures y test `xfail(strict=True)`.
-- **Límites de control de T²MRCD**: salen del artículo de T²MRCD (Fase I, observaciones individuales).
-  No se inventan: si un valor no está documentado en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md),
-  queda como **decisión abierta**.
-- **Sin placeholders estadísticos.** `MRCD.fit` lanza `NotImplementedError` hasta que exista el port; la
-  Fase I de T²MRCD termina en `failed / MRCD_NOT_IMPLEMENTED`. Nada de covarianza clásica «mientras tanto».
+- **Límites de control de T²MRCD**: ningún estimador da un límite y no hay artículo de Fase II, así que los
+  límites de **Fase I y Fase II se calibran por bootstrap** sobre las observaciones limpias del histórico
+  ([ADR 0007](docs/adr/0007-limites-t2mrcd-por-bootstrap.md)). Decidido (dueño, 2026-10-07): filas limpias =
+  subconjunto `best` de MRCD con `alpha = 0.75` (`h = ceiling(0.75·n)`); B = `n_replicates` (100 por defecto,
+  citado: Heng, Shen y Lange, 2026); remuestreo con reemplazo de tamaño `h`; `alpha_limit = 0.005` (cuantil
+  0.995) y límite = promedio de los cuantiles por réplica (tipo 7, elección técnica reversible); **un único
+  límite** para Fase I y Fase II. Pendiente solo: la cita final del artículo T² (P6, en proceso de publicación)
+  y la recalibración a petición (futura). Detalle en
+  [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté documentado allí queda como
+  **decisión abierta**.
+- **Sin placeholders estadísticos.** MRCD se ajusta con `pymrcd` (el port de `rrcov::CovMrcd`, ADR 0006).
+  Con los defaults decididos la Fase I se ejecuta completa; si un campo decisivo se pasa explícitamente como
+  `None`, la Fase I de T²MRCD termina en `failed / T2MRCD_DECISION_PENDING` con `details.pending` (lista de
+  campos pendientes), comprobado **antes** de ajustar nada. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
+  `tests/support/`, nunca en `src/`. Nada de covarianza clásica «mientras tanto».
 
 ## 2. Arquitectura (hexagonal)
 
@@ -42,12 +52,14 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
 | Ejecución de Fase I y II | `JobQueue` | `InlineJobQueue` | `CeleryJobQueue` |
-| Persistencia de modelos (Fase I) | `ModelRepository`* | en memoria | Postgres (TimescaleDB) |
-| Persistencia de monitoreos (Fase II) | `MonitoringRepository`* | en memoria | Postgres (TimescaleDB) |
+| Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) |
+| Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` | JWT/OIDC |
 
-\* Nombres orientativos: se fijan en el Paso 2.
+Puertos auxiliares: `IdGenerator` y `Clock` (application) y `TaskMapper` (reparto de tareas independientes, como
+las réplicas bootstrap; vive en `domain/common/parallel.py` y su adaptador con procesos irá en `infrastructure`).
+El `JobQueue` recibe un `JobRequest` con solo identificadores.
 
 API por carta, asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona.md),
 [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)): `POST /v1/charts/<carta>/models` → `202` + `model_id`;
@@ -55,8 +67,8 @@ API por carta, asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona
 `GET …/monitorings/{id}`. Estados `queued | running | succeeded | failed`.
 
 Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md)): `domain/charts/<carta>/`,
-`domain/estimators/<estimador>/` y `domain/common/`. Cada carta implementa el `Protocol`
-`fit_phase1` / `score_phase2`.
+`domain/estimators/<estimador>/` y `domain/common/`. Cada carta implementa el `Protocol` `ControlChart`
+(`domain/common/chart.py`): `fit_phase1`, `validate_phase2_input` y `score_phase2`.
 
 ### Dirección de dependencias (la verifica `import-linter`)
 
@@ -66,18 +78,35 @@ Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md
 | `voracious.container` | todo (es el cableado) | — |
 | `voracious.infrastructure` | `application`, `domain` | `api`, `workers`, `container` |
 | `voracious.application` | `domain` | `api`, `infrastructure`, `workers`, `config`, `container`, frameworks web/logging |
-| `voracious.domain` | stdlib, `numpy`, `scipy` | **nada del proyecto**; ni FastAPI, Pydantic, IO, red, config, logging |
+| `voracious.domain` | stdlib, `numpy`, `scipy`, `pymrcd` (solo en `domain/estimators/mrcd/`) | **nada del proyecto**; ni FastAPI, Pydantic, IO, red, config, logging |
 | `voracious.config` | stdlib, `pydantic-settings` | cualquier capa del proyecto |
 
 Orden real de capas (contrato `layers`): `api | workers` → `container` → `infrastructure` → `application`
-→ `domain`; `config` queda fuera del orden. Hay **6 contratos vigentes** en `pyproject.toml`
-(`[tool.importlinter]`): capas, `domain` limpio, `application` limpia, `config` aislada, `api ↛ config` y
-`api ↛ infrastructure`. Los dos últimos usan `allow_indirect_imports` porque `api → container → config` e
-`infrastructure` es el camino legítimo. Falta `workers ↛ infrastructure|config` (deuda del Paso 3).
+→ `domain`; `config` queda fuera del orden. Hay **13 contratos vigentes** en `pyproject.toml`
+(`[tool.importlinter]`):
 
-Estructura de dominio: `domain/charts/<carta>/`, `domain/estimators/<estimador>/`, `domain/common/`.
-Contratos `independence` (cartas entre sí, estimadores entre sí, `estimators ↛ charts`,
-`common ↛ charts|estimators`): **anunciados para el Paso 2**, aún no existen.
+1. capas;
+2. `domain` limpio (sin `config`, `container`, frameworks ni IO; M1 añade `multiprocessing`, `concurrent`,
+   `threading`, `socket`, `io`, `pathlib` y `os`: el reparto en procesos es un adaptador de `infrastructure`);
+3. `application` limpia;
+4. `config` aislada;
+5. `api ↛ config`;
+6. `api ↛ infrastructure`;
+7. `pymrcd ↛ voracious`;
+8. `pymrcd` solo importa `numpy`/`scipy`;
+9. `independence` entre cartas;
+10. `independence` entre estimadores;
+11. `estimators ↛ charts`;
+12. `common ↛ charts|estimators`;
+13. solo `domain.estimators.mrcd` importa `pymrcd`.
+
+Los contratos 5, 6 y 13 usan `allow_indirect_imports` porque `api → container → config|infrastructure` y
+`charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos. Falta `workers ↛ infrastructure|config`
+(deuda del Paso 3).
+
+Estructura de dominio: `domain/charts/<carta>/`, `domain/estimators/<estimador>/`, `domain/common/`
+(`ControlChart` en `common/chart.py`, `TaskMapper` en `common/parallel.py`). Los contratos `independence` ya
+existen y los verifica `import-linter`.
 
 Flujo: `api|workers → container → infrastructure → application → domain`.
 
@@ -157,4 +186,4 @@ Cada paso termina en commit + push a `main` (tras el «sí» del dueño) y **par
 8. Si se duda entre dos caminos que cuesten rehacer, se pregunta; si es reversible, se decide y se anota
    en el informe.
 9. Una carta o estimador no importa a otra carta ni a otro estimador; lo común va en `domain/common/`
-   (se verifica con contratos `independence`, que llegan en el Paso 2).
+   (se verifica con los contratos `independence` de `import-linter`, ya vigentes).

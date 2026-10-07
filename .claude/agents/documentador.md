@@ -1,6 +1,6 @@
 ---
 name: documentador
-description: Mantiene docs/ de Voracious (arquitectura, ADR, fidelidad.md, ESTADO.md) explicando el por qué de las decisiones, no el diff. No toca src/.
+description: Mantiene docs/ de Voracious (arquitectura, ADR, metodos/<método>.md, ESTADO.md) explicando el por qué de las decisiones, no el diff. No toca src/.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---

@@ -24,8 +24,10 @@ Ver [ADR 0001](adr/0001-hexagonal.md).
 
 ## Arquitectura de hoy y del Paso 2 en adelante
 
-Existe hoy (Paso 1): `config`, `container`, `api` con `/health` y `/ready`, logging en `infrastructure`.
-Lo demás es **objetivo** de los Pasos 2 y 3.
+Existe hoy (Pasos 1 y 2): `config`, `container`, `api` con `/health` y `/ready`, logging en `infrastructure`, el
+dominio (`common`, `estimators/mrcd`, `charts/t2mrcd`) y `application` (casos de uso, puertos y registros).
+Siguen siendo **objetivo del Paso 3**: los adaptadores de `infrastructure` (cola, repositorios, `TaskMapper` con
+procesos), el cableado en `container`, `workers` y las rutas de la API.
 
 ```
  HTTP ─▶ api/ (routers por carta, schemas, errores, tenant por X-Tenant-ID)
@@ -42,9 +44,9 @@ Lo demás es **objetivo** de los Pasos 2 y 3.
                      │ usa
                      ▼
           domain/
-            ├─ charts/<carta>/       p. ej. t2mrcd: parámetros, estadística, Fase I y Fase II
-            ├─ estimators/<estim.>/  p. ej. mrcd: parámetros, ajuste, resultado
-            └─ common/               tipos de resultado, errores, utilidades numéricas puras
+            ├─ charts/<carta>/       p. ej. t2mrcd: parámetros, estadística, bootstrap, Fase I y Fase II
+            ├─ estimators/<estim.>/  p. ej. mrcd: parámetros, adaptador sobre pymrcd, resultado
+            └─ common/               ControlChart, TaskMapper, errores, tipos numéricos (sin estadística)
 ```
 
 Flujo de dependencias: `api | workers` → `container` → `infrastructure` → `application` → `domain`.
@@ -56,11 +58,19 @@ independiente con su documento en [`metodos/`](metodos/README.md). Una carta pue
 estimadores; un estimador no conoce las cartas; una carta no importa a otra carta ni un estimador a otro.
 `domain/common/` no tiene lógica estadística de ningún método.
 
-Contrato común de una carta (`typing.Protocol` sin estado; **objetivo del Paso 2**, ubicación exacta por decidir,
-ver [`ESTADO.md`](ESTADO.md)):
+Contrato común de una carta: `ControlChart`, un `typing.Protocol` sin estado en `domain/common/chart.py`
+(enmienda del [ADR 0004](adr/0004-cartas-y-estimadores-extensibles.md); vive en `common` porque es lo único que
+todas las cartas pueden compartir sin importarse entre sí):
 
-- `fit_phase1(X, params) -> PhaseIModel`: ajusta con datos históricos y calcula los límites.
-- `score_phase2(model, X_new) -> PhaseIIResult`: puntúa observaciones nuevas y marca señales.
+- `fit_phase1(x, params, *, mapper: TaskMapper) -> modelo`: ajusta con datos históricos y calcula los límites.
+- `validate_phase2_input(model, x_new)`: validación síncrona antes de encolar la Fase II.
+- `score_phase2(model, x_new) -> resultado`: puntúa observaciones nuevas y marca señales.
+
+**`TaskMapper`** (`domain/common/parallel.py`) es el puerto con el que una carta pide ejecutar tareas
+independientes (las réplicas bootstrap de T²MRCD) sin saber cómo: el dominio no puede importar procesos ni hilos
+(contrato `domain` limpio). `SerialTaskMapper` es el adaptador en serie; el de procesos
+(`ProcessPoolTaskMapper`) irá en `infrastructure` (Paso 3). El contexto compartido se entrega una vez y las
+tareas llevan solo índice y semilla, de modo que el resultado no depende del número de procesos.
 
 `application` e `infrastructure` trabajan contra este contrato; añadir una carta no las modifica, solo se
 registra en `container.py`.
@@ -88,32 +98,52 @@ expresar que `container` está en medio. `config` queda fuera del orden (`exhaus
 
 ### Contratos de `import-linter` vigentes (`pyproject.toml`, `[tool.importlinter]`)
 
+Son 13; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2. En resumen:
+
 1. Capas: `api | workers` → `container` → `infrastructure` → `application` → `domain` (exhaustivo).
-2. `domain` no importa configuración, `container`, frameworks ni IO (FastAPI, Starlette, Pydantic,
-   pydantic-settings, structlog, httpx, uvicorn).
+2. `domain` no importa configuración, `container`, frameworks ni IO; desde el Paso 2 (M1) tampoco
+   `multiprocessing`, `concurrent`, `threading`, `socket`, `io`, `pathlib` ni `os`.
 3. `application` no importa `config` ni frameworks web/logging.
 4. `config` no importa ninguna capa del proyecto.
 5. `api` no importa `config` (la recibe de `container`).
 6. `api` no importa `infrastructure` (solo a través de `container`).
+7. `pymrcd` no importa `voracious`; 8. `pymrcd` solo importa `numpy` y `scipy`.
+9. y 10. `independence`: cartas entre sí; estimadores entre sí.
+11. `estimators ↛ charts`; 12. `common ↛ charts|estimators`.
+13. Solo `domain.estimators.mrcd` importa `pymrcd`.
 
-Los contratos 5 y 6 llevan `allow_indirect_imports = true`: `api → container → config|infrastructure` es el
-camino legítimo y, sin esa opción, import-linter lo contaría como violación; lo que se prohíbe es el import
-directo.
+Los contratos 5, 6 y 13 llevan `allow_indirect_imports = true`: `api → container → config|infrastructure` y
+`charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos y, sin esa opción, import-linter los contaría
+como violación; lo que se prohíbe es el import directo.
 
-**Anunciados para el Paso 2:** contratos `independence` (cartas entre sí; estimadores entre sí) y `forbidden`
-`estimators ↛ charts` y `common ↛ charts|estimators`. **Deuda:** `workers ↛ infrastructure|config` (Paso 3).
+**Deuda:** `workers ↛ infrastructure|config` (Paso 3, cuando `workers` tenga contenido).
 
 ## Puertos y adaptadores
 
-Los nombres de los puertos de persistencia son **orientativos y se fijan en el Paso 2**.
+Los puertos están fijados (Paso 2) y viven en `application/ports.py`, salvo `TaskMapper` (dominio). Los
+adaptadores de la columna «hoy» son **objetivo del Paso 3**.
 
 | Pieza | Puerto | Adaptador hoy | Adaptador después | Variable |
 | --- | --- | --- | --- | --- |
-| Ejecución de Fase I y Fase II | `JobQueue` | `InlineJobQueue` (mismo proceso) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
+| Ejecución de Fase I y Fase II | `JobQueue` (recibe `JobRequest`) | `InlineJobQueue` (mismo proceso) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
 | Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
 | Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
+| Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio); procesos en el Paso 3 | `ProcessPoolTaskMapper`, luego Celery/Dask | _por definir_ |
+| Identificadores y reloj | `IdGenerator`, `Clock` | _Paso 3_ | — | — |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` | `VORACIOUS_STORAGE=local` |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` (sin auth real) | JWT/OIDC | — |
+
+Decisiones de diseño de los puertos y registros:
+
+- **`JobRequest` solo lleva identificadores** (`kind`, `tenant_id`, `chart_id`, `model_id`, `monitoring_id`): los
+  datos están en el repositorio y el mensaje sirve para cualquier cola (Celery incluido).
+- **Todo `get` exige `tenant_id`** y devuelve `None` si el recurso es de otro tenant: un recurso ajeno es
+  indistinguible de uno inexistente, y el aislamiento no depende de que el llamador se acuerde de comprobarlo.
+- **Registros inmutables** (`ModelRecord`, `MonitoringRecord`) con `created_at`, `started_at` y `finished_at`
+  (UTC, de `Clock`); cada transición crea un registro nuevo (`dataclasses.replace`) que se guarda con `update`.
+  El modelo y el resultado de la carta se guardan como `object`: solo la carta los interpreta.
+- **Casos de uso** (`application/use_cases/`): `TrainModel`, `GetModel`, `MonitorObservations`, `GetMonitoring`
+  (los que usa la API) y `RunTrainingJob`, `RunMonitoringJob` (los que ejecuta el worker; idempotentes).
 
 Las variables de esta tabla son **objetivo**; hoy solo existe `VORACIOUS_LOG_LEVEL`.
 
@@ -142,7 +172,9 @@ Fase II ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). **Objetivo del Paso 3**; `
   `404` si no existe o es de otro tenant.
 - Errores con formato uniforme `{code, message, details}`.
 - Toda ruta de negocio exige tenant; un tenant nunca ve recursos de otro.
-- Mientras `MRCD.fit` no exista, la Fase I de T²MRCD termina en `failed` con `MRCD_NOT_IMPLEMENTED`.
+- Con los defaults de T²MRCD (P2–P6 cerradas) la Fase I se ejecuta completa; si un campo decisivo se pasa como
+  `None`, termina en `failed` con `T2MRCD_DECISION_PENDING` y `details.pending`. Fase I y Fase II comparten un único límite. Catálogo completo de códigos en la enmienda del
+  [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
 
 ### Salud (existe desde el Paso 1)
 

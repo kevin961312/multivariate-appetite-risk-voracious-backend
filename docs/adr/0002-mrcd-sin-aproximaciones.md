@@ -35,3 +35,19 @@ cualquier atajo cambia la probabilidad de señal de la carta.
 
 - Implementar MRCD es más lento que adoptar una librería, pero el resultado es auditable línea a línea.
 - `validador-estadistico` revisa todo cambio en `domain/mrcd/` y `domain/charts/`.
+
+## Enmienda 2026-10-07 (Paso 2): la regla de `NotImplementedError` quedó superada
+
+El texto original de la «Decisión» (líneas 19-20: `MRCD.fit` lanza `NotImplementedError` y el análisis
+falla con `MRCD_NOT_IMPLEMENTED`) describía un cascarón sin port. Con `pymrcd` ([ADR 0006](0006-libreria-pymrcd.md))
+ya hay MRCD fiel a `rrcov`, así que **esa regla ya no rige** y el código `MRCD_NOT_IMPLEMENTED` no existe. Se
+conserva el texto original arriba por trazabilidad. Lo que sigue vigente es el *principio*: nada de
+placeholders estadísticos. Se concreta así (decisión del dueño, 2026-10-07):
+
+- MRCD se ajusta con `pymrcd`; si falla (lo mismo que haría `rrcov`), la Fase I termina en
+  `failed / MRCD_FIT_FAILED` con `details.r_message`. Sin *fallback*.
+- Si falta una decisión estadística de la **carta** (hoy P2–P6 de
+  [`../metodos/t2mrcd.md`](../metodos/t2mrcd.md) están cerradas; aplica si un campo se pasa como `None`), la Fase I termina en `failed / T2MRCD_DECISION_PENDING` con
+  `details.pending`, comprobado **antes** de ajustar. Es preferible no responder a responder con un valor
+  inventado, que es lo que el ADR quería evitar.
+- Los valores «SOLO TEST» que permiten ejecutar esa Fase I en pruebas viven solo en `tests/support/`.

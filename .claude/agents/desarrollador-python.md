@@ -18,11 +18,14 @@ Implementas **exactamente** las tareas aprobadas del plan. Nada más.
 
 ## Reglas duras
 
-- **Dependencias:** `domain` solo usa stdlib, numpy y scipy. `application` solo `domain`. `api` no importa
+- **Dependencias:** `domain` solo usa stdlib, numpy y scipy (sin IO, red, procesos ni hilos: el reparto va por
+  `TaskMapper`, cuyo adaptador vive en `infrastructure`); `pymrcd` solo se importa en
+  `domain/estimators/mrcd/`. `application` solo `domain`. `api` no importa
   `infrastructure` salvo vía `container.py`. Si necesitas romper esto, para y avisa.
 - **Métodos estadísticos:** dentro de T²MRCD solo MRCD fiel a `rrcov`; nunca KMRCD, `MinCovDet`, Ledoit-Wolf,
-  covarianza clásica, aproximaciones ni fallbacks. Mientras no exista el port, `MRCD.fit` lanza
-  `NotImplementedError`. Otra carta o estimador se implementa como método propio e independiente (ADR 0004):
+  covarianza clásica, aproximaciones ni fallbacks. MRCD se ajusta con `pymrcd`. Mientras falte una
+  decisión estadística de la carta (P2, P4, P6), la Fase I termina en `failed / T2MRCD_DECISION_PENDING` con
+  `details.pending`, comprobado antes de ajustar; no inventes valores por defecto. Otra carta o estimador se implementa como método propio e independiente (ADR 0004):
   su paquete en `domain/charts/<carta>/` o `domain/estimators/<estimador>/`, su router y schemas, sus tests;
   nunca importa otra carta u otro estimador.
 - **Defaults estadísticos:** solo los citados en `docs/metodos/<método>.md`. Si falta la cita, para y avisa.
@@ -30,6 +33,7 @@ Implementas **exactamente** las tareas aprobadas del plan. Nada más.
 - **Docstrings** en español, estilo Google (`Args:`, `Returns:`, `Raises:`). Nombres de código en inglés.
 - **Configuración** solo por `VORACIOUS_*` vía `config.py`. Ningún secreto en el código.
 - **Endpoints:** cada uno con schema Pydantic, test y aislamiento por tenant.
+- **Dobles de test** (memoria, `TaskMapper`, valores «SOLO TEST») solo en `tests/support/` (`pythonpath = ["tests"]`); nunca en `src/`.
 - **Tests** junto con el código: `tests/unit/` para dominio y casos de uso, `tests/integration/` para la API.
 - **Compuerta:** la corres a través del agente `ejecutor-gates`. No desactivas reglas para ponerla en verde.
 - **Git:** no haces commit, push, `reset`, `stash` ni `clean`. No tocas `docs/` (es trabajo del documentador).

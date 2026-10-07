@@ -44,3 +44,40 @@ Rutas por carta (`<carta>` es su identificador, p. ej. `t2mrcd`):
 
 - **Fase II síncrona:** más simple para el cliente, pero rompe el contrato cuando haya lotes grandes.
 - **Un solo recurso «analysis» con `phase=`:** no expresa que un monitoreo depende de un modelo entrenado.
+
+## Enmienda 2026-10-07 (Paso 2): catálogo de códigos, validación síncrona e idempotencia
+
+Sustituye al párrafo de la línea 32-33 sobre `MRCD_NOT_IMPLEMENTED` (superado, ver enmienda del
+[ADR 0002](0002-mrcd-sin-aproximaciones.md)).
+
+**Catálogo de códigos** (formato uniforme `{code, message, details}`):
+
+| Código | Origen | Cuándo |
+| --- | --- | --- |
+| `T2MRCD_DECISION_PENDING` | dominio | Un campo estadístico decisivo es `None` (con los defaults no ocurre); `details.pending` lista los campos |
+| `MRCD_FIT_FAILED` | dominio | `pymrcd` lanzó `RError`; `details.r_message` |
+| `BOOTSTRAP_REPLICATE_FAILED` | dominio | Una réplica falló; la Fase I falla (no se descartan réplicas) |
+| `BOOTSTRAP_LIMIT_NOT_FINITE` | dominio | La agregación devolvió un límite no finito |
+| `T2MRCD_CLEAN_CRITERION_INVALID` | dominio | El criterio de fila limpia no devolvió una máscara booleana de longitud n |
+| `T2MRCD_NO_CLEAN_OBSERVATIONS` | dominio | El criterio no dejó ninguna fila limpia |
+| `INVALID_INPUT` | dominio | Entrada vacía, no finita, con `p` distinto del modelo o con suma por fila desbordada |
+| `INTERNAL_ERROR` | aplicación | Excepción inesperada (no `DomainError`); sin traza en el registro, el detalle va al log |
+| `CHART_NOT_FOUND` | aplicación | Carta no registrada |
+| `MODEL_NOT_FOUND` | aplicación | Modelo inexistente, de otra carta o de otro tenant |
+| `MODEL_NOT_READY` | aplicación | Modelo no `succeeded` (Fase II) |
+| `MONITORING_NOT_FOUND` | aplicación | Monitoreo inexistente o ajeno |
+
+El mapeo a HTTP (`404`, `409`, `422`…) es del Paso 3.
+
+**Validación síncrona de Fase II.** `MonitorObservations` valida las observaciones con
+`validate_phase2_input` **antes** de encolar: una entrada incompatible con el modelo (p. ej. otro número de
+variables) es un error inmediato del cliente, no un monitoreo `failed` que descubre al hacer polling. La Fase I
+no se valida igual por ahora (deuda del Paso 3, ver `ESTADO.md`).
+
+**Jobs idempotentes.** `RunTrainingJob` y `RunMonitoringJob` no hacen nada si el registro ya no está `queued`.
+Con una cola real (Celery) un mensaje puede entregarse dos veces; así un duplicado no vuelve a ejecutar
+minutos de cómputo ni pisa un resultado. Limitación conocida: la transición `queued → running` no es atómica
+(deuda del Paso 3).
+
+**`JobRequest` solo lleva identificadores.** Los datos viven en el repositorio, de modo que el mensaje es
+pequeño y serializable por cualquier cola.

@@ -38,13 +38,16 @@ estimadores pueden entrar como métodos propios (ADR 0004), cada uno fiel a **su
   (para MRCD: archivo:línea de `rrcov` y versión), y el valor coincide con el código.
 - **Validaciones:** `0.5 ≤ alpha ≤ 1`, `target ∈ {identity, equicorrelation}`, `maxcond > 1` y las demás
   que exija `rrcov`.
-- **Interfaz:** `MRCD(params).fit(X) -> MRCDResult` con `location`, `covariance`, `precision`, `rho`, `h`,
-  `best_subset`, `mahalanobis` y `n_csteps`.
-- **Cascarón honesto:** mientras no haya port, `fit` lanza `NotImplementedError`; no hay placeholder.
+- **Interfaz:** `fit_mrcd(x, MRCDParams) -> MRCDFit` (adaptador sobre `pymrcd.cov_mrcd`, con los nombres de los
+  slots de `CovMrcd`); un `RError` se convierte en `MRCD_FIT_FAILED`, nunca en otro estimador.
+- **Decisiones pendientes, sin placeholder:** MRCD se ajusta con `pymrcd`. Mientras falte una decisión estadística
+  de la carta, la Fase I termina en `failed / T2MRCD_DECISION_PENDING` con `details.pending`, comprobado antes de
+  ajustar. Un valor por defecto inventado en `src/` para P2, P4 o P6 es BLOQUEANTE; los valores «SOLO TEST» solo
+  pueden vivir en `tests/support/`.
 - **Golden:** existen el script R, los fixtures (n > p, p > n, contaminado, semilla fija) y el test con
   tolerancia **declarada** (`rtol`/`atol` explícitos). En el cascarón, `xfail(strict=True)`.
-- **T²:** los límites de control vienen del artículo de T²MRCD (Fase I) con cita; si no, figuran como
-  decisión abierta.
+- **T²:** los límites salen del bootstrap documentado en `docs/metodos/t2mrcd.md` y el ADR 0007; todo valor
+  sin cita (P2, P4, P6, cita de B) figura como decisión abierta.
 - **Pureza del dominio:** `domain/` solo importa stdlib, numpy y scipy.
 
 ## Formato de salida obligatorio
@@ -61,7 +64,7 @@ Veredicto: APROBADO | APROBADO CON OBSERVACIONES | RECHAZADO
 - `archivo:línea` — <problema menor>
 
 ### Citas verificadas
-| Parámetro/paso | Cita en fidelidad.md | Coincide con rrcov | Nota |
+| Parámetro/paso | Cita en docs/metodos/<método>.md | Coincide con rrcov | Nota |
 ```
 
 ## Red flags (RECHAZADO automático)
