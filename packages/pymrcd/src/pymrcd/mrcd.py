@@ -22,7 +22,7 @@ from pymrcd._rlinalg import r_mahalanobis_inverted, r_matvec
 from pymrcd._types import FloatArray, IntArray
 from pymrcd.detmrcd import DetMrcd, detmrcd
 
-__all__ = ["TARGETS", "MrcdResult", "cov_mrcd"]
+__all__ = ["TARGETS", "MrcdResult", "cov_mrcd", "mahalanobis"]
 
 TARGETS = ("identity", "equicorrelation")
 """Valores admitidos de ``target`` (``CovControl.R:26``)."""
@@ -166,3 +166,56 @@ def cov_mrcd(
         init_hsets=res.hsets_init,
         detail=res,
     )
+
+
+def mahalanobis(x: npt.ArrayLike, center: npt.ArrayLike, icov: npt.ArrayLike) -> FloatArray:
+    """Distancias de Mahalanobis al cuadrado con la inversa dada, como en ``rrcov::CovMrcd``.
+
+    Fuente: ``stats::mahalanobis(x, center, cov, inverted=TRUE)`` de R 4.5.2
+    (``R-4.5.2/src/library/stats/R/mahalanobis.R:31-47``): un vector es **una fila**
+    (``:33``), ``sweep`` resta el centro por columnas (``:36``) y ``rowSums(x %*% cov * x)``
+    (``:46``). Es la misma rutina con la que ``cov_mrcd`` calcula ``mah``
+    (``rrcov-1.7-7/R/CovMrcd.R:46``), así que ``mahalanobis(res.x, res.center, res.icov)`` es
+    igual bit a bit a ``res.mah``.
+
+    Conformidad de ``icov`` (``mahalanobis.R:46``, ``x %*% cov * x``): si ``nrow(icov) != p``
+    falla ``%*%`` con ``non-conformable arguments``; si ``nrow(icov) == p`` pero
+    ``ncol(icov) != p``, ``%*%`` da ``n x k`` y falla ``*`` con ``non-conformable arrays``. Un
+    ``icov`` vector se trata como columna (regla de ``%*%`` cuando ``length == ncol(x)``). Sin esta
+    comprobación el *broadcasting* de numpy daría un resultado erróneo en silencio.
+
+    Divergencia explícita con R: si ``length(center) != p``, ``sweep`` (``mahalanobis.R:36``)
+    solo **avisa** («STATS does not recycle exactly across MARGIN») y recicla el centro; aquí se
+    lanza ``RError``. Es deliberadamente más estricto: un centro reciclado no tiene sentido
+    estadístico y casi siempre indica un error de quien llama.
+
+    Args:
+        x: Matriz ``n x p`` (o vector de longitud ``p``, que se trata como una fila).
+        center: Vector de longitud ``p``.
+        icov: Inversa de la covarianza ``p x p``.
+
+    Returns:
+        Vector de ``n`` distancias al cuadrado.
+
+    Raises:
+        RError: si ``x`` no es vector ni matriz, si ``center`` no tiene longitud ``p`` (más
+            estricto que R, ver arriba) o si ``icov`` no es ``p x p`` (mensajes de ``%*%`` y
+            ``*`` de R).
+    """
+    arr = np.asarray(x, dtype=np.float64)
+    if arr.ndim == 1:
+        arr = arr[None, :]
+    if arr.ndim != 2:
+        raise RError("'x' must be a matrix or a vector")
+    mu = np.asarray(center, dtype=np.float64)
+    inv = np.asarray(icov, dtype=np.float64)
+    p = arr.shape[1]
+    if mu.ndim != 1 or mu.shape[0] != p:
+        raise RError("non-conformable arguments")
+    if inv.ndim == 1 and inv.shape[0] == p:
+        inv = inv[:, None]  # %*% trata el vector como columna p x 1
+    if inv.ndim != 2 or inv.shape[0] != p:
+        raise RError("non-conformable arguments")  # %*% (mahalanobis.R:46)
+    if inv.shape[1] != p:
+        raise RError("non-conformable arrays")  # (n x k) * (n x p) (mahalanobis.R:46)
+    return r_mahalanobis_inverted(arr, mu, inv)
