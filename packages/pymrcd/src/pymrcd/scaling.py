@@ -59,7 +59,7 @@ def non0q(u: FloatArray) -> float:
     return float(qq[i]) / denom
 
 
-def do_scale(x: FloatArray) -> DoScaleResult:
+def do_scale(x: FloatArray, n_threads: int | None = None) -> DoScaleResult:
     """``doScale(x, center=median, scale=Qn)`` de ``robustbase``.
 
     Fuente: ``robustbase-0.99-6/R/detmcd.R:229-289``: ``center = apply(x, 2, median)`` (``:237``,
@@ -70,6 +70,7 @@ def do_scale(x: FloatArray) -> DoScaleResult:
 
     Args:
         x: Matriz ``n x p``.
+        n_threads: Hilos de ``Qn`` (rendimiento, no cambia ningún bit); ``None`` ⇒ por defecto.
 
     Returns:
         ``DoScaleResult`` con ``x`` estandarizada, ``center`` y ``scale``.
@@ -80,7 +81,7 @@ def do_scale(x: FloatArray) -> DoScaleResult:
     arr = np.asarray(x, dtype=np.float64)
     center = r_median_cols(arr)
     xc = arr - center[None, :]
-    scale = qn_columns(xc)
+    scale = qn_columns(xc, n_threads=n_threads)
     if np.isnan(scale).any() or (scale < 0).any():
         raise RError("provide better scale; must be all positive")
     for j in np.flatnonzero(scale == 0).tolist():

@@ -92,6 +92,7 @@ def cov_mrcd(
     target: str = "identity",
     maxcond: float = 50,
     init_hsets: npt.ArrayLike | None = None,
+    n_threads: int | None = None,
 ) -> MrcdResult:
     """Estimador MRCD, port fiel de ``rrcov::CovMrcd``.
 
@@ -112,6 +113,9 @@ def cov_mrcd(
         maxcond: Número de condición objetivo.
         init_hsets: Subconjuntos iniciales ``h' x L`` en **base 0** (``initHsets`` de R menos 1)
             o ``None`` para calcularlos con ``r6pack``.
+        n_threads: Hilos de la extensión C de ``Qn``/OGK. Parámetro de **rendimiento**, no
+            estadístico: el resultado es idéntico bit a bit para cualquier valor (especificación
+            §3.12.9 e). ``None`` ⇒ ``PYMRCD_NUM_THREADS`` o todos los CPU visibles por afinidad.
 
     Returns:
         ``MrcdResult``.
@@ -144,6 +148,7 @@ def cov_mrcd(
         target=0 if target == "identity" else 1,
         maxcsteps=maxcsteps,
         hsets_init=hs,
+        n_threads=n_threads,
     )
     mah = r_mahalanobis_inverted(xf, res.initmean, res.icov)
     return MrcdResult(

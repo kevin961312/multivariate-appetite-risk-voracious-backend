@@ -9,6 +9,8 @@ Port de la definición **local** de ``r6pack`` en ``rrcov-1.7-7/R/detmrcd.R:57-1
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
+from functools import partial
 from typing import NamedTuple
 
 import numpy as np
@@ -71,7 +73,7 @@ class InitSet(NamedTuple):
     ord: IntArray
 
 
-def initset(data: FloatArray, p_mat: FloatArray, h: int) -> InitSet:
+def initset(data: FloatArray, p_mat: FloatArray, h: int, n_threads: int | None = None) -> InitSet:
     """``initset(data, scalefn=Qn, P, h)``, función local de ``r6pack``.
 
     Fuente: ``rrcov-1.7-7/R/detmrcd.R:65-76`` (especificación §3.5.1): ``stopifnot`` de
@@ -86,6 +88,7 @@ def initset(data: FloatArray, p_mat: FloatArray, h: int) -> InitSet:
         data: Datos ``n x p``.
         p_mat: Autovectores ``P`` (``p x p``).
         h: Tamaño del subconjunto.
+        n_threads: Hilos de ``Qn`` (rendimiento); ``None`` ⇒ por defecto.
 
     Returns:
         ``InitSet`` con ``ord`` en base 0.
@@ -101,7 +104,7 @@ def initset(data: FloatArray, p_mat: FloatArray, h: int) -> InitSet:
     if h > n:
         raise RError("h <= n is not TRUE")
     proj = r_matprod(x, p_arr)
-    lam = do_scale(proj).scale
+    lam = do_scale(proj, n_threads=n_threads).scale
     pt = np.array(p_arr.T, dtype=np.float64)
     sqrtcov = r_matprod(p_arr, lam[:, None] * pt)
     sqrtinvcov = r_matprod(p_arr, pt / lam[:, None])
@@ -232,7 +235,7 @@ class R6Pack(NamedTuple):
     p_mats: tuple[FloatArray, ...]
 
 
-def r6pack(x: FloatArray, h: int) -> R6Pack:
+def r6pack(x: FloatArray, h: int, n_threads: int | None = None) -> R6Pack:
     """``r6pack(x, h, full.h=FALSE, adjust.eignevalues=FALSE, scaled=FALSE, scalefn=Qn)``.
 
     Fuente: ``rrcov-1.7-7/R/detmrcd.R:57-174``: ``doScale(x, median, Qn)`` (``:123-125``);
@@ -244,16 +247,25 @@ def r6pack(x: FloatArray, h: int) -> R6Pack:
     Args:
         x: Datos ``n x p`` (``mU`` o ``mW``).
         h: Tamaño de los subconjuntos.
+        n_threads: Hilos de ``Qn`` y de ``ogk_u`` (rendimiento, no cambia ningún bit); ``None`` ⇒
+            por defecto.
 
     Returns:
         ``R6Pack`` con ``hsets`` en base 0.
     """
-    xs = do_scale(np.asarray(x, dtype=np.float64)).x
-    builders = (set1_matrix, set2_matrix, set3_matrix, set4_matrix, set5_matrix, ogk_u)
+    xs = do_scale(np.asarray(x, dtype=np.float64), n_threads=n_threads).x
+    builders: tuple[Callable[[FloatArray], FloatArray], ...] = (
+        set1_matrix,
+        set2_matrix,
+        set3_matrix,
+        set4_matrix,
+        set5_matrix,
+        partial(ogk_u, n_threads=n_threads),
+    )
     hsets = np.empty((h, 6), dtype=np.int64)
     p_mats: list[FloatArray] = []
     for k, build in enumerate(builders):
         p_k = r_eigen_sym(build(xs)).vectors
         p_mats.append(p_k)
-        hsets[:, k] = initset(xs, p_k, h).ord
+        hsets[:, k] = initset(xs, p_k, h, n_threads=n_threads).ord
     return R6Pack(x=xs, hsets=hsets, p_mats=tuple(p_mats))

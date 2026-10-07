@@ -22,10 +22,15 @@ from voracious.domain.estimators.mrcd import (
 
 def test_defaults_match_cov_mrcd_signature() -> None:
     # Los defaults de MRCDParams son los de pymrcd.cov_mrcd (= CovControlMrcd de rrcov 1.7-7).
+    # n_threads es de rendimiento (no estadístico): va aparte, no en MRCDParams.
     signature = inspect.signature(pymrcd.cov_mrcd).parameters
     for f in dataclasses.fields(MRCDParams):
         assert f.default == signature[f.name].default, f.name
-    assert {f.name for f in dataclasses.fields(MRCDParams)} == set(signature) - {"x", "init_hsets"}
+    assert {f.name for f in dataclasses.fields(MRCDParams)} == set(signature) - {
+        "x",
+        "init_hsets",
+        "n_threads",
+    }
 
 
 def test_fit_is_bitwise_equal_to_cov_mrcd_on_golden_c7() -> None:
@@ -113,3 +118,15 @@ def test_estimator_delegates_to_fit_mrcd_and_is_picklable() -> None:
     assert np.array_equal(fit.center, ref.center)
     assert pickle.dumps(estimator)
     assert copy.deepcopy(estimator) == estimator
+
+
+def test_n_threads_is_performance_only() -> None:
+    x = read_case_x("C7")
+    one = fit_mrcd(x, MRCDParams(), n_threads=1)
+    many = MRCDEstimator(MRCDParams(), n_threads=4).fit(x)
+    for name in ("center", "cov", "icov", "mah", "best", "ok", "i_best", "n_csteps"):
+        a, b = getattr(one, name), getattr(many, name)
+        assert a.dtype == b.dtype, name
+        assert a.tobytes() == b.tobytes(), name
+    assert (one.rho, one.cnp2, one.crit) == (many.rho, many.cnp2, many.crit)
+    assert MRCDEstimator(MRCDParams()).n_threads is None

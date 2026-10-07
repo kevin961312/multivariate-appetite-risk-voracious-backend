@@ -30,6 +30,9 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
+    # Solo para mypy sobre packages/pymrcd/setup.py (la compilación usa su propio entorno aislado
+    # con setuptools >= 77, declarado en packages/pymrcd/pyproject.toml).
+    "types-setuptools>=84",
 ]
 
 # --- workspace de uv ------------------------------------------------------

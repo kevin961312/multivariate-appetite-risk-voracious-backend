@@ -16,12 +16,31 @@ dependencies = [
     "scipy>=1.18.1,<1.19",
 ]
 
+# Extensión C `pymrcd._qn_ext` (qn0 de robustbase y U de OGK; especificación §3.12.9): setuptools
+# >= 77 por los metadatos de licencia PEP 639; `setup.py` solo declara `ext_modules`.
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/pymrcd"]
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pymrcd*"]
+
+[tool.setuptools.package-data]
+pymrcd = ["py.typed", "*.pyi", "_ext/*.c", "_ext/*.h"]
+
+# uv recompila la extensión cuando cambia el C, setup.py o este archivo (si no, reutiliza la caché).
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "setup.py" },
+    { file = "src/pymrcd/_ext/*.c" },
+    { file = "src/pymrcd/_ext/*.h" },
+]
 
 # --- mypy ------------------------------------------------------------------
 # Propio de pymrcd: sin plugin de pydantic (pymrcd no depende de pydantic).

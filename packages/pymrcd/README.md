@@ -25,10 +25,32 @@ res.best  # subconjunto óptimo, base 0
 ```
 
 API pública: `cov_mrcd(x, alpha=0.5, h=None, maxcsteps=200, rho=None, target="identity", maxcond=50,
-init_hsets=None) -> MrcdResult` y la excepción `RError` (errores de R con su mensaje). Los valores por
+init_hsets=None, n_threads=None) -> MrcdResult` y la excepción `RError` (errores de R con su mensaje). Los valores por
 defecto son los de `CovControlMrcd()` de rrcov 1.7-7. `MrcdResult` lleva `center`, `cov`, `icov`, `rho`,
 `target`, `cnp2`, `crit`, `best`, `mah`, `alpha`, `quan`/`h`, `n_obs`, `x`, `ok`, `i_best`, `n_csteps`,
 `init_hsets` y `detail` (intermedios de `.detmrcd`).
+
+`n_threads` es un parámetro de **rendimiento**, no estadístico: el resultado es idéntico bit a bit con
+cualquier valor. `None` usa `PYMRCD_NUM_THREADS` si está definida y, si no, todos los CPU visibles por
+afinidad.
+
+## Extensión C (`pymrcd._qn_ext`)
+
+`Qn` (`qn0`, `whimed_i` de robustbase; `R_qsort` y `rPsort` de R) y los pares de OGK se calculan en una
+extensión C, port literal de las fuentes de R (`src/pymrcd/_ext/`, con la cita archivo:línea y la lista de
+cambios en cada función; especificación §3.12.9). Usa la C-API de CPython con el protocolo de búfer (sin
+cabeceras de numpy) y hilos POSIX entre columnas; el GIL se libera durante el cálculo. Se compila con
+`-ffp-contract=off -fno-fast-math` (sin FMA, como el binario de R del oráculo) y la compuerta lo comprueba
+desensamblando el binario (`scripts/check_pymrcd_fma.sh`).
+
+No hay implementación de respaldo en Python: sin la extensión compilada, `import pymrcd` falla con un
+`ImportError` explícito. Para compilarla (requiere un compilador de C con pthreads):
+
+```bash
+uv sync --reinstall-package pymrcd
+```
+
+`uv` la recompila sola cuando cambian `setup.py`, `pyproject.toml` o `src/pymrcd/_ext/*` (`cache-keys`).
 
 ## Diferencias de API con R
 
@@ -65,7 +87,9 @@ versiones. Subir una cota exige volver a pasar los golden.
 ## Créditos
 
 - V. Todorov, autor de `rrcov`.
-- M. Maechler y colaboradores, autores de `robustbase`.
+- M. Maechler y colaboradores, autores de `robustbase`; P. J. Rousseeuw y C. Croux, autores del código
+  original de `Qn` (`qn_sn.c`, con permiso de licencia GPL).
+- R Core Team (`R_qsort`, `rPsort` de R 4.5.2, GPL-2+).
 - K. Boudt, P. J. Rousseeuw, S. Vanduffel y T. Verdonck (2020), «The minimum regularized covariance
   determinant estimator», *Statistics and Computing* 30, 113-128. Autores del método.
 

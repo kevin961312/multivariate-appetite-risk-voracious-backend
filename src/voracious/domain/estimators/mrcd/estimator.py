@@ -35,7 +35,7 @@ PYMRCD_VERSION: str = pymrcd.__version__
 """Versión de ``pymrcd`` con la que se ajusta (se guarda con cada modelo)."""
 
 
-def fit_mrcd(x: npt.ArrayLike, params: MRCDParams) -> MRCDFit:
+def fit_mrcd(x: npt.ArrayLike, params: MRCDParams, n_threads: int | None = None) -> MRCDFit:
     """Ajusta MRCD con ``pymrcd.cov_mrcd`` (subconjuntos iniciales calculados, sin inyectar).
 
     Las filas no finitas las descarta ``cov_mrcd`` igual que ``rrcov`` (``CovMrcd.R:19-20``) y su
@@ -44,6 +44,10 @@ def fit_mrcd(x: npt.ArrayLike, params: MRCDParams) -> MRCDFit:
     Args:
         x: Datos ``n x p``.
         params: Parámetros de MRCD.
+        n_threads: Hilos de la extensión C de ``pymrcd``. Parámetro de **rendimiento**, no
+            estadístico: no forma parte de ``MRCDParams``, no se persiste y no cambia ningún bit
+            del ajuste (``docs/metodos/mrcd-especificacion.md`` §3.12.9 e). ``None`` ⇒ por
+            defecto de ``pymrcd``.
 
     Returns:
         El ajuste.
@@ -62,6 +66,7 @@ def fit_mrcd(x: npt.ArrayLike, params: MRCDParams) -> MRCDFit:
             rho=params.rho,
             target=params.target,
             maxcond=params.maxcond,
+            n_threads=n_threads,
         )
     except pymrcd.RError as exc:
         raise EstimationError(
@@ -91,9 +96,12 @@ class MRCDEstimator:
 
     Attributes:
         params: Parámetros de MRCD de cada ajuste.
+        n_threads: Hilos de ``pymrcd`` por ajuste (rendimiento; ver ``fit_mrcd``). No es un
+            parámetro estadístico y no se guarda con la versión de la carta.
     """
 
     params: MRCDParams
+    n_threads: int | None = None
 
     @property
     def name(self) -> str:
@@ -113,7 +121,7 @@ class MRCDEstimator:
             InvalidInputError: Si ``x`` no es una matriz numérica de dos dimensiones.
             EstimationError: ``MRCD_FIT_FAILED`` si ``rrcov`` fallaría.
         """
-        return fit_mrcd(x, self.params)
+        return fit_mrcd(x, self.params, n_threads=self.n_threads)
 
 
 if TYPE_CHECKING:

@@ -353,6 +353,7 @@ def detmrcd(
     maxcsteps: int = 200,
     hsets_init: IntArray | None = None,
     record: bool = False,
+    n_threads: int | None = None,
 ) -> DetMrcd:
     """``.detmrcd(x, h, alpha, rho, maxcond, minscale, target, maxcsteps, hsets.init)``.
 
@@ -382,6 +383,9 @@ def detmrcd(
         maxcsteps: Máximo de C-steps.
         hsets_init: Subconjuntos iniciales en base 0 o ``None``.
         record: Guarda los intermedios de cada C-step.
+        n_threads: Hilos de la extensión C de ``Qn``/OGK (parámetro de rendimiento, no estadístico:
+            no cambia ningún bit; especificación §3.12.9 e). ``None`` ⇒ ``PYMRCD_NUM_THREADS`` o
+            los CPU visibles.
 
     Returns:
         ``DetMrcd``.
@@ -395,7 +399,7 @@ def detmrcd(
 
     # 1. Estandarización (detmrcd.R:417-422).
     vmx = r_median_cols(xin)
-    vsd_raw = qn_columns(xin)
+    vsd_raw = qn_columns(xin, n_threads=n_threads)
     vsd = vsd_raw.copy()
     vsd[vsd < minscale] = minscale
     mu = r_scale(xin, vmx, vsd)
@@ -412,7 +416,7 @@ def detmrcd(
     # 3.1-3.3 Subconjuntos iniciales (detmrcd.R:445-459).
     r6: R6Pack | None = None
     if hsets_init is None:
-        r6 = r6pack(xw, h_int)
+        r6 = r6pack(xw, h_int, n_threads=n_threads)
         hsets = r6.hsets
     else:
         hsets = _check_hsets(hsets_init, h_int, n)
