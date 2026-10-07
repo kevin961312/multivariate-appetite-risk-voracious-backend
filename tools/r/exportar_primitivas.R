@@ -310,7 +310,7 @@ for (p in c(30, 60)) {
   caso("chol2inv_chol", sprintf("rcov%d", p), list(A = A), function(e) list(inv = chol2inv(chol(e$A))), sprintf("rho*I + (1-rho)*scfac*S, S rango 10, p=%d", p))
   caso("chol", sprintf("rcov%d", p), list(A = A), function(e) list(R = chol(e$A)), sprintf("rho*I + (1-rho)*scfac*S, S rango 10, p=%d", p))
 }
-def("determinant", "base::determinant(A)$modulus (log|det|, dgetrf) y sign; ademas det(A) y obj = det(A)^(1/p) como detmrcd.R:410-413.", "det.R:25-29, Lapack.c:1403-1458")
+def("determinant", "base::determinant(A)$modulus (log|det|, dgetrf) y sign; ademas det(A) y obj = det(A)^(1/p) EXACTAMENTE como rrcov (detmrcd.R:410-413, objective=='geom': obj <- function(x) det(x)^(1/p), sin abs()); si det(A) < 0 el resultado es NaN (se exporta como 'NaN').", "det.R:25-29, Lapack.c:1403-1458")
 i <- 0
 for (p in c(2, 3, 5, 10, 20, 40, 100)) {
   i <- i + 1; A <- spd(p, max(p, 20))
@@ -319,7 +319,7 @@ for (p in c(2, 3, 5, 10, 20, 40, 100)) {
        sprintf("SPD %dx%d", p, p))
 }
 caso("determinant", "general", list(A = rn(7, 7)), function(e) { d <- determinant(e$A)
-     list(modulus = as.numeric(d$modulus), sign = as.integer(d$sign), det = det(e$A), obj = abs(det(e$A))^(1 / 7)) }, "general 7x7 (signo variable)")
+     list(modulus = as.numeric(d$modulus), sign = as.integer(d$sign), det = det(e$A), obj = det(e$A)^(1 / 7)) }, "general 7x7 (signo variable); det < 0 => obj = det^(1/7) = NaN en R (detmrcd.R:410-413 no usa abs)")
 caso("determinant", "subdesborde", list(A = diag(rep(1e-10, 40)) + 0), function(e) { d <- determinant(e$A)
      list(modulus = as.numeric(d$modulus), sign = as.integer(d$sign), det = det(e$A), obj = det(e$A)^(1 / 40)) }, "diag(1e-10) 40x40: det subdesborda a 0 (T19) pero modulus finito")
 def("matprod", "A %*% B (dgemm 'N','N'); B se entrega MATERIALIZADA (p.ej. t(A)).", "array.c:788-843")
@@ -346,7 +346,7 @@ for (d in list(c(10, 4), c(50, 20), c(200, 40), c(100, 250))) {
 }
 caso("crossprod", "n_menor_p", list(X = rn(30, 80)), function(e) list(C = crossprod(e$X)), "crossprod 30x80 (rango deficiente)")
 def("eigen_sym", "eigen(A, symmetric=TRUE) (dsyevr jobz='V', uplo='L'): valores decrecientes y vectores (columnas). Los signos de los vectores son los de LAPACK.", "eigen.R:45-74, Lapack.c:166-237")
-def("eigen_auto", "eigen(A) sin symmetric= (isSymmetric tol 100*eps => La_rs jobz='V'); A = mE %*% t(mE)/(h-1) no exactamente simetrica. Salida valores y vectores.", "eigen.R:22-74")
+def("eigen_auto", "eigen(A) sin symmetric= (isSymmetric tol 100*eps => La_rs jobz='V'). Entrada A = la matriz EXACTA a la que se aplica eigen() (= 1.3 * S, calculada en R antes de exportar; no hay que reescalar en Python). Salida valores y vectores.", "eigen.R:22-74")
 i <- 0
 for (d in list(c(3, 3), c(5, 20), c(12, 40), c(20, 100), c(40, 60), c(60, 30), c(100, 50), c(200, 50))) {
   i <- i + 1; p <- d[1]
@@ -355,8 +355,8 @@ for (d in list(c(3, 3), c(5, 20), c(12, 40), c(20, 100), c(40, 60), c(60, 30), c
   caso("eigen_sym", cc(i), list(A = A), function(e) { r <- eigen(e$A, symmetric = TRUE); list(valores = r$values, vectores = r$vectors) },
        sprintf("cor de datos %dx%d%s", d[2], p, if (d[2] <= p) " (rango deficiente, autoespacio nulo)" else ""))
   E1 <- rn(p, d[2]); S <- E1 %*% t(E1) / (d[2] - 1)
-  caso("eigen_auto", cc(i), list(A = S), function(e) { r <- eigen(1.3 * e$A); list(valores = r$values, vectores = r$vectors) },
-       sprintf("1.3 * mE %%*%% t(mE)/(h-1), mE %dx%d", p, d[2]))
+  caso("eigen_auto", cc(i), list(A = 1.3 * S), function(e) { r <- eigen(e$A); list(valores = r$values, vectores = r$vectors) },
+       sprintf("A = 1.3 * S (matriz pasada a eigen), con S = mE %%*%% t(mE)/(h-1), mE %dx%d", p, d[2]))
 }
 caso("eigen_sym", "identidad", list(A = diag(6)), function(e) { r <- eigen(e$A, symmetric = TRUE); list(valores = r$values, vectores = r$vectors) }, "identidad 6x6")
 caso("eigen_sym", "diag_distinta", list(A = diag(c(5, 3, 1, 4, 2))), function(e) { r <- eigen(e$A, symmetric = TRUE); list(valores = r$values, vectores = r$vectors) }, "diagonal 5x5")

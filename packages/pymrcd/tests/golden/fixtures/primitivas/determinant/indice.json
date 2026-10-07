@@ -1,6 +1,6 @@
 {
   "funcion": "determinant",
-  "descripcion": "base::determinant(A)$modulus (log|det|, dgetrf) y sign; ademas det(A) y obj = det(A)^(1/p) como detmrcd.R:410-413.",
+  "descripcion": "base::determinant(A)$modulus (log|det|, dgetrf) y sign; ademas det(A) y obj = det(A)^(1/p) EXACTAMENTE como rrcov (detmrcd.R:410-413, objective=='geom': obj <- function(x) det(x)^(1/p), sin abs()); si det(A) < 0 el resultado es NaN (se exporta como 'NaN').",
   "referencia": "det.R:25-29, Lapack.c:1403-1458",
   "semilla": 20261100,
   "RNGkind": ["Mersenne-Twister", "Inversion", "Rejection"],
@@ -308,7 +308,7 @@
     },
     {
       "id": "general",
-      "descripcion": "general 7x7 (signo variable)",
+      "descripcion": "general 7x7 (signo variable); det < 0 => obj = det^(1/7) = NaN en R (detmrcd.R:410-413 no usa abs)",
       "entradas": {
         "A": {
           "archivo": "entrada_A_general.csv.gz",
@@ -345,7 +345,7 @@
           "forma": [1, 1],
           "clase": "escalar",
           "tipo": "double",
-          "sha256": "05fb43522010e6a9cfa367a6627ef973934112242f7f772b1cc96a2c0c5d439c"
+          "sha256": "072acfd0cc32929c161b727cecf02b1bd3966fec8725e072d48dfb8feef6570f"
         }
       }
     },

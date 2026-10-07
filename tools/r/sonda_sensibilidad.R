@@ -3,7 +3,8 @@
 ## (como conjuntos), el solapamiento mínimo, Delta rho y max|Delta cov| (y si 'best' cambia).
 ## Los subconjuntos iniciales se obtienen con rrcov:::.detmrcd(save.hsets=TRUE) -> $initHsets
 ## (no se modifica ninguna lógica). 5 perturbaciones por caso, semillas 7001..7005.
-## Uso: Rscript tools/r/sonda_sensibilidad.R   (desde la raíz del repo)
+## Uso: Rscript tools/r/sonda_sensibilidad.R [CASO ...]   (desde la raíz del repo; sin args = C1,C5,C7,C8;
+## con args solo recalcula esos casos y fusiona sus filas en sonda_sensibilidad.csv sin tocar las demás)
 source("tools/r/casos.R")
 suppressMessages(library(rrcov, lib.loc = LIB_RRCOV))
 RNGkind("Mersenne-Twister", "Inversion", "Rejection")
@@ -12,7 +13,8 @@ correr <- function(x) rrcov:::.detmrcd(x, alpha = 0.5, h = NULL, rho = NULL, max
                                        target = 0, maxcsteps = 200, hsets.init = NULL,
                                        save.hsets = TRUE, trace = 0L)
 filas <- list()
-for (nm in c("C1", "C5", "C7", "C8")) {
+args <- commandArgs(TRUE); sonda_casos <- if (length(args)) args else c("C1", "C5", "C7", "C8")
+for (nm in sonda_casos) {
   x <- leer_csv_gz(file.path(RAIZ_FIXTURES, nm, "x.csv.gz"))
   r0 <- correr(x); h <- r0$h
   for (rep in seq_len(NREP)) {
@@ -33,4 +35,9 @@ for (nm in c("C1", "C5", "C7", "C8")) {
 res <- do.call(rbind, filas)
 options(width = 250)
 print(res, digits = 4, row.names = FALSE)
-write.csv(res, file.path(RAIZ_FIXTURES, "sonda_sensibilidad.csv"), row.names = FALSE)
+fcsv <- file.path(RAIZ_FIXTURES, "sonda_sensibilidad.csv")
+if (length(args) && file.exists(fcsv)) {
+  prev <- read.csv(fcsv, stringsAsFactors = FALSE)
+  res <- rbind(prev[!prev$caso %in% args, ], res)
+}
+write.csv(res, fcsv, row.names = FALSE)

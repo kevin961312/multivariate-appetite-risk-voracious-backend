@@ -13,7 +13,9 @@ casos <- list(
   C7  = list(n=100, p=20,  sigma="I",    contam=0),
   C8  = list(n=200, p=40,  sigma="AR1",  contam=0),
   C9  = list(n=100, p=20,  sigma="I",    contam=0.20),
-  C10 = list(n=50,  p=200, sigma="I",    contam=0.10)
+  C10 = list(n=50,  p=200, sigma="I",    contam=0.10),
+  ## C11: regimen ceil(n/2) <= p < n (h = 31 <= p = 40 < n = 60); semilla 20261011
+  C11 = list(n=60,  p=40,  sigma="I",    contam=0)
 )
 PHI <- 0.7
 SHIFT <- 5

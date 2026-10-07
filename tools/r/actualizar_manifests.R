@@ -1,7 +1,10 @@
 ## Actualiza los manifest.json de los 13 casos (tolerancias declaradas por cantidad, copiadas de
 ## docs/metodos/mrcd-especificacion.md §11; nota de plataforma; descriptor de intermedios) y crea
-## primitivas/manifest.json. Idempotente. Uso: Rscript tools/r/actualizar_manifests.R
+## primitivas/manifest.json. Idempotente. Uso: Rscript tools/r/actualizar_manifests.R [CASO ...]
+## (con args solo actualiza esos manifests y omite primitivas/informe de tamano)
 source("tools/r/casos.R")
+args_man <- commandArgs(TRUE)
+solo <- length(args_man) > 0
 suppressMessages({ library(jsonlite); library(digest) })
 sha <- function(f) digest(f, algo = "sha256", file = TRUE)
 
@@ -62,7 +65,7 @@ tolerancias <- list(
   por_cantidad = tabla,
   nota_escala = "El atol absoluto de cov/icov depende de la escala de los datos; informar tambien el error relativo a max|ref|.")
 
-for (nm in c(names(casos), names(variantes))) {
+for (nm in if (solo) args_man else c(names(casos), names(variantes))) {
   f <- file.path(RAIZ_FIXTURES, nm, "manifest.json")
   m <- read_json(f, simplifyVector = FALSE)
   m$tolerancias <- tolerancias
@@ -79,6 +82,7 @@ for (nm in c(names(casos), names(variantes))) {
   write_json(m, f, auto_unbox = TRUE, digits = NA, pretty = TRUE, null = "null")
 }
 
+if (solo) quit(save = "no", status = 0)
 ## manifest de primitivas
 vers <- read_json(file.path(RAIZ_FIXTURES, "C1", "manifest.json"))$entorno
 pi_idx <- list.files(file.path(RAIZ_FIXTURES, "primitivas"), pattern = "^indice\\.json$", recursive = TRUE)

@@ -44,7 +44,7 @@ plantilla-agentes/
 referencias/
 
 # Fixtures golden: intermedios p×p pesados solo en local (se regeneran con tools/r/, ver
-# packages/pymrcd/tests/golden/fixtures/README.md). Se versionan completos C1, C7, C8, C9 y C8_eq.
+# packages/pymrcd/tests/golden/fixtures/README.md). Se versionan completos C1, C7, C8, C9, C11 y C8_eq.
 packages/pymrcd/tests/golden/fixtures/*/intermedios/r6_P.csv.gz
 packages/pymrcd/tests/golden/fixtures/*/intermedios/r6_P_k*.csv.gz
 packages/pymrcd/tests/golden/fixtures/*/intermedios/r6_P[0-9]*.csv.gz
@@ -115,6 +115,7 @@ packages/pymrcd/tests/golden/fixtures/*/intermedios/r6_x[0-9]*.csv.gz
 !packages/pymrcd/tests/golden/fixtures/C7/intermedios/*
 !packages/pymrcd/tests/golden/fixtures/C8/intermedios/*
 !packages/pymrcd/tests/golden/fixtures/C9/intermedios/*
+!packages/pymrcd/tests/golden/fixtures/C11/intermedios/*
 !packages/pymrcd/tests/golden/fixtures/C8_eq/intermedios/*
 # Corrida completa del Monte Carlo (detenida): salidas locales, no se versionan
 tools/r/experimentos/resultados/mc_canonico2/

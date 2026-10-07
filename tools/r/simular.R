@@ -2,7 +2,7 @@
 ## packages/pymrcd/tests/golden/fixtures/<caso>/x.csv.gz (17 dígitos, sin cabecera, filas = observaciones).
 ## Las variantes *_eq reutilizan la entrada de su caso base (no se duplica).
 ## Contaminación: las primeras ceil(frac*n) filas se desplazan +5 en todas las coordenadas.
-## Uso: Rscript tools/r/simular.R   (desde la raíz del repo)
+## Uso: Rscript tools/r/simular.R [CASO ...]   (desde la raíz del repo; sin args = todos)
 source("tools/r/casos.R")
 RNGkind("Mersenne-Twister", "Inversion", "Rejection")
 
@@ -17,7 +17,8 @@ simular_caso <- function(nm) {
   x
 }
 
-for (nm in names(casos)) {
+args <- commandArgs(TRUE); todos <- names(casos); if (length(args)) todos <- args
+for (nm in todos) {
   x <- simular_caso(nm)
   dir.create(file.path(RAIZ_FIXTURES, nm), recursive = TRUE, showWarnings = FALSE)
   ruta <- file.path(RAIZ_FIXTURES, nm, "x.csv.gz")
