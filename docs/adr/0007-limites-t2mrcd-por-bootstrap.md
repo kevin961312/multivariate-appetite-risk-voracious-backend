@@ -129,3 +129,27 @@ Decisión del dueño. Sustituye los puntos 3 y 4 de la «Decisión» y la fila �
 
 Pendiente (heredado): cita bibliográfica del bootstrap OOB y de `alpha_limit = 0.005`; regla de cuantil tipo 7.
 - **2026-10-07 (Paso 2b):** vuelve el límite de Fase II por OOB, agregación pool en ambas fases y límite operativo por régimen (ver enmienda arriba).
+
+## Enmienda 2026-10-07 (Paso 2b.2): alternativa evaluada y descartada
+
+**Alternativa evaluada y descartada: bootstrap de los *valores* de T² de `best` (propuesta del dueño, 2026-10-07).**
+Calcular μ₀ y S₀ una vez con el histórico, obtener los T² de las `h` filas de `best` (p. ej. 75), remuestrear
+esos valores 100 veces con reemplazo, tomar el cuantil 0.995 de cada remuestreo y promediar. Tiene la ventaja de
+costar un solo ajuste MRCD. **Se evaluó por simulación** (datos normales limpios, `pymrcd`, 20 000 observaciones
+nuevas en control para medir la falsa alarma real; script `metodo_dueno.py`, fuera del repositorio):
+
+| Caso | Resultado |
+| --- | --- |
+| n = 200, p = 10 (3 conjuntos de datos) | límite ≈ máximo de los T² de `best` (11.9–13.0); 74 % del histórico queda por debajo; falsa alarma con observaciones nuevas **34–37 %** |
+| n = 100, p = 250 | falsa alarma con observaciones nuevas **100 %** |
+
+**Por qué falla.** MRCD elige `best` como las `h` filas de menor T² (verificado: los T² de `best` son exactamente
+los `h` menores del histórico). Un remuestreo de *valores* no puede superar el máximo de la muestra, así que el
+cuantil 0.995 de cada remuestreo cae cerca de ese máximo y el límite queda en el percentil ≈ 75 de los T² del
+histórico. Con p > n, además, las observaciones nuevas no participaron en S₀ y su T² es mucho mayor que el de las
+filas con las que se ajustó. Y al fijar μ₀ y S₀ **ignora el error de estimación de μ y S**, justo lo que se
+quiere capturar. Remuestrear *filas* y reajustar MRCD en cada réplica propaga ese error.
+
+**Decisión del dueño (2026-10-07), opción (a): mantener lo implementado** (remuestrear filas de `best` y reajustar
+MRCD en cada réplica). El coste de minutos (ver «Consecuencias») se acepta; se atacará con M5 (optimizar
+`pymrcd`), no cambiando el método.

@@ -90,7 +90,7 @@ con tenant y el contrato asíncrono `202` + polling cuando el trabajo es largo:
 
 | Método y ruta | Respuesta |
 | --- | --- |
-| `GET …/versions`, `GET …/versions/{version_id}` | lista y detalle de versiones (inmutables) con estado `proposed \| approved \| rejected \| superseded`, límites y reporte antes/después |
+| `GET …/versions`, `GET …/versions/{version_id}` | lista y detalle de versiones (inmutables) con estado `proposed \| active \| superseded \| rejected`, límites y reporte antes/después |
 | `POST …/versions/{version_id}/approve`, `POST …/versions/{version_id}/reject` | aprueba (con `effective_from` no retroactivo) o rechaza una **propuesta** |
 | `GET …/status` | estado de la carta: `requires_new_base > proposal_pending > revalidation_due > startup/active`, versión vigente y avisos |
 | `POST …/monitorings` (ampliado) | ahora cada observación lleva `observed_at` y `batch_label`; `202 {monitoring_id}` |
@@ -116,3 +116,13 @@ con tenant y el contrato asíncrono `202` + polling cuando el trabajo es largo:
 | `EFFECTIVE_FROM_NOT_AFTER_SCORED` | `effective_from` no es posterior a la última observación ya puntuada (Q6) |
 | `OBSERVATION_BEFORE_FIRST_VERSION` | `observed_at` anterior a la primera versión vigente |
 | `BOOTSTRAP_OOB_EMPTY` | Una réplica no tiene filas OOB (ver ADR 0007, enmienda) |
+
+## Enmienda 2026-10-07 (Paso 2b.2): código nuevo y nombre de estado
+
+- **Estado de versión:** el catálogo de endpoints decía `approved`; el nombre vigente es `active` (ADR 0008,
+  enmienda 2b.2). Corregido en la tabla de arriba.
+- **Código nuevo `RECALIBRATION_DECISION_PENDING`** (aplicación): la recalibración tiene decisiones estadísticas
+  sin cerrar (hoy, las pruebas formales de S y μ sin cita; `details.pending` lista los campos). Es una
+  **validación síncrona** previa a encolar, para que el cliente lo sepa de inmediato. Se omite con `force_replace`
+  o cuando hay un evento estructural sin resolver (que ya fuerza el reemplazo). Si llegara a ejecutarse, la
+  carta falla con su propio código (`T2MRCD_DECISION_PENDING`).

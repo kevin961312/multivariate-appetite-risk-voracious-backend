@@ -1,16 +1,16 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-07 (Paso 2b.1, dominio, implementado y pendiente de commit).
+Última actualización: 2026-10-07 (Paso 2b completo: 2b.1 commiteado en `c44f86d`; 2b.2 hecho y commiteado).
 
-**Siguiente hito:** commit del 2b.1 (tras el «sí» del dueño), luego 2b.2 (aplicación: ciclo de vida) y
-luego el Paso 3 (adaptadores, `container.py`, tenant y rutas, incluidas las del ciclo de vida).
+**Siguiente hito:** commit del 2b.2 (tras el «sí» del dueño) y luego el Paso 3 (adaptadores, `container.py`,
+tenant y rutas, incluidas las del ciclo de vida).
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
 | 0 | Fundaciones del repo: docs, ADR, `CLAUDE.md`, equipo de agentes | **hecho** |
 | 1 | Esqueleto: `pyproject`/uv, ruff, mypy, pytest, import-linter (6 contratos), `config`, app factory, `/health`, `/ready`, structlog, `scripts/gate.sh` y hook pre-commit | **hecho** |
 | 2 | Dominio extensible, puertos y casos de uso (ver abajo) | **hecho** (veredicto LT-QA: LISTO CON DEUDA); commiteado (`b73dcf6`) |
-| 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, depuración, comparación S/μ. **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **2b.1 hecho, pendiente de commit** (2026-10-07); 2b.2 pendiente |
+| 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, depuración, comparación S/μ. **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **hecho.** 2b.1 commiteado (`c44f86d`); 2b.2 hecho y commiteado (2026-10-07). Validador: APROBADO CON OBSERVACIONES, ya aplicadas |
 | 3 | Adaptadores mínimos, `container.py`, tenant, rutas por carta Fase I/II, errores uniformes | pendiente |
 | 4 | Dockerfile, docker-compose (perfiles distribuidos comentados), CI | pendiente |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
@@ -67,7 +67,14 @@ la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [A
   deciden las pruebas formales de S y μ). Motivo: con datos estables la Frobenius de MRCD sale ≈ 0.25–0.5. Sin
   pruebas citadas, la recalibración responde `T2MRCD_DECISION_PENDING` salvo `force_replace`, en ambos modos.
 - **Error MC con B = 1:** `None` (no disponible).
-- **Pendiente 2b.2:** hash del contenido de la base al persistir.
+- **Hash del contenido de la base:** hecho en 2b.2 (`base_hash`, SHA-256).
+
+### Decisión del dueño (2026-10-07, 2b.2): método del límite
+
+El dueño propuso calcular el límite con bootstrap de los **valores** de T² de `best`. Se evaluó por simulación
+(límite ≈ máximo de `best`; falsa alarma con nuevas 34–37 % con n = 200, p = 10 y 100 % con n = 100, p = 250) y
+**el dueño decidió mantener lo implementado** (remuestrear filas y reajustar MRCD). Detalle en
+[`metodos/t2mrcd.md`](metodos/t2mrcd.md) y la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md).
 
 ## Paso 2: decisiones del dueño (2026-10-07)
 
@@ -153,13 +160,14 @@ correrlo en un servidor con más núcleos.
 ### Del Paso 2, para el Paso 3
 
 - **Cita final del artículo T²MRCD** (P6): sustituir `STATISTIC_REFERENCE` cuando se publique (regla dura 3).
-- **Recalibración y ciclo de vida:** dominio implementado (2b.1, pendiente de commit); aplicación (2b.2) y luego Paso 3.
+- **Ciclo de vida:** dominio (2b.1) y aplicación (2b.2) implementados; faltan rutas, schemas de los endpoints del ADR 0005 y adaptadores reales (Paso 3).
 - **Citas de las pruebas formales de cambio en S y μ** (hoy sin cita; bloquean la recalibración sin `force_replace`).
 - **Reponderado tipo MCD** (añadir a `best` las observaciones con distancia robusta no extrema): estudio futuro para
   acercar la falsa alarma real al 0.5 % nominal.
-- **Hash del contenido de la base** al persistir (2b.2): la comprobación por T² con `rtol` no prueba identidad.
-- **Persistencia de estrategias por nombre** (M1 de 2b, en 2b.2): `clean_criterion` y `aggregation` son *callables*
-  dentro de los parámetros; un repositorio real no puede guardarlos tal cual.
+- **Persistencia del objeto modelo** (Paso 3): M1 ya guarda por nombre los parámetros de los **registros**, pero
+  `T2MRCDModel.params` sigue llevando las estrategias como objetos.
+- **Atomicidad (Paso 3):** los controles «una propuesta / una recalibración por carta» (`PROPOSAL_PENDING`,
+  `RECALIBRATION_IN_PROGRESS`) leen y luego escriben; con repositorios reales hay que hacerlos atómicos.
 - **Coste de la recalibración** (cientos de ajustes por las rondas de depuración): M5, optimizar `pymrcd`, **más
   urgente**, antes de producción.
 - **Mejoras posteriores:** M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT).

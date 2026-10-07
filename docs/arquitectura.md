@@ -65,6 +65,11 @@ todas las cartas pueden compartir sin importarse entre sí):
 - `fit_phase1(x, params, *, mapper: TaskMapper) -> modelo`: ajusta con datos históricos y calcula los límites.
 - `validate_phase2_input(model, x_new)`: validación síncrona antes de encolar la Fase II.
 - `score_phase2(model, x_new) -> resultado`: puntúa observaciones nuevas y marca señales.
+- **Codec de parámetros** (`encode_params`, `decode_params`, `encode_recalibration_params`,
+  `decode_recalibration_params`; mejora M1, ADR 0004 enmienda 2b.2): los registros persistidos no pueden guardar
+  invocables, así que la carta convierte sus parámetros (con estrategias) en datos y de vuelta. Los protocolos de
+  forma de `application/charts.py` fijan lo que el ciclo de vida exige a cualquier carta (resultado con `t2`,
+  `signal`, `limit`, `limit_kind`; modelo con `base_mask` y `row_disposition`; informe con `row_disposition`).
 
 **`TaskMapper`** (`domain/common/parallel.py`) es el puerto con el que una carta pide ejecutar tareas
 independientes (las réplicas bootstrap de T²MRCD) sin saber cómo: el dominio no puede importar procesos ni hilos
@@ -131,7 +136,7 @@ adaptadores de la columna «hoy» son **objetivo del Paso 3**.
 | Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio); procesos en el Paso 3 | `ProcessPoolTaskMapper`, luego Celery/Dask | _por definir_ |
 | Identificadores y reloj | `IdGenerator`, `Clock` | _Paso 3_ | — | — |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` | `VORACIOUS_STORAGE=local` |
-| Versiones, observaciones, anotaciones, eventos estructurales y recalibraciones (**previstos**, Paso 2b.2) | `ModelVersionRepository` (append-only, CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | _Paso 2b.2/3_ | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
+| Versiones, observaciones, anotaciones, eventos estructurales y recalibraciones (puertos **definidos** en 2b.2) | `ModelVersionRepository` (append-only, CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria solo en `tests/support/`; reales en el Paso 3 | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` (sin auth real) | JWT/OIDC | — |
 
 Decisiones de diseño de los puertos y registros:
@@ -177,7 +182,7 @@ Fase II ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). **Objetivo del Paso 3**; `
   `None`, termina en `failed` con `T2MRCD_DECISION_PENDING` y `details.pending`. Fase I y Fase II tienen límites distintos que comparten réplicas (ADR 0007, enmienda del Paso 2b). Catálogo completo de códigos en la enmienda del
   [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
 
-### Ciclo de vida de la carta (objetivo, Paso 2b y 3)
+### Ciclo de vida de la carta (casos de uso en 2b.2; rutas y adaptadores en el Paso 3)
 
 Decidido en el [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md): el backend posee versiones, observaciones,
 anotaciones, eventos estructurales, propuesta/aprobación y avisos; el front solo muestra y pide. Endpoints
@@ -200,8 +205,14 @@ previstos en el [ADR 0005](adr/0005-api-fase-i-fase-ii.md) (enmienda 2026-10-07)
 3. `revalidation_due`: venció la revalidación periódica (6 meses u N observaciones).
 4. `startup` (vigilando con v0) o `active` (con una versión recalibrada vigente).
 
-Las versiones son inmutables y append-only; solo cambia su estado, con comparar-y-cambiar (CAS) para impedir dos
-aprobaciones concurrentes. Cada observación se puntúa con la versión vigente en su fecha.
+Las versiones son inmutables y append-only; solo cambia su estado (`proposed | active | superseded | rejected`),
+con comparar-y-cambiar (CAS) que lleva los datos de la decisión, para impedir dos aprobaciones concurrentes. Cada
+observación se puntúa con la versión vigente en su fecha. `effective_from` por defecto es el instante de la
+aprobación y debe ser posterior a la última observación puntuada y al `effective_from` vigente. La revalidación
+cuenta meses desde `approved_at` de la vigente (v0: fin de la Fase I) y observaciones puntuadas con ella
+(`count_scored_with`); se evalúa al consultar, sin tareas programadas. Cada versión guarda `base_hash` (SHA-256 de
+la base) y su `justification` (`initial_fit`, `structural_event`, `forced_replace`, `change_detected`,
+`no_change_detected`). Detalle en el ADR 0008, enmienda 2b.2.
 
 ### Salud (existe desde el Paso 1)
 

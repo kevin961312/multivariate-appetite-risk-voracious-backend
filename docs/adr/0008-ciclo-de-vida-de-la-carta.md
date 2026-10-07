@@ -1,8 +1,9 @@
 # ADR 0008 — Ciclo de vida de la carta: versiones, registro de observaciones y recalibración
 
 - **Estado:** Aceptado (decisiones del dueño, 2026-10-07). Implementación: Paso 2b (dominio y aplicación) y
-  Paso 3 (API y adaptadores). **Dominio implementado (Paso 2b.1, 2026-10-07, pendiente de commit); aplicación
-  (versiones persistidas, observaciones, anotaciones, aprobación) pendiente (2b.2).**
+  Paso 3 (API y adaptadores). **Dominio implementado (Paso 2b.1, commit `c44f86d`); aplicación implementada
+  (Paso 2b.2, 2026-10-07): ver «Enmienda 2026-10-07 (Paso 2b.2)» al final.** Los
+  estados de versión del texto original (`approved`) quedan alineados con el código (`active`) en esa enmienda.
 - **Fecha:** 2026-10-07
 - **Relacionado:** [ADR 0005](0005-api-fase-i-fase-ii.md) (endpoints), [ADR 0007](0007-limites-t2mrcd-por-bootstrap.md)
   (límites), [`../metodos/t2mrcd.md`](../metodos/t2mrcd.md), [`../arquitectura.md`](../arquitectura.md).
@@ -77,7 +78,9 @@ pedido). `phase2_alpha_limit` es configurable, default 0.005.
   tubería, no el bootstrap OOB: con el clásico el OOB da una Fase II ≈ +16 % sobre la F (efecto .632: cada
   réplica usa ≈ 63 % de filas distintas), es decir, conservador.
 - **M6 (aprobada):** el reporte incluye el error Monte Carlo del límite.
-- **M1 (aprobada, 2b.2):** las estrategias (`clean_criterion`, `aggregation`) se persisten por nombre.
+- **M1 (aprobada, implementada en 2b.2):** las estrategias (`clean_criterion`, `aggregation`,
+  `phase2_aggregation`, `relative_change_metric`, `covariance_test`, `mean_test` y `decision_rule`) se persisten
+  por nombre.
 
 ## Alternativas descartadas
 
@@ -107,7 +110,49 @@ pedido). `phase2_alpha_limit` es configurable, default 0.005.
 - **Pruebas formales de cambio** (igualdad de covarianzas y de medias por remuestreo): **pendientes de cita**.
   Sin ellas la recalibración termina en `failed / T2MRCD_DECISION_PENDING` salvo reemplazo forzado.
 - Cita del umbral 0.10 y del 6 meses (hoy documento del dueño, orientativos).
-- **2b.2:** guardar un hash del contenido de la base al persistir (la comprobación por T² con `rtol` no prueba
-  identidad).
+- ~~Hash del contenido de la base~~: **cerrado en 2b.2** (ver la enmienda).
 - **Mejoras aprobadas para después:** M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT); M5 antes de producción.
 - Cita del artículo T²MRCD (P6) y del bootstrap (heredados del ADR 0007).
+
+## Enmienda 2026-10-07 (Paso 2b.2): aplicación del ciclo de vida
+
+El texto de arriba no se reescribe (salvo las líneas de estado, M1 y el hash, ya marcadas). Esto concreta lo
+que decidió la implementación de `application/` y corrige un nombre.
+
+- **Estados de versión: `proposed | active | superseded | rejected`.** El texto original decía `approved`;
+  el código usa `active` (la última aprobada) y `superseded` (aprobada y sustituida, sigue rigiendo las fechas
+  anteriores). Cambian **solo por comparar-y-cambiar (CAS)** que lleva los datos de la decisión (quién, cuándo,
+  nota), de modo que dos aprobaciones concurrentes no coexisten y la decisión queda auditada en la misma
+  operación que el cambio de estado.
+- **`effective_from`.** Por defecto, el instante de la aprobación. Debe ser posterior a la última observación
+  ya puntuada (Q6, `EFFECTIVE_FROM_NOT_AFTER_SCORED`) **y** al `effective_from` de la versión vigente; si no,
+  dos versiones se solaparían en el tiempo.
+- **Candidatas de una recalibración.** Una observación excluida automáticamente en una recalibración **sigue
+  siendo candidata** en las posteriores (la depuración se repite con otra base y otro límite); solo las filas de
+  la base vigente se marcan `already_in_base` para no pasarlas dos veces como nuevas. `Exclusion.round` es
+  `None`: T²MRCD informa el total de rondas, no la ronda por fila.
+- **Mínimo de observaciones.** La validación síncrona cuenta candidatas **antes** de quitar las de causa
+  asignable (es una puerta barata previa a encolar) y el dominio **recomprueba** tras depurar
+  (`RECALIBRATION_INSUFFICIENT_OBSERVATIONS`). No es doble criterio: son dos momentos del mismo mínimo.
+- **Justificación de cada versión** (`ModelVersion.justification`): `initial_fit` (v0), `structural_event`,
+  `forced_replace`, `change_detected` o `no_change_detected`. Es lo que el reporte antes/después muestra como
+  «por qué esta decisión».
+- **Evento estructural durante una recalibración.** Si llega un evento mientras hay una recalibración en cola o
+  en curso, la versión resultante se guarda `rejected` con nota `structural_event`: se calculó con una base que
+  el evento invalida.
+- **Revalidación.** Meses desde `approved_at` de la versión vigente (para la v0, el fin de la Fase I) y/o N
+  observaciones **puntuadas con la versión vigente** (`ObservationRepository.count_scored_with`). Se evalúa al
+  consultar el estado, con `Clock`; no hay tareas programadas.
+- **Hash de la base.** `ModelVersion.base_hash` = SHA-256 de la forma y los bytes `float64` little-endian en
+  orden C (`base_content_hash`). La base se guarda como copia de solo lectura (`frozen_base`) para que el hash
+  siga correspondiendo a lo guardado. Cierra el pendiente de 2b.1: la comprobación por T² con `rtol` no probaba
+  identidad.
+- **Decisiones pendientes síncronas.** Nuevo código `RECALIBRATION_DECISION_PENDING` (ADR 0005, enmienda): la
+  recalibración con pruebas formales sin cita se rechaza al pedirla, no al ejecutarse. Se omite con
+  `force_replace` o cuando hay un evento estructural sin resolver (que ya fuerza el reemplazo).
+- **Puertos implementados** (`application/ports.py`): `ModelVersionRepository`, `ObservationRepository`,
+  `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository`; adaptadores en memoria
+  en `tests/support/` y reales en el Paso 3.
+- **Deuda declarada hacia el Paso 3:** atomicidad de «una propuesta / una recalibración por carta» (`PROPOSAL_PENDING`,
+  `RECALIBRATION_IN_PROGRESS` se comprueban leyendo y luego escribiendo) y de `queued → running`; persistencia
+  del objeto modelo (`T2MRCDModel.params` aún lleva estrategias como objetos: solo los **registros** guardan datos).

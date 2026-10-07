@@ -82,3 +82,17 @@ El texto original no se reescribe; esto lo concreta tras implementar el Paso 2.
   - `score_phase2(model, x_new) -> Resultado` y la propiedad `chart_id`.
   - `ControlChart` es genérico en parámetros (contravariante), modelo y resultado (covariante); el registro de
     cartas de `application` usa `Any` en los tres porque es heterogéneo.
+
+## Enmienda 2026-10-07 (Paso 2b.2): codec de parámetros y protocolos de forma
+
+- **`ControlChart` gana el codec de parámetros** (`encode_params`, `decode_params`,
+  `encode_recalibration_params`, `decode_recalibration_params`), por la mejora M1. Por qué: los parámetros de una
+  carta pueden llevar estrategias (funciones), y los registros persistidos (modelo, versión, recalibración) no
+  pueden guardar invocables. La carta es quien sabe nombrar sus estrategias; `application` solo guarda y devuelve
+  datos (números, textos, booleanos, `None`, diccionarios). Una carta nueva implementa su codec y no toca la
+  aplicación.
+- **Protocolos de forma** (`application/charts.py`): lo que el ciclo de vida exige a *cualquier* carta sin
+  conocer la suya: resultado de Fase II con `t2`, `signal`, `limit` y `limit_kind`; modelo con `base_mask` y
+  `row_disposition`; informe de recalibración con `row_disposition`. Son estructurales (`Protocol`), así que no
+  crean dependencia de `application` hacia una carta concreta.
+

@@ -9,10 +9,11 @@ cita no hay default ([CLAUDE.md](../../CLAUDE.md), regla dura 3).
 Estado: el dominio (Paso 2) existe y **con los defaults decididos la Fase I se ejecuta completa** (P2, P3, P4,
 P5 y P6 cerradas el 2026-10-07). El mecanismo `failed / T2MRCD_DECISION_PENDING` se conserva: si alguien pasa
 explícitamente un campo decisivo como `None`, la Fase I se detiene antes de ajustar nada. La API HTTP es del Paso 3.
-**Paso 2b.1 (dominio, implementado el 2026-10-07; pendiente de commit):** dos límites (Fase I y Fase II por OOB),
-agregación pool, depuración automática, comparación y recalibración como funciones del dominio. **Paso 2b.2
-(aplicación: versiones persistidas, registro de observaciones, anotaciones, aprobación) es objetivo**, no código
-existente.
+**Paso 2b.1 (dominio, commit `c44f86d`):** dos límites (Fase I y Fase II por OOB), agregación pool, depuración
+automática, comparación y recalibración como funciones del dominio. **Paso 2b.2 (aplicación, implementada el
+2026-10-07):** versiones persistidas, registro de observaciones, anotaciones, eventos y
+aprobación, con los parámetros guardados como datos (ver «Parámetros como datos (M1)»). Rutas HTTP y adaptadores
+reales: Paso 3.
 
 - **Estimador declarado:** MRCD, siempre. Sin *fallbacks* ni «modos rápidos» (ADR 0004, punto 5): si MRCD
   falla, la Fase I termina en `failed / MRCD_FIT_FAILED`.
@@ -120,6 +121,24 @@ el de los T² OOB (en promedio ≈ 28 filas por réplica, unas 2800 en total). C
 Medida (2026-10-07, Mac de desarrollo, 8 núcleos, `pymrcd` sin optimizar): un ajuste 200×300 ≈ 47 s y una
 réplica de 150×300 ≈ 27 s; B = 100 son ≈ 45 min en serie y ≈ 6–8 min en 8 núcleos.
 
+### Alternativa evaluada y descartada: bootstrap de los valores de T² (dueño, 2026-10-07)
+
+El dueño propuso calcular el límite remuestreando los **valores** de T² de las `h` filas de `best` (con μ₀ y S₀
+del ajuste del histórico): 100 remuestreos de esos 75 valores, cuantil 0.995 de cada uno y promedio. Se evaluó
+por simulación (normal limpia, `pymrcd`, 20 000 observaciones nuevas en control; script `metodo_dueno.py`, fuera
+del repo):
+
+- n = 200, p = 10 (3 conjuntos): el límite sale ≈ máximo de los T² de `best` (11.9–13.0), con el 74 % del
+  histórico por debajo; falsa alarma con observaciones nuevas **34–37 %**.
+- n = 100, p = 250: falsa alarma **100 %**.
+
+**Causa:** MRCD elige `best` con los `h` T² más pequeños (verificado: los T² de `best` son exactamente los `h`
+menores), un bootstrap de valores no supera el máximo de la muestra y el límite cae en el percentil ≈ 75 de los
+T²; con p > n las nuevas, que no participaron en S₀, tienen T² mucho mayores. Además ignora el error de estimación
+de μ y S. **Decisión del dueño (2026-10-07): opción (a), se mantiene lo implementado** (remuestrear filas de
+`best` y reajustar MRCD en cada réplica). Detalle en la enmienda del
+[ADR 0007](../adr/0007-limites-t2mrcd-por-bootstrap.md).
+
 ## Fase I (ajuste y límites)
 
 Orden de `fit_phase1` (dominio 2b.1), y por qué:
@@ -172,7 +191,7 @@ silencio porque cambiarían el resultado sin dejar rastro. `alpha_limit`, si se 
   (`validate_phase2_input`: no vacía, finita, mismo `p`) antes de encolar.
 - Salida: T² por observación, señal `t2 > límite` (estricta), el límite usado (`operative_limit`) y su régimen
   (`limit_kind`). No se recalcula nada al puntuar: el límite sale de la versión vigente.
-- **Objetivo 2b.2 (aplicación, ADR 0008):** cada observación se registra con `observed_at`, `batch_label`, valores, T², límite
+- **Implementado en 2b.2 (aplicación, ADR 0008):** cada observación se registra con `observed_at`, `batch_label`, valores, T², límite
   usado y versión; las que señalan admiten anotación (causa asignable, cuál, acción). La v0 vigila con el límite
   de Fase I (provisional y fijo); las versiones recalibradas, con el de Fase II.
 
@@ -194,7 +213,7 @@ inmutable, en estado propuesta**, que solo rige al aprobarse (ADR 0008). Pasos:
 
 Constante técnica `BASE_CONSISTENCY_RTOL = 1e-9` (`chart.py`): al recalibrar se comprueba que la base recibida
 reproduce los T² guardados (`rtol`, redondeo de BLAS). Es una comprobación de consistencia, **no prueba
-identidad**: **pendiente en 2b.2** guardar un hash del contenido de la base al persistir.
+identidad**; por eso la aplicación guarda además `ModelVersion.base_hash` (ver «Parámetros como datos (M1)»).
 
 Un **evento estructural** marca «requiere nueva base»: se sigue vigilando con la versión vigente (Q7) y el
 siguiente recálculo reemplaza con datos posteriores. **Revalidación periódica** configurable (6 meses o N
@@ -228,6 +247,31 @@ Las pruebas por remuestreo de igualdad de covarianzas y de medias **no tienen ci
 la recalibración termina en `failed / T2MRCD_DECISION_PENDING` (con `details.pending`: `recalibration.covariance_test`,
 `.mean_test`, `.n_test_resamples`) salvo que se fuerce el reemplazo; nunca se sustituyen por otra prueba sin fuente.
 
+## Parámetros como datos (M1, Paso 2b.2)
+
+Los registros persistidos (modelo, versión, recalibración) no pueden guardar funciones, así que
+`domain/charts/t2mrcd/registry.py` codifica los parámetros como datos y los decodifica con un registro
+`nombre → estrategia` (`T2MRCDStrategies`). Es decisión de ingeniería, no estadística; lo estadístico sigue en las
+secciones anteriores.
+
+- **Nombres estables:** `best_subset` (criterio de fila limpia, P2), `pooled_quantile` (agregación, P4/Q1),
+  `frobenius_relative` (medida de cambio en S, Q4) y `any_formal_test_change` (regla de decisión). Cambiar un
+  nombre rompe lo ya guardado; no se renombran.
+- **El registro de producción no trae pruebas formales de cambio** (`covariance_test`, `mean_test`): siguen sin
+  cita. Las pruebas «SOLO TEST» se registran únicamente en `tests/support/`, en una copia del registro. Con ellas
+  en `None` la recalibración responde `T2MRCD_DECISION_PENDING` (o `RECALIBRATION_DECISION_PENDING` si se detecta
+  al pedirla) salvo `force_replace`.
+- **Campo ausente al decodificar = el default ya citado** en las tablas de arriba; no se inventa otro valor.
+- **`seed` es obligatoria** al codificar y decodificar (reproducibilidad, ADR 0007); un **campo desconocido es
+  error**, no se ignora, para que un dato mal escrito no cambie el método en silencio.
+- **El muestreador de réplicas y el estimador no se registran:** los fija la carta (OOB y MRCD, ADR 0002); sus
+  nombres ya quedan en `BootstrapLimits`.
+- **Hash de la base:** `ModelVersion.base_hash` es el SHA-256 de la forma y los bytes `float64` little-endian en
+  orden C (`base_content_hash`), y la base se guarda como copia de solo lectura (`frozen_base`), para que el hash
+  siga correspondiendo a lo guardado. Sustituye a la comprobación por T² con `rtol` como prueba de identidad.
+- **Limitación conocida:** `T2MRCDModel.params` (el objeto modelo) aún lleva las estrategias como objetos; solo
+  los **registros** guardan datos. Persistir el objeto modelo es deuda del Paso 3.
+
 ## Tests golden
 
 Referencia de la carta (distinta de la del estimador). Los tests del Paso 2 usan implementaciones «SOLO TEST»
@@ -247,7 +291,6 @@ Referencia de la carta (distinta de la del estimador). Los tests del Paso 2 usan
 - Cita bibliográfica del bootstrap de límites T² y del valor `alpha_limit = 0.005` (hoy decisiones del dueño).
 - **Pruebas formales de cambio en S y en μ** por remuestreo: pendientes de cita; también el umbral 0.10 y el 6 meses.
 - **Reponderado tipo MCD** para el remuestreo (estudio futuro; ver «Remuestreo solo sobre `best`»).
-- **Hash del contenido de la base** al persistir (2b.2).
 - Fuente de referencia de los golden de la carta (¿código R existente o cálculo propio verificado contra el artículo?).
 
 **Cerradas el 2026-10-07:** P2, P3 (con cita), P4 (valor; agregación **pool** desde el Paso 2b), P5 (dos límites: Fase I y Fase II por OOB, desde el Paso 2b), P6 (referencia provisional) y la recalibración (versión inmutable propuesta, ADR 0008).

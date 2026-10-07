@@ -43,8 +43,8 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
   (`relative_change_threshold` 0.10; `threshold_decides = False`: solo informativo, deciden las pruebas formales
   de S y μ). El **ciclo de vida** (versiones inmutables
   propuestas y aprobadas, registro de observaciones, anotaciones, eventos estructurales, recalibración y
-  revalidación) lo posee el backend: [ADR 0008](docs/adr/0008-ciclo-de-vida-de-la-carta.md) (dominio implementado en
-  2b.1; aplicación en 2b.2). Pendientes: pruebas formales de cambio en S y μ, cita del bootstrap y de los umbrales (0.10, 6 meses),
+  revalidación) lo posee el backend: [ADR 0008](docs/adr/0008-ciclo-de-vida-de-la-carta.md) (dominio en 2b.1;
+  aplicación en 2b.2). Pendientes: pruebas formales de cambio en S y μ, cita del bootstrap y de los umbrales (0.10, 6 meses),
   P6 (cita del artículo T²). Detalle en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté
   documentado allí queda como **decisión abierta**.
 - **Sin placeholders estadísticos.** MRCD se ajusta con `pymrcd` (el port de `rrcov::CovMrcd`, ADR 0006).
@@ -65,12 +65,12 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) |
 | Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` |
-| Versiones, observaciones, anotaciones, eventos y recalibraciones (previstos, 2b.2) | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria | Postgres (TimescaleDB) |
+| Versiones, observaciones, anotaciones, eventos y recalibraciones (puertos definidos en 2b.2) | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria (solo `tests/support/`) | Postgres (TimescaleDB) |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` | JWT/OIDC |
 
-Puertos previstos del ciclo de vida (Paso 2b.2, aún no existen): `ModelVersionRepository` (append-only, con
-CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository` y
-`RecalibrationRepository`; adaptador en memoria hoy, Postgres después.
+Puertos del ciclo de vida (definidos en el Paso 2b.2): `ModelVersionRepository` (append-only, con CAS de
+estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository` y
+`RecalibrationRepository`; adaptadores reales (Postgres) en el Paso 3.
 
 Puertos auxiliares: `IdGenerator` y `Clock` (application) y `TaskMapper` (reparto de tareas independientes, como
 las réplicas bootstrap; vive en `domain/common/parallel.py` y su adaptador con procesos irá en `infrastructure`).
