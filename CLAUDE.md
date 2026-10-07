@@ -14,22 +14,25 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
 - **El núcleo es MRCD, exactamente.** Port propio a Python de `rrcov::CovMrcd()` de R
   (Boudt, Rousseeuw, Vanduffel y Verdonck, 2020). Se comercializa porque, a diferencia de
   Shewhart/EWMA/Hotelling clásico, no asume normalidad, resiste outliers y enmascaramiento, y funciona con p > n.
-- **Prohibido sustituirlo** por KMRCD, `sklearn.covariance.MinCovDet`, Ledoit-Wolf ni ninguna aproximación
-  «más rápida». KMRCD no conserva las propiedades de MRCD y su probabilidad de señal no es eficiente.
+- **Prohibido sustituirlo dentro de T²MRCD** por KMRCD, `sklearn.covariance.MinCovDet`, Ledoit-Wolf ni ninguna aproximación
+  «más rápida». T²MRCD es la carta por defecto y MRCD su estimador de referencia. KMRCD no conserva las propiedades de MRCD y su probabilidad de señal no es eficiente.
   Si algo es lento se optimiza la **implementación** (vectorización, Numba/Cython, paralelismo entre
-  portafolios), nunca el **método**. Ver [ADR 0002](docs/adr/0002-mrcd-sin-aproximaciones.md).
+  portafolios), nunca el **método**. Otros métodos pueden entrar **como métodos propios**, nunca como sustitutos de MRCD
+  en T²MRCD. Ver [ADR 0002](docs/adr/0002-mrcd-sin-aproximaciones.md) y
+  [ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md).
 - **La referencia es el código fuente de `rrcov`, no la memoria.** Parámetros de `CovMrcd`: `alpha`, `h`,
   `maxcsteps`, `rho`, `target` (`identity` | `equicorrelation`), `maxcond`. Defaults, estandarización
   inicial, subconjuntos iniciales deterministas, elección de `rho` por número de condición, C-steps y factor
   de consistencia se toman **leyendo `rrcov` (`CovMrcd.R`, `CovControlMrcd`)**, y cada decisión cita
-  archivo y línea en [`docs/mrcd/fidelidad.md`](docs/mrcd/fidelidad.md).
-- **La fidelidad se demuestra con tests golden**: salidas de `rrcov::CovMrcd` en R sobre conjuntos fijos
+  archivo y línea en [`docs/metodos/mrcd.md`](docs/metodos/mrcd.md).
+- **La fidelidad se demuestra con tests golden, por método**: salidas de `rrcov::CovMrcd` en R sobre conjuntos fijos
   (semilla fija; casos n > p, p > n y contaminado) guardadas como fixtures; el port debe coincidir dentro
   de una tolerancia declarada. En el cascarón: script R, carpeta de fixtures y test `xfail(strict=True)`.
 - **Límites de control de T²MRCD**: salen del artículo de T²MRCD (Fase I, observaciones individuales).
-  No se inventan: si un valor no está documentado en `docs/`, queda como **decisión abierta**.
-- **Sin placeholders estadísticos.** `MRCD.fit` lanza `NotImplementedError` hasta que exista el port; un
-  análisis termina en `failed / MRCD_NOT_IMPLEMENTED`. Nada de covarianza clásica «mientras tanto».
+  No se inventan: si un valor no está documentado en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md),
+  queda como **decisión abierta**.
+- **Sin placeholders estadísticos.** `MRCD.fit` lanza `NotImplementedError` hasta que exista el port; la
+  Fase I de T²MRCD termina en `failed / MRCD_NOT_IMPLEMENTED`. Nada de covarianza clásica «mientras tanto».
 
 ## 2. Arquitectura (hexagonal)
 
@@ -38,40 +41,59 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
-| Ejecución de análisis | `JobQueue` | `InlineJobQueue` | `CeleryJobQueue` |
-| Persistencia de análisis | `AnalysisRepository` | `InMemoryAnalysisRepository` | `PostgresAnalysisRepository` (TimescaleDB) |
+| Ejecución de Fase I y II | `JobQueue` | `InlineJobQueue` | `CeleryJobQueue` |
+| Persistencia de modelos (Fase I) | `ModelRepository`* | en memoria | Postgres (TimescaleDB) |
+| Persistencia de monitoreos (Fase II) | `MonitoringRepository`* | en memoria | Postgres (TimescaleDB) |
 | Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` | JWT/OIDC |
 
-API asíncrona desde el día uno: `POST /v1/analyses` → `202` + `analysis_id`;
-`GET /v1/analyses/{id}` → `queued | running | succeeded | failed`.
+\* Nombres orientativos: se fijan en el Paso 2.
+
+API por carta, asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona.md),
+[ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)): `POST /v1/charts/<carta>/models` → `202` + `model_id`;
+`GET /v1/charts/<carta>/models/{id}`; `POST …/models/{id}/monitorings` → `202` + `monitoring_id`;
+`GET …/monitorings/{id}`. Estados `queued | running | succeeded | failed`.
+
+Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md)): `domain/charts/<carta>/`,
+`domain/estimators/<estimador>/` y `domain/common/`. Cada carta implementa el `Protocol`
+`fit_phase1` / `score_phase2`.
 
 ### Dirección de dependencias (la verifica `import-linter`)
 
-| Capa | Puede importar | No puede importar |
+| Capa (de arriba abajo) | Puede importar | No puede importar |
 | --- | --- | --- |
-| `voracious.domain` | stdlib, `numpy`, `scipy` | **nada del proyecto**; ni FastAPI, Pydantic, IO, red, config, logging de infraestructura |
-| `voracious.application` | `domain` | `api`, `infrastructure`, `workers`, `config`, `container` |
-| `voracious.infrastructure` | `application`, `domain` | `api` |
-| `voracious.api` | `application`, `domain`, `container` | `infrastructure` (solo a través de `container.py`) |
-| `voracious.workers` | `application`, `domain`, `container` | `api` |
+| `voracious.api`, `voracious.workers` | `application`, `domain`, `container` | `infrastructure` y `config` directos (solo vía `container`); `api` ↛ `workers` y viceversa |
 | `voracious.container` | todo (es el cableado) | — |
-| `voracious.config` | stdlib, `pydantic-settings` | `api`, `application`, `domain`, `infrastructure` |
+| `voracious.infrastructure` | `application`, `domain` | `api`, `workers`, `container` |
+| `voracious.application` | `domain` | `api`, `infrastructure`, `workers`, `config`, `container`, frameworks web/logging |
+| `voracious.domain` | stdlib, `numpy`, `scipy` | **nada del proyecto**; ni FastAPI, Pydantic, IO, red, config, logging |
+| `voracious.config` | stdlib, `pydantic-settings` | cualquier capa del proyecto |
 
-Flujo: `api → application → domain` e `infrastructure → application → domain`.
+Orden real de capas (contrato `layers`): `api | workers` → `container` → `infrastructure` → `application`
+→ `domain`; `config` queda fuera del orden. Hay **6 contratos vigentes** en `pyproject.toml`
+(`[tool.importlinter]`): capas, `domain` limpio, `application` limpia, `config` aislada, `api ↛ config` y
+`api ↛ infrastructure`. Los dos últimos usan `allow_indirect_imports` porque `api → container → config` e
+`infrastructure` es el camino legítimo. Falta `workers ↛ infrastructure|config` (deuda del Paso 3).
+
+Estructura de dominio: `domain/charts/<carta>/`, `domain/estimators/<estimador>/`, `domain/common/`.
+Contratos `independence` (cartas entre sí, estimadores entre sí, `estimators ↛ charts`,
+`common ↛ charts|estimators`): **anunciados para el Paso 2**, aún no existen.
+
+Flujo: `api|workers → container → infrastructure → application → domain`.
 
 ## 3. Qué documento abrir para cada carpeta
 
 | Si vas a tocar… | Abre primero |
 | --- | --- |
-| `src/voracious/domain/mrcd/` | [`docs/mrcd/fidelidad.md`](docs/mrcd/fidelidad.md), [ADR 0002](docs/adr/0002-mrcd-sin-aproximaciones.md) |
-| `src/voracious/domain/charts/` | [`docs/mrcd/fidelidad.md`](docs/mrcd/fidelidad.md) (límites T²: decisiones abiertas) |
+| `src/voracious/domain/estimators/<estimador>/` | `docs/metodos/<método>.md` (p. ej. [`mrcd.md`](docs/metodos/mrcd.md)), [ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md); para MRCD también [ADR 0002](docs/adr/0002-mrcd-sin-aproximaciones.md) |
+| `src/voracious/domain/charts/<carta>/` | `docs/metodos/<método>.md` (p. ej. [`t2mrcd.md`](docs/metodos/t2mrcd.md): límites T² son decisiones abiertas), [ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md) |
+| `src/voracious/domain/common/` | [ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md) (sin lógica estadística de ningún método), [`docs/arquitectura.md`](docs/arquitectura.md) |
 | `src/voracious/application/` | [`docs/arquitectura.md`](docs/arquitectura.md), [ADR 0001](docs/adr/0001-hexagonal.md) |
 | `src/voracious/infrastructure/` | [`docs/arquitectura.md`](docs/arquitectura.md) (tabla de puertos), [ADR 0001](docs/adr/0001-hexagonal.md) |
-| `src/voracious/api/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [`docs/arquitectura.md`](docs/arquitectura.md) |
-| `src/voracious/workers/` | [ADR 0003](docs/adr/0003-api-asincrona.md) |
+| `src/voracious/api/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md), [`docs/arquitectura.md`](docs/arquitectura.md) |
+| `src/voracious/workers/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md) |
 | `src/voracious/config.py`, `container.py` | [`docs/arquitectura.md`](docs/arquitectura.md) (variables `VORACIOUS_*`) |
-| `tests/golden/`, `tools/r/` | [`docs/mrcd/fidelidad.md`](docs/mrcd/fidelidad.md) |
+| `tests/golden/`, `tools/r/` | `docs/metodos/<método>.md` del método probado ([índice](docs/metodos/README.md)) |
 | `docs/` | [`docs/README.md`](docs/README.md) |
 | `.claude/` | este archivo, sección 5 |
 | ¿Qué falta? | [`docs/ESTADO.md`](docs/ESTADO.md) |
@@ -84,13 +106,16 @@ pytest + pytest-cov + httpx, ruff, mypy `--strict` sobre `src/`, import-linter. 
 Compuerta local (= CI = pre-commit):
 
 ```bash
-uv run ruff check . && uv run ruff format --check . && uv run mypy src \
-  && uv run lint-imports && uv run pytest --cov=voracious --cov-fail-under=80 > .gate.log 2>&1
-echo "EXIT=$?"
+scripts/gate.sh; echo "EXIT=$?"
 ```
 
-Reglas: salida redirigida a fichero y `echo "EXIT=$?"` en la línea siguiente. **Nunca** `| tail` ni `| head`
-(esconden el código de salida). Una compuerta roja se informa con `archivo:línea`; **no** se arregla
+`scripts/gate.sh` corre todas las etapas (ruff, format, mypy, import-linter, pytest con cobertura ≥ 80 %)
+aunque falle alguna y deja cada salida en `.gates/<etapa>.log`; el `EXIT` final es 0 solo si todas pasan.
+Por clon hay que activar el hook: `git config core.hooksPath .githooks`. Siempre `uv run …` para ejecutar
+Python o herramientas sueltas (el `python` del PATH es de pyenv, no el del proyecto).
+
+Reglas: `echo "EXIT=$?"` en la misma línea tras el script. **Nunca** `| tail` ni `| head` (esconden el código
+de salida). Una compuerta roja se informa con `archivo:línea` leyendo `.gates/<etapa>.log`; **no** se arregla
 desactivando reglas.
 
 Código: tipado estricto, docstrings en español estilo Google, nombres de código en inglés.
@@ -103,7 +128,7 @@ Agentes en `.claude/agents/`, comandos en `.claude/commands/`.
 | --- | --- |
 | `arquitecto` | Plan del paso en tareas autocontenidas; separa obligatorio de mejoras M1, M2… No escribe código. |
 | `desarrollador-python` | Implementa respetando capas y tipado. No commitea. |
-| `validador-estadistico` | Solo lectura; vigila fidelidad a `rrcov::CovMrcd`. |
+| `validador-estadistico` | Solo lectura; vigila la fidelidad de cada método a su referencia, sin sustituciones ni fallbacks. |
 | `ejecutor-gates` | Corre la compuerta; VERDE/ROJO con `archivo:línea`. |
 | `lt-qa` | Informe final; veredicto `LISTO / LISTO CON DEUDA / REQUIERE CAMBIOS / BLOQUEADO`. |
 | `documentador` | Actualiza `docs/` y `ESTADO.md` con el *por qué*. No toca `src/`. |
@@ -119,8 +144,11 @@ Cada paso termina en commit + push a `main` (tras el «sí» del dueño) y **par
 ## 6. Reglas duras
 
 1. Nada en `domain/` importa FastAPI, Pydantic de la API, IO, red ni configuración.
-2. Ninguna aproximación ni sustituto de MRCD, ni siquiera como placeholder.
-3. Ningún default estadístico sin cita a rrcov en `docs/mrcd/fidelidad.md`.
+2. Ninguna sustitución, aproximación ni fallback dentro de un método, ni como placeholder. En T²MRCD solo
+   MRCD fiel a `rrcov`; otros métodos entran como métodos propios, con su referencia, su
+   `docs/metodos/<método>.md`, sus golden tests y su API ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md)).
+3. Ningún default estadístico sin cita a su referencia (`rrcov` archivo:línea y versión, o artículo) en
+   `docs/metodos/<método>.md`.
 4. Ningún secreto en el repo; configuración solo por variables `VORACIOUS_*`; `.env.example` sin valores reales.
 5. Cada endpoint nuevo lleva test, schema Pydantic y respeta el aislamiento por tenant.
 6. Compuerta roja → no hay commit. Se informa con `archivo:línea`, no se desactivan reglas.
@@ -128,3 +156,5 @@ Cada paso termina en commit + push a `main` (tras el «sí» del dueño) y **par
    Nunca `git reset --hard`, `git stash`, `git clean`. Nunca commitear `.env` ni `plantilla-agentes/`.
 8. Si se duda entre dos caminos que cuesten rehacer, se pregunta; si es reversible, se decide y se anota
    en el informe.
+9. Una carta o estimador no importa a otra carta ni a otro estimador; lo común va en `domain/common/`
+   (se verifica con contratos `independence`, que llegan en el Paso 2).

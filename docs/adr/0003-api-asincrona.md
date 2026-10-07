@@ -1,6 +1,6 @@
 # ADR 0003 — API asíncrona desde el día uno
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado — ampliado por [0005](0005-api-fase-i-fase-ii.md)
 - **Fecha:** 2026-10-06
 
 ## Contexto

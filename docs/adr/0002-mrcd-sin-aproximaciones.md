@@ -1,6 +1,6 @@
 # ADR 0002 — MRCD exacto, sin aproximaciones ni sustitutos
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado — acotado por [0004](0004-cartas-y-estimadores-extensibles.md)
 - **Fecha:** 2026-10-06
 
 ## Contexto
@@ -14,7 +14,7 @@ cualquier atajo cambia la probabilidad de señal de la carta.
 
 - El núcleo es un **port propio a Python de `rrcov::CovMrcd()`**, fiel a su código fuente.
 - La referencia es el **código de `rrcov`** (`CovMrcd.R`, `CovControlMrcd`), no la memoria ni otras
-  implementaciones. Cada default y paso del algoritmo cita archivo:línea en [`../mrcd/fidelidad.md`](../mrcd/fidelidad.md).
+  implementaciones. Cada default y paso del algoritmo cita archivo:línea en [`../metodos/mrcd.md`](../metodos/mrcd.md).
 - La fidelidad se demuestra con **tests golden** contra salidas de R con tolerancia declarada.
 - Mientras el port no exista, `MRCD.fit` lanza `NotImplementedError` y el análisis falla con
   `MRCD_NOT_IMPLEMENTED`. **No hay placeholder estadístico.**
