@@ -159,11 +159,11 @@ class MonitorObservations:
         self.monitorings.add(record)
         self.queue.enqueue(
             JobRequest(
-                kind=JobKind.MONITOR,
+                kind=JobKind.SCORE,
                 tenant_id=tenant_id,
-                chart_id=chart_id,
+                scope=chart_id,
+                resource_id=record.monitoring_id,
                 model_id=model_id,
-                monitoring_id=record.monitoring_id,
             )
         )
         return record.monitoring_id
@@ -259,6 +259,8 @@ class RunMonitoringJob:
     def execute(self, job: JobRequest) -> None:
         """Ejecuta el trabajo. Es idempotente: si el monitoreo ya no está ``queued``, no hace nada.
 
+        La transición ``queued → running`` es atómica (``MonitoringRepository.claim``).
+
         Cada fila se puntúa con la versión vigente en su fecha (por partes si el lote abarca
         varias) y se registra. Un ``DomainError`` o un error de aplicación (modelo que ya no está
         disponible, fecha anterior a la primera versión) dejan el monitoreo ``failed`` con su
@@ -266,27 +268,28 @@ class RunMonitoringJob:
         ``failed / INTERNAL_ERROR`` y se relanza.
 
         Args:
-            job: Petición ``monitor``.
+            job: Petición ``score``.
 
         Raises:
-            ValueError: Si ``job`` no es de tipo ``monitor``.
+            ValueError: Si ``job`` no es de tipo ``score``.
             UnknownChartError: Si la carta no existe.
             MonitoringNotFoundError: Si el monitoreo no existe.
         """
-        if job.kind is not JobKind.MONITOR or job.monitoring_id is None:
-            msg = f"RunMonitoringJob solo ejecuta trabajos 'monitor', no '{job.kind}'"
+        if job.kind is not JobKind.SCORE or job.model_id is None:
+            msg = f"RunMonitoringJob solo ejecuta trabajos 'score', no '{job.kind}'"
             raise ValueError(msg)
-        chart = resolve_chart(self.charts, job.chart_id)
-        record = _get_monitoring(
-            self.monitorings, job.tenant_id, job.chart_id, job.model_id, job.monitoring_id
+        chart = resolve_chart(self.charts, job.scope)
+        model_id = job.model_id
+        _get_monitoring(self.monitorings, job.tenant_id, job.scope, model_id, job.resource_id)
+        claimed = self.monitorings.claim(
+            job.tenant_id, job.scope, model_id, job.resource_id, self.clock.now()
         )
-        if record.status is not JobStatus.QUEUED:
+        if claimed is None:
             return
-        record = replace(record, status=JobStatus.RUNNING, started_at=self.clock.now())
-        self.monitorings.update(record)
+        record = claimed
         try:
-            ready_model(self.models, job.tenant_id, job.chart_id, job.model_id)
-            versions = self.versions.list(job.tenant_id, job.chart_id, job.model_id)
+            ready_model(self.models, job.tenant_id, job.scope, model_id)
+            versions = self.versions.list(job.tenant_id, job.scope, model_id)
             by_row = _versions_by_row(record.observed_at, versions)
             observations = self._score(chart, record, by_row)
             self.observations.add_many(observations)

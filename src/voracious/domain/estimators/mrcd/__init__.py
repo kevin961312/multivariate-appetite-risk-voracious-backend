@@ -3,6 +3,7 @@
 Documento de fidelidad: ``docs/metodos/mrcd.md``. Este paquete no conoce ninguna carta.
 """
 
+from voracious.domain.estimators.mrcd.codec import decode_fit, encode_fit
 from voracious.domain.estimators.mrcd.estimator import (
     ESTIMATOR_NAME,
     MRCD_FIT_FAILED,
@@ -22,5 +23,7 @@ __all__ = [
     "MRCDFit",
     "MRCDParams",
     "MRCDTarget",
+    "decode_fit",
+    "encode_fit",
     "fit_mrcd",
 ]

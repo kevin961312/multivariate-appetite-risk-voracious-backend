@@ -1,9 +1,8 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-07 (Paso 2b completo; M5, `Qn` de `pymrcd` en C, hecho y commiteado).
+Última actualización: 2026-10-07 (Paso 3 hecho: API por pasos, adaptadores y cableado).
 
-**Siguiente hito:** commit de M5 (tras el «sí» del dueño) y luego el Paso 3 (adaptadores, `container.py`,
-tenant y rutas, incluidas las del ciclo de vida).
+**Siguiente hito:** Paso 4 (Dockerfile, docker-compose, CI), y a continuación el Paso 5 (golden por método).
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
@@ -12,9 +11,48 @@ tenant y rutas, incluidas las del ciclo de vida).
 | 2 | Dominio extensible, puertos y casos de uso (ver abajo) | **hecho** (veredicto LT-QA: LISTO CON DEUDA); commiteado (`b73dcf6`) |
 | 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, depuración, comparación S/μ. **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **hecho.** 2b.1 commiteado (`c44f86d`); 2b.2 hecho y commiteado (2026-10-07). Validador: APROBADO CON OBSERVACIONES, ya aplicadas |
 | M5 | Optimizar `pymrcd`: `Qn` y pares de OGK en C ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07; [especificación §3.12.9](metodos/mrcd-especificacion.md)) | **hecho.** Validador: APROBADO CON OBSERVACIONES. Criterio «≥ 10× con 1 hilo» **no cumplido** (4.1×); ver abajo |
-| 3 | Adaptadores mínimos, `container.py`, tenant, rutas por carta Fase I/II, errores uniformes | pendiente |
+| 3 | Adaptadores, `container.py`, tenant, errores uniformes y API por pasos independientes encadenables por id ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); 3.1 infraestructura, 3.2 dominio en piezas, 3.3 Fase I por API, 3.4 Fase II y recalibración por API | **hecho** (14 contratos de import-linter). Validador: APROBADO CON OBSERVACIONES en 3.2 y 3.4, ya aplicadas. Ver «Paso 3» abajo |
 | 4 | Dockerfile, docker-compose (perfiles distribuidos comentados), CI | pendiente |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
+
+## Paso 3: API por pasos (2026-10-07)
+
+Requisito del dueño: APIs independientes por paso, encadenables por id, para avanzar, mantener y depurar cada una
+sin que «todo en un solo API» colapse. Decisión y alternativas en el [ADR 0009](adr/0009-api-por-pasos-encadenables.md);
+rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); carriles en la del
+[ADR 0003](adr/0003-api-asincrona.md).
+
+- **3.1 Infraestructura:** repositorios en memoria thread-safe con `claim` y altas atómicas (D6), `InlineJobQueue`
+  por carriles, `ProcessPoolTaskMapper` (idéntico en bits a serie), reloj, ids, tenant, errores uniformes,
+  contrato 14 `workers ↛ infrastructure|config`, stub `typings/threadpoolctl.pyi`.
+- **3.2 Dominio en piezas públicas** sin cambiar bits, codecs exactos y fixture de huellas.
+- **3.3 Fase I por API:** datasets, `fits`, `limits`, `depurations`, `models` (solo referencias), `pipelines`.
+  Equivalencia en bits cadena HTTP = tubería = `fit_phase1`. Semilla deducida del linaje
+  ([`metodos/t2mrcd.md`](metodos/t2mrcd.md)).
+- **3.4 Fase II y recalibración por API:** `scores`, `recalibrations` (stepwise/pipeline, `cancel`), `comparisons`,
+  `versions`, anotaciones por POST append-only. Equivalencia en bits con `recalibrate`.
+- **Mejoras hechas:** M1 (estado codificado), M2 (CSV), M3 (`?include=`), M6 (`LocalDatasetStorage` con hash).
+
+### Decisiones del dueño del Paso 3 (P1–P5 propias de este Paso)
+
+- P1: una sola API de MRCD con `alpha` parametrizable (default 0.75); no hay «MRCD puro».
+- P2: `/models` solo con referencias.
+- P3: la comparación responde `RECALIBRATION_DECISION_PENDING` mientras no haya pruebas formales citadas.
+- P4: anotaciones append-only por `POST`.
+- P5: commit único al final del Paso.
+
+### Deuda del Paso 3
+
+- **Postgres/TimescaleDB, Celery y S3:** adaptadores reales (Paso 4+). Hoy los repositorios y la cola viven en el
+  proceso: reiniciar pierde el estado.
+- **M4** (`Idempotency-Key`), **M5** (progreso de los trabajos) y **M7** (webhooks): después.
+- **Sesiones stepwise sin expiración automática:** una recalibración paso a paso queda abierta hasta `cancel`,
+  aprobación o rechazo.
+- **Pool de procesos por llamada** en `ProcessPoolTaskMapper`: el coste del `spawn` se paga en cada calibración.
+- **Huellas de composición solo en Darwin arm64;** falta validar en Linux (también el C de `pymrcd`).
+- **`/ready` sin checks** y su código HTTP cuando falle (decisión abierta).
+- **Autenticación real** (JWT/OIDC) y roles (M4 antiguo); hoy solo `X-Tenant-ID`.
+- **Coste no medido de extremo a extremo** de la Fase I con réplicas en procesos sobre la API.
 
 ## Ajuste de plan aprobado: ADR 0004 y 0005
 
@@ -30,7 +68,7 @@ ambas asíncronas ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). Por eso el plan 
   `IdGenerator`, `Clock`), los casos de uso `TrainModel`, `GetModel`, `MonitorObservations`, `GetMonitoring`
   y los jobs `RunTrainingJob`/`RunMonitoringJob`, y `docs/metodos/` completado.
 - **Paso 2b (en curso):** ver arriba.
-- **Paso 3:** rutas `/v1/charts/t2mrcd/models…` y `…/monitorings…` más los endpoints del ciclo de vida (ADR 0005,
+- **Paso 3 (plan original; lo ejecutado está en «Paso 3: API por pasos»):** rutas `/v1/charts/t2mrcd/models…` y `…/monitorings…` más los endpoints del ciclo de vida (ADR 0005,
   enmienda 2026-10-07); test de que la Fase I termina en `failed / T2MRCD_DECISION_PENDING` si un campo decisivo se
   pasa como `None`; aislamiento por tenant.
 - **Paso 5:** golden tests por método (MRCD contra `rrcov`; T²MRCD contra su propia referencia).
@@ -70,7 +108,7 @@ pendiente). Sustituye a la estimación de 20–70 min de 2b.
   cubrió con la instantánea no versionada).
 - `assert_r_equal("E")` de los fixtures antiguos de `Qn` está limitado a la plataforma de referencia; la
   especificación pide exactitud en todas (el C no depende de libm ni BLAS).
-- Cableado de `VORACIOUS_MRCD_THREADS` en `container` (Paso 3) y su fijación al repartir réplicas entre procesos.
+- (Cerrado en el Paso 3) `VORACIOUS_MRCD_THREADS` cableada en `container`; el mapper por procesos fija `PYMRCD_NUM_THREADS`.
 - Imagen del Paso 4: compilador de C o *wheels* precompiladas.
 
 ## Paso 2b: decisiones del dueño (2026-10-07)
@@ -196,10 +234,9 @@ correrlo en un servidor con más núcleos.
 
 ## Deuda técnica
 
-### Del Paso 2, para el Paso 3
+### Del Paso 2 que sigue abierto
 
 - **Cita final del artículo T²MRCD** (P6): sustituir `STATISTIC_REFERENCE` cuando se publique (regla dura 3).
-- **Ciclo de vida:** dominio (2b.1) y aplicación (2b.2) implementados; faltan rutas, schemas de los endpoints del ADR 0005 y adaptadores reales (Paso 3).
 - **Citas de las pruebas formales de cambio en S y μ** (hoy sin cita; bloquean la recalibración sin `force_replace`).
 - **Reponderado tipo MCD** (añadir a `best` las observaciones con distancia robusta no extrema): estudio futuro para
   acercar la falsa alarma real al 0.5 % nominal.
@@ -208,22 +245,11 @@ correrlo en un servidor con más núcleos.
   falsa alarma 27–30 % (p = 10) y 100 % (p = 250), y sobre todas las filas fue inestable (0.2–0.9 %) y expuesto al
   enmascaramiento; además ignora el error de estimación de μ y S. Solo podría suavizar el cuantil del pool
   (≈ 7 500 valores), con ganancia pequeña.
-- **Persistencia del objeto modelo** (Paso 3): M1 ya guarda por nombre los parámetros de los **registros**, pero
-  `T2MRCDModel.params` sigue llevando las estrategias como objetos.
-- **Atomicidad (Paso 3):** los controles «una propuesta / una recalibración por carta» (`PROPOSAL_PENDING`,
-  `RECALIBRATION_IN_PROGRESS`) leen y luego escriben; con repositorios reales hay que hacerlos atómicos.
-- **Coste de la recalibración** (cientos de ajustes por las rondas de depuración): M5 hecho (ver arriba); queda repartir
-  réplicas entre procesos (`ProcessPoolTaskMapper`) y fijar `VORACIOUS_MRCD_THREADS`.
-- **Mejoras posteriores:** M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT).
-- **Fase I fuera del hilo de la API:** tarda minutos (ver ADR 0007); `InlineJobQueue` la ejecutaría dentro de la petición.
-- **`ProcessPoolTaskMapper`** en `infrastructure`, con BLAS a 1 hilo por proceso y una prueba de que los límites
-  no cambian respecto al reparto en serie.
-- **Transición de estado atómica** `queued → running`: hoy la idempotencia de los jobs no cubre dos workers a la vez.
-- **Contrato `workers ↛ infrastructure|config`** (cuando `workers` tenga contenido) y decidir si hace falta
-  `infrastructure ↛ config`.
-- **Empaquetado de `packages/pymrcd` en la imagen** (Paso 4, pero afecta al diseño del Dockerfile).
-- **Validación síncrona del histórico** de Fase I (hoy solo se valida la de Fase II antes de encolar).
-- **M3:** `DatasetStorage`.
+- **Empaquetado de `packages/pymrcd` en la imagen** (Paso 4, afecta al diseño del Dockerfile; compilador de C o *wheels*).
+- **Cerradas en el Paso 3:** persistencia del objeto modelo (M1, codecs), atomicidad de propuestas y recalibraciones
+  (D6), `ProcessPoolTaskMapper`, `queued → running` atómico (`claim`), Fase I fuera del hilo de la API, contrato
+  `workers ↛ infrastructure|config`, validación síncrona del histórico, `DatasetStorage` (M6), cableado de
+  `VORACIOUS_MRCD_THREADS`.
 
 ### Anterior
 

@@ -11,10 +11,18 @@ from enum import StrEnum
 from typing import Protocol
 
 from voracious.application.records import (
+    ComparisonRecord,
+    DatasetRecord,
+    DepurationRecord,
+    FitRecord,
+    LimitsRecord,
     ModelRecord,
     ModelVersion,
     MonitoringRecord,
     ObservationRecord,
+    PipelineRecord,
+    PipelineStep,
+    ProposalRequest,
     RecalibrationRecord,
     SignalAnnotation,
     StructuralEvent,
@@ -23,25 +31,312 @@ from voracious.application.records import (
 
 __all__ = [
     "Clock",
+    "ComparisonRepository",
+    "DatasetStorage",
+    "DepurationRepository",
     "DuplicateKeyError",
+    "FitRepository",
     "IdGenerator",
     "JobKind",
+    "JobLane",
     "JobQueue",
     "JobRequest",
+    "LimitsRepository",
     "ModelRepository",
     "ModelVersionRepository",
     "MonitoringRepository",
     "ObservationRepository",
+    "PipelineRepository",
     "RecalibrationRepository",
+    "RecordNotFoundError",
     "SignalAnnotationRepository",
     "StructuralEventRepository",
     "VersionDecision",
     "VersionStatusChange",
+    "lane_of",
 ]
 
 
 class DuplicateKeyError(Exception):
     """Un ``add`` encontró ya un registro con la misma clave (los registros solo se añaden)."""
+
+
+class RecordNotFoundError(Exception):
+    """Un ``update`` no encontró el registro que debía reemplazar (error de integración)."""
+
+
+class DatasetStorage(Protocol):
+    """Datasets inmutables ``n x p`` (``memory`` hoy; ``local`` en disco; S3 después).
+
+    La clave es (tenant, dataset); un dataset no pertenece a ninguna carta.
+    """
+
+    def add(self, record: DatasetRecord) -> None:
+        """Guarda un dataset nuevo.
+
+        Args:
+            record: Dataset.
+
+        Raises:
+            DuplicateKeyError: Si ya existe uno con la misma clave.
+        """
+        ...
+
+    def get(self, tenant_id: str, dataset_id: str) -> DatasetRecord | None:
+        """Busca un dataset del tenant.
+
+        Args:
+            tenant_id: Tenant.
+            dataset_id: Dataset.
+
+        Returns:
+            El dataset, o ``None`` si no existe para ese tenant.
+        """
+        ...
+
+
+class FitRepository(Protocol):
+    """Ajustes del estimador de una carta (``/fits``)."""
+
+    def add(self, record: FitRecord) -> None:
+        """Guarda un ajuste nuevo.
+
+        Args:
+            record: Registro.
+
+        Raises:
+            DuplicateKeyError: Si ya existe la clave.
+        """
+        ...
+
+    def get(self, tenant_id: str, chart_id: str, fit_id: str) -> FitRecord | None:
+        """Busca un ajuste.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            fit_id: Ajuste.
+
+        Returns:
+            El registro, o ``None`` si no existe para esa clave.
+        """
+        ...
+
+    def update(self, record: FitRecord) -> None:
+        """Reemplaza un ajuste existente.
+
+        Args:
+            record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe.
+        """
+        ...
+
+    def claim(
+        self, tenant_id: str, chart_id: str, fit_id: str, started_at: datetime
+    ) -> FitRecord | None:
+        """Pasa el ajuste de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            fit_id: Ajuste.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+
+class LimitsRepository(Protocol):
+    """Calibraciones de límites (``/limits``)."""
+
+    def add(self, record: LimitsRecord) -> None:
+        """Guarda una calibración nueva.
+
+        Args:
+            record: Registro.
+
+        Raises:
+            DuplicateKeyError: Si ya existe la clave.
+        """
+        ...
+
+    def get(self, tenant_id: str, chart_id: str, limits_id: str) -> LimitsRecord | None:
+        """Busca una calibración.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            limits_id: Calibración.
+
+        Returns:
+            El registro, o ``None`` si no existe para esa clave.
+        """
+        ...
+
+    def update(self, record: LimitsRecord) -> None:
+        """Reemplaza una calibración existente.
+
+        Args:
+            record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe.
+        """
+        ...
+
+    def claim(
+        self, tenant_id: str, chart_id: str, limits_id: str, started_at: datetime
+    ) -> LimitsRecord | None:
+        """Pasa la calibración de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            limits_id: Calibración.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+
+class DepurationRepository(Protocol):
+    """Depuraciones (``/depurations``)."""
+
+    def add(self, record: DepurationRecord) -> None:
+        """Guarda una depuración nueva.
+
+        Args:
+            record: Registro.
+
+        Raises:
+            DuplicateKeyError: Si ya existe la clave.
+        """
+        ...
+
+    def get(self, tenant_id: str, chart_id: str, depuration_id: str) -> DepurationRecord | None:
+        """Busca una depuración.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            depuration_id: Depuración.
+
+        Returns:
+            El registro, o ``None`` si no existe para esa clave.
+        """
+        ...
+
+    def update(self, record: DepurationRecord) -> None:
+        """Reemplaza una depuración existente.
+
+        Args:
+            record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe.
+        """
+        ...
+
+    def claim(
+        self, tenant_id: str, chart_id: str, depuration_id: str, started_at: datetime
+    ) -> DepurationRecord | None:
+        """Pasa la depuración de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            depuration_id: Depuración.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+
+class PipelineRepository(Protocol):
+    """Tuberías (``/pipelines``)."""
+
+    def add(self, record: PipelineRecord) -> None:
+        """Guarda una tubería nueva.
+
+        Args:
+            record: Registro.
+
+        Raises:
+            DuplicateKeyError: Si ya existe la clave.
+        """
+        ...
+
+    def get(self, tenant_id: str, chart_id: str, pipeline_id: str) -> PipelineRecord | None:
+        """Busca una tubería.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            pipeline_id: Tubería.
+
+        Returns:
+            El registro, o ``None`` si no existe para esa clave.
+        """
+        ...
+
+    def update(self, record: PipelineRecord) -> None:
+        """Reemplaza una tubería existente.
+
+        Args:
+            record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe.
+        """
+        ...
+
+    def claim(
+        self, tenant_id: str, chart_id: str, pipeline_id: str, started_at: datetime
+    ) -> PipelineRecord | None:
+        """Pasa la tubería de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            pipeline_id: Tubería.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def append_step(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        pipeline_id: str,
+        expected_steps: int,
+        step: PipelineStep,
+    ) -> PipelineRecord | None:
+        """Añade un paso si la tubería sigue ``running`` con ``expected_steps`` pasos (atómico).
+
+        Dos avances concurrentes de la misma tubería: solo uno añade el paso siguiente.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            pipeline_id: Tubería.
+            expected_steps: Número de pasos que debe tener ahora.
+            step: Paso nuevo.
+
+        Returns:
+            El registro con el paso añadido, o ``None`` si no se cumplía la condición.
+        """
+        ...
 
 
 class ModelRepository(Protocol):
@@ -73,6 +368,27 @@ class ModelRepository(Protocol):
 
         Args:
             record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe un modelo con esa clave.
+        """
+        ...
+
+    def claim(
+        self, tenant_id: str, chart_id: str, model_id: str, started_at: datetime
+    ) -> ModelRecord | None:
+        """Pasa el modelo de ``queued`` a ``running`` de forma atómica (comparar-y-cambiar).
+
+        Dos llamadas concurrentes sobre el mismo modelo: solo una lo obtiene.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            started_at: Instante de inicio (UTC); va a ``started_at``.
+
+        Returns:
+            El registro ya en ``running``, o ``None`` si no existe o no estaba ``queued``.
         """
         ...
 
@@ -109,6 +425,31 @@ class MonitoringRepository(Protocol):
 
         Args:
             record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe un monitoreo con esa clave.
+        """
+        ...
+
+    def claim(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        monitoring_id: str,
+        started_at: datetime,
+    ) -> MonitoringRecord | None:
+        """Pasa el monitoreo de ``queued`` a ``running`` de forma atómica (comparar-y-cambiar).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            monitoring_id: Monitoreo.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro ya en ``running``, o ``None`` si no existe o no estaba ``queued``.
         """
         ...
 
@@ -170,6 +511,21 @@ class ModelVersionRepository(Protocol):
         Raises:
             DuplicateKeyError: Si ya existe una versión con la misma clave
                 (tenant, carta, modelo, número).
+        """
+        ...
+
+    def add_proposal_if_none(self, version: ModelVersion) -> bool:
+        """Añade una versión ``proposed`` solo si el modelo no tiene otra propuesta (atómico, D6).
+
+        Args:
+            version: Versión en estado ``proposed``.
+
+        Returns:
+            ``True`` si se añadió; ``False`` si ya había una propuesta sin resolver.
+
+        Raises:
+            ValueError: Si ``version`` no está ``proposed``.
+            DuplicateKeyError: Si ya existe una versión con la misma clave.
         """
         ...
 
@@ -388,6 +744,22 @@ class RecalibrationRepository(Protocol):
         """
         ...
 
+    def add_if_none_in_progress(self, record: RecalibrationRecord) -> bool:
+        """Guarda la recalibración solo si el modelo no tiene otra en curso (atómico, D6).
+
+        «En curso» es ``queued`` o ``running``.
+
+        Args:
+            record: Registro a guardar.
+
+        Returns:
+            ``True`` si se guardó; ``False`` si ya había una en curso para el modelo.
+
+        Raises:
+            DuplicateKeyError: Si ya existe una con la misma clave.
+        """
+        ...
+
     def get(
         self, tenant_id: str, chart_id: str, model_id: str, recalibration_id: str
     ) -> RecalibrationRecord | None:
@@ -422,16 +794,252 @@ class RecalibrationRepository(Protocol):
 
         Args:
             record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe una recalibración con esa clave.
+        """
+        ...
+
+    def claim(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        started_at: datetime,
+    ) -> RecalibrationRecord | None:
+        """Pasa la recalibración de ``queued`` a ``running`` de forma atómica (comparar-y-cambiar).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro ya en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def find(
+        self, tenant_id: str, chart_id: str, recalibration_id: str
+    ) -> RecalibrationRecord | None:
+        """Busca una recalibración solo por su id (los pasos sueltos no conocen el modelo).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            recalibration_id: Recalibración.
+
+        Returns:
+            El registro, o ``None`` si no existe para ese tenant y esa carta.
+        """
+        ...
+
+    def request_proposal(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        proposal: ProposalRequest,
+    ) -> RecalibrationRecord | None:
+        """Guarda la petición de propuesta si la recalibración sigue ``running`` sin otra (atómico).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            proposal: Petición (``queued``).
+
+        Returns:
+            El registro con la petición, o ``None`` si no estaba ``running`` o ya tenía una.
+        """
+        ...
+
+    def cancel(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        finished_at: datetime,
+    ) -> RecalibrationRecord | None:
+        """Cancela una sesión paso a paso ``running`` sin propuesta pedida (atómico).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            finished_at: Instante de la cancelación (UTC).
+
+        Returns:
+            El registro ``cancelled``, o ``None`` si no cumplía la condición.
+        """
+        ...
+
+    def claim_proposal(
+        self, tenant_id: str, chart_id: str, model_id: str, recalibration_id: str
+    ) -> RecalibrationRecord | None:
+        """Pasa la petición de propuesta de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+
+        Returns:
+            El registro con la petición en ``running``, o ``None`` si no había una ``queued``.
+        """
+        ...
+
+
+class ComparisonRepository(Protocol):
+    """Comparaciones de bases (``/comparisons``), hijas de un modelo."""
+
+    def add(self, record: ComparisonRecord) -> None:
+        """Guarda una comparación nueva.
+
+        Args:
+            record: Registro.
+
+        Raises:
+            DuplicateKeyError: Si ya existe la clave.
+        """
+        ...
+
+    def get(
+        self, tenant_id: str, chart_id: str, model_id: str, comparison_id: str
+    ) -> ComparisonRecord | None:
+        """Busca una comparación.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            comparison_id: Comparación.
+
+        Returns:
+            El registro, o ``None`` si no existe para esa clave.
+        """
+        ...
+
+    def update(self, record: ComparisonRecord) -> None:
+        """Reemplaza una comparación existente.
+
+        Args:
+            record: Registro nuevo.
+
+        Raises:
+            RecordNotFoundError: Si no existe.
+        """
+        ...
+
+    def claim(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        comparison_id: str,
+        started_at: datetime,
+    ) -> ComparisonRecord | None:
+        """Pasa la comparación de ``queued`` a ``running`` de forma atómica.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            comparison_id: Comparación.
+            started_at: Instante de inicio (UTC).
+
+        Returns:
+            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
         """
         ...
 
 
 class JobKind(StrEnum):
-    """Tipo de trabajo asíncrono."""
+    """Tipo de trabajo asíncrono (Paso 3: un trabajo por paso de cómputo encadenable).
 
-    TRAIN = "train"
-    MONITOR = "monitor"
-    RECALIBRATE = "recalibrate"
+    La recalibración en modo tubería es una tubería más (``PIPELINE``) que encadena los pasos
+    (vuelta 3.4); por eso ya no hay un tipo propio de recalibración.
+    """
+
+    MRCD_FIT = "mrcd_fit"
+    """Ajuste MRCD suelto (``/fits``)."""
+
+    LIMITS = "limits"
+    """Calibración de límites bootstrap sobre un ajuste."""
+
+    DEPURATION = "depuration"
+    """Depuración automática iterativa."""
+
+    MODEL_ASSEMBLY = "model_assembly"
+    """Ensamblado de un modelo a partir de referencias (el recurso es el modelo)."""
+
+    SCORE = "score"
+    """Puntuación de observaciones de Fase II contra un modelo."""
+
+    COMPARISON = "comparison"
+    """Comparación de bases (cambio en S y μ); el recurso es la comparación."""
+
+    VERSION_PROPOSAL = "version_proposal"
+    """Propuesta de una versión nueva de un modelo; el recurso es la recalibración."""
+
+    PIPELINE = "pipeline"
+    """Orquestación de varios pasos encadenados (Fase I o recalibración)."""
+
+
+class JobLane(StrEnum):
+    """Carril de la cola: trabajos de coste parecido comparten un grupo de trabajadores.
+
+    Separar carriles evita que un trabajo largo (una calibración bootstrap de minutos) bloquee a
+    uno corto (puntuar un lote).
+    """
+
+    ESTIMATION = "estimation"
+    """Ajustes del estimador."""
+
+    CALIBRATION = "calibration"
+    """Calibraciones con réplicas, depuraciones y comparaciones (lo más costoso)."""
+
+    LIGHT = "light"
+    """Trabajos cortos: puntuar, ensamblar, proponer versión."""
+
+    ORCHESTRATION = "orchestration"
+    """Tuberías que encadenan otros pasos."""
+
+
+_LANES: dict[JobKind, JobLane] = {
+    JobKind.MRCD_FIT: JobLane.ESTIMATION,
+    JobKind.LIMITS: JobLane.CALIBRATION,
+    JobKind.DEPURATION: JobLane.CALIBRATION,
+    JobKind.COMPARISON: JobLane.CALIBRATION,
+    JobKind.MODEL_ASSEMBLY: JobLane.LIGHT,
+    JobKind.SCORE: JobLane.LIGHT,
+    JobKind.VERSION_PROPOSAL: JobLane.LIGHT,
+    JobKind.PIPELINE: JobLane.ORCHESTRATION,
+}
+
+
+def lane_of(kind: JobKind) -> JobLane:
+    """Carril de la cola de un tipo de trabajo.
+
+    Args:
+        kind: Tipo de trabajo.
+
+    Returns:
+        Su carril.
+    """
+    return _LANES[kind]
+
+
+_MODEL_REQUIRED = frozenset({JobKind.SCORE, JobKind.VERSION_PROPOSAL, JobKind.COMPARISON})
+"""Trabajos sobre un recurso hijo de un modelo: ``model_id`` es obligatorio."""
 
 
 @dataclass(frozen=True)
@@ -439,50 +1047,48 @@ class JobRequest:
     """Petición de trabajo serializable (solo identificadores; los datos están en el repositorio).
 
     Attributes:
-        kind: ``train`` (Fase I), ``monitor`` (Fase II) o ``recalibrate``.
+        kind: Tipo de trabajo.
         tenant_id: Tenant.
-        chart_id: Carta.
-        model_id: Modelo (el que se entrena, contra el que se monitorea o que se recalibra).
-        monitoring_id: Monitoreo, solo si ``kind == "monitor"``.
-        recalibration_id: Recalibración, solo si ``kind == "recalibrate"``.
+        scope: Espacio del recurso: la carta (``t2mrcd``…) a la que pertenece.
+        resource_id: Recurso que el trabajo actualiza (el ajuste en ``mrcd_fit``, los límites en
+            ``limits``, la depuración en ``depuration``, el modelo en ``model_assembly``, la
+            puntuación en ``score``, la tubería en ``pipeline``, la comparación en
+            ``comparison`` y la recalibración en ``version_proposal``).
+        model_id: Modelo del que cuelga el recurso: obligatorio en ``score``,
+            ``comparison`` y ``version_proposal``; ``None`` en el resto (o el recurso es el
+            modelo, o no cuelga de ninguno).
     """
 
     kind: JobKind
     tenant_id: str
-    chart_id: str
-    model_id: str
-    monitoring_id: str | None = None
-    recalibration_id: str | None = None
+    scope: str
+    resource_id: str
+    model_id: str | None = None
 
     def __post_init__(self) -> None:
-        """Comprueba la coherencia entre ``kind`` y los identificadores opcionales.
+        """Comprueba los identificadores y su coherencia con ``kind``.
 
         Raises:
-            ValueError: Si ``monitoring_id`` no está exactamente en ``monitor`` o
-                ``recalibration_id`` no está exactamente en ``recalibrate``.
+            ValueError: Si un identificador está vacío o ``model_id`` no cumple la regla de su
+                tipo.
         """
-        if (self.kind is JobKind.MONITOR) != (self.monitoring_id is not None):
-            msg = "monitoring_id es obligatorio en 'monitor' y no se admite en otro tipo"
+        for name in ("tenant_id", "scope", "resource_id"):
+            if not getattr(self, name):
+                msg = f"'{name}' no puede estar vacío"
+                raise ValueError(msg)
+        if self.kind in _MODEL_REQUIRED and not self.model_id:
+            msg = f"model_id es obligatorio en '{self.kind}'"
             raise ValueError(msg)
-        if (self.kind is JobKind.RECALIBRATE) != (self.recalibration_id is not None):
-            msg = "recalibration_id es obligatorio en 'recalibrate' y no se admite en otro tipo"
+        if self.kind not in _MODEL_REQUIRED and self.model_id is not None:
+            msg = f"model_id no se admite en '{self.kind}'"
             raise ValueError(msg)
-
-    @property
-    def resource_id(self) -> str:
-        """Recurso que el trabajo actualiza: el monitoreo, la recalibración o el modelo."""
-        if self.monitoring_id is not None:
-            return self.monitoring_id
-        if self.recalibration_id is not None:
-            return self.recalibration_id
-        return self.model_id
 
 
 class JobQueue(Protocol):
     """Cola de trabajos (``InlineJobQueue`` hoy, ``CeleryJobQueue`` después)."""
 
     def enqueue(self, job: JobRequest) -> None:
-        """Encola un trabajo.
+        """Encola un trabajo y vuelve enseguida, sin esperar a que se ejecute.
 
         Args:
             job: Petición serializable.

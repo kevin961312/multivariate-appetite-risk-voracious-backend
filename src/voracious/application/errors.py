@@ -4,20 +4,35 @@ from collections.abc import Mapping
 
 __all__ = [
     "ApplicationError",
+    "ComparisonNotFoundError",
+    "ComparisonNotReadyError",
+    "DatasetNotFoundError",
+    "DepurationNotFinalError",
+    "DepurationNotFoundError",
     "EffectiveFromNotAfterScoredError",
+    "FitNotFoundError",
+    "FitNotReadyError",
+    "LimitsFitMismatchError",
+    "LimitsNotFoundError",
+    "LimitsNotReadyError",
+    "LimitsParamsMismatchError",
     "ModelNotFoundError",
     "ModelNotReadyError",
     "MonitoringNotFoundError",
     "NotASignalError",
     "ObservationBeforeFirstVersionError",
     "ObservationNotFoundError",
+    "PipelineNotFoundError",
     "ProposalPendingError",
     "RangeBeforeStructuralEventError",
     "RecalibrationDecisionPendingError",
     "RecalibrationInProgressError",
     "RecalibrationInsufficientObservationsError",
+    "RecalibrationMismatchError",
     "RecalibrationNotFoundError",
+    "RecalibrationNotInProgressError",
     "UnknownChartError",
+    "VersionInputsMismatchError",
     "VersionNotFoundError",
     "VersionNotProposedError",
 ]
@@ -160,3 +175,113 @@ class ObservationBeforeFirstVersionError(ApplicationError):
     """
 
     code = "OBSERVATION_BEFORE_FIRST_VERSION"
+
+
+class DatasetNotFoundError(ApplicationError):
+    """El dataset no existe o es de otro tenant (``DATASET_NOT_FOUND``)."""
+
+    code = "DATASET_NOT_FOUND"
+
+
+class FitNotFoundError(ApplicationError):
+    """El ajuste no existe, es de otra carta o de otro tenant (``FIT_NOT_FOUND``)."""
+
+    code = "FIT_NOT_FOUND"
+
+
+class FitNotReadyError(ApplicationError):
+    """El ajuste existe pero no está en ``succeeded`` (``FIT_NOT_READY``)."""
+
+    code = "FIT_NOT_READY"
+
+
+class LimitsNotFoundError(ApplicationError):
+    """Los límites no existen, son de otra carta o de otro tenant (``LIMITS_NOT_FOUND``)."""
+
+    code = "LIMITS_NOT_FOUND"
+
+
+class LimitsNotReadyError(ApplicationError):
+    """Los límites existen pero no están en ``succeeded`` (``LIMITS_NOT_READY``)."""
+
+    code = "LIMITS_NOT_READY"
+
+
+class LimitsFitMismatchError(ApplicationError):
+    """Los límites no se calibraron sobre el ajuste indicado (``LIMITS_FIT_MISMATCH``)."""
+
+    code = "LIMITS_FIT_MISMATCH"
+
+
+class LimitsParamsMismatchError(ApplicationError):
+    """Los parámetros de unos límites no son los de la cadena de Fase I del dataset.
+
+    Código ``LIMITS_PARAMS_MISMATCH``: todas las rondas de una cadena usan los parámetros de los
+    límites que produjeron su dataset; un modelo con parámetros distintos por ronda sería un
+    híbrido que ``fit_phase1`` no reproduce.
+    """
+
+    code = "LIMITS_PARAMS_MISMATCH"
+
+
+class DepurationNotFoundError(ApplicationError):
+    """La depuración no existe, es de otra carta o de otro tenant (``DEPURATION_NOT_FOUND``)."""
+
+    code = "DEPURATION_NOT_FOUND"
+
+
+class DepurationNotFinalError(ApplicationError):
+    """La depuración no está ``succeeded`` o no es la final de su cadena.
+
+    Código ``DEPURATION_NOT_FINAL``: un modelo solo se ensambla con la ronda final.
+    """
+
+    code = "DEPURATION_NOT_FINAL"
+
+
+class PipelineNotFoundError(ApplicationError):
+    """La tubería no existe, es de otra carta o de otro tenant (``PIPELINE_NOT_FOUND``)."""
+
+    code = "PIPELINE_NOT_FOUND"
+
+
+class RecalibrationNotInProgressError(ApplicationError):
+    """La recalibración ya terminó (o tiene ya su propuesta pedida) y no admite más pasos.
+
+    Código ``RECALIBRATION_NOT_IN_PROGRESS`` (vuelta 3.4).
+    """
+
+    code = "RECALIBRATION_NOT_IN_PROGRESS"
+
+
+class RecalibrationMismatchError(ApplicationError):
+    """Un paso referencia recursos que no pertenecen a esa recalibración (o a ninguna).
+
+    Código ``RECALIBRATION_MISMATCH`` (vuelta 3.4): p. ej. límites de la Fase I sobre un dataset de
+    candidatas, o una recalibración distinta de la del dataset.
+    """
+
+    code = "RECALIBRATION_MISMATCH"
+
+
+class ComparisonNotFoundError(ApplicationError):
+    """La comparación no existe, es de otro modelo o de otro tenant (``COMPARISON_NOT_FOUND``)."""
+
+    code = "COMPARISON_NOT_FOUND"
+
+
+class ComparisonNotReadyError(ApplicationError):
+    """La comparación existe pero no está en ``succeeded`` (``COMPARISON_NOT_READY``)."""
+
+    code = "COMPARISON_NOT_READY"
+
+
+class VersionInputsMismatchError(ApplicationError):
+    """Los pasos pedidos para la versión no son los que exige la decisión de la recalibración.
+
+    Código ``VERSION_INPUTS_MISMATCH`` (vuelta 3.4): EXTEND exige el ajuste y los límites del
+    dataset de extensión; REPLACE, los de la última ronda de las filas nuevas; sin reemplazo
+    forzado hace falta la comparación. ``details.reason`` dice cuál falló.
+    """
+
+    code = "VERSION_INPUTS_MISMATCH"

@@ -8,13 +8,14 @@ import pytest
 from support.app import App
 from support.solo_test import fast_params, small_data
 from voracious.application.errors import (
+    FitNotFoundError,
     ModelNotFoundError,
     ModelNotReadyError,
     MonitoringNotFoundError,
     UnknownChartError,
 )
 from voracious.application.ports import JobKind, JobRequest
-from voracious.application.records import JobStatus, MonitoringSummary
+from voracious.application.records import JobStatus, ModelRecord, MonitoringSummary
 from voracious.application.use_cases import INTERNAL_ERROR
 from voracious.application.use_cases.training import initial_version
 from voracious.domain.charts.t2mrcd import (
@@ -26,6 +27,7 @@ from voracious.domain.charts.t2mrcd import (
     T2MRCDParams,
 )
 from voracious.domain.common import InvalidInputError, RowDisposition
+from voracious.domain.estimators.mrcd import MRCDFit
 
 TENANT = "tenant-a"
 OTHER = "tenant-b"
@@ -41,9 +43,31 @@ def _t2mrcd_app() -> App:
 
 
 def _trained(app: App) -> str:
-    model_id = app.train().execute(TENANT, "t2mrcd", small_data().tolist(), fast_params())
+    return app.train(TENANT, "t2mrcd", small_data().tolist(), fast_params())
+
+
+def _queued_model(app: App) -> str:
+    """Modelo pedido por referencias y aún ``queued`` (su trabajo no se ejecuta)."""
+    dataset = app.upload().execute(TENANT, small_data())
+    fit_id = app.request_fit().execute(TENANT, "t2mrcd", dataset.dataset_id, None)
     app.run_all()
+    limits_id = app.request_limits().execute(TENANT, "t2mrcd", fit_id, fast_params())
+    app.run_all()
+    model_id = app.request_model().execute(TENANT, "t2mrcd", fit_id=fit_id, limits_id=limits_id)
     return model_id
+
+
+def _failed_model(app: App, chart_id: str = "t2mrcd") -> str:
+    record = ModelRecord(TENANT, chart_id, "failed-1", JobStatus.FAILED, {}, small_data(), T0)
+    app.models.add(record)
+    return record.model_id
+
+
+class _BoomFitChart(T2MRCDChart):
+    """T²MRCD cuyo ajuste suelto falla con una excepción inesperada."""
+
+    def fit_estimator(self, *args: object, **kwargs: object) -> MRCDFit:
+        raise RuntimeError("fallo inesperado con traza")
 
 
 class _BoomChart:
@@ -116,18 +140,18 @@ def test_full_phase1_and_phase2_with_real_t2mrcd() -> None:
     ]
 
 
-def test_decision_pending_leaves_model_failed_with_details() -> None:
+def test_decision_pending_fails_the_pipeline_before_fitting() -> None:
     app = App(charts={"t2mrcd": T2MRCDChart()})
     params = T2MRCDParams(bootstrap=T2MRCDBootstrap(seed=1, aggregation=None))
-    model_id = app.train().execute(TENANT, "t2mrcd", small_data(), params)
-    app.run_all()
-    record = app.get_model().execute(TENANT, "t2mrcd", model_id)
+    record = app.pipeline(TENANT, "t2mrcd", small_data(), params)
     assert record.status is JobStatus.FAILED
-    assert record.model is None
+    assert record.model_id is None
+    assert record.steps == ()
     assert record.error is not None
     assert record.error.code == T2MRCD_DECISION_PENDING
     assert record.error.details["pending"] == ["bootstrap.aggregation"]
     assert record.finished_at is not None
+    assert app.fits.get(TENANT, "t2mrcd", "id-1") is None
 
 
 def test_tenant_isolation() -> None:
@@ -146,8 +170,9 @@ def test_tenant_isolation() -> None:
 
 def test_unknown_chart_is_chart_not_found() -> None:
     app = _t2mrcd_app()
+    dataset = app.upload().execute(TENANT, small_data())
     with pytest.raises(UnknownChartError) as info:
-        app.train().execute(TENANT, "ewma", small_data(), fast_params())
+        app.request_pipeline().execute(TENANT, "ewma", dataset.dataset_id, fast_params())
     assert info.value.code == "CHART_NOT_FOUND"
     assert info.value.details == {"chart_id": "ewma"}
     with pytest.raises(UnknownChartError):
@@ -166,7 +191,7 @@ def test_model_of_other_chart_is_not_found() -> None:
 
 def test_monitoring_requires_succeeded_model() -> None:
     app = _t2mrcd_app()
-    model_id = app.train().execute(TENANT, "t2mrcd", small_data(), fast_params())
+    model_id = _queued_model(app)
     with pytest.raises(ModelNotReadyError) as info:
         app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     assert info.value.code == "MODEL_NOT_READY"
@@ -175,9 +200,7 @@ def test_monitoring_requires_succeeded_model() -> None:
 
 def test_failed_model_is_not_ready() -> None:
     app = App(charts={"t2mrcd": T2MRCDChart()})
-    params = T2MRCDParams(bootstrap=T2MRCDBootstrap(seed=1, aggregation=None))
-    model_id = app.train().execute(TENANT, "t2mrcd", small_data(), params)
-    app.run_all()
+    model_id = _failed_model(app)
     with pytest.raises(ModelNotReadyError):
         app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
 
@@ -197,17 +220,18 @@ def test_phase2_input_is_validated_before_enqueue() -> None:
 def test_training_input_must_be_a_matrix() -> None:
     app = _t2mrcd_app()
     with pytest.raises(InvalidInputError):
-        app.train().execute(TENANT, "t2mrcd", [1.0, 2.0], fast_params())
+        app.upload().execute(TENANT, [1.0, 2.0])
     assert app.models.records == {}
 
 
 def test_unexpected_error_is_internal_error_and_reraised() -> None:
-    app = App(charts={"boom": _BoomChart()})
-    model_id = app.train().execute(TENANT, "boom", small_data(), object())
+    app = App(charts={"t2mrcd": _BoomFitChart()})
+    dataset = app.upload().execute(TENANT, small_data())
+    fit_id = app.request_fit().execute(TENANT, "t2mrcd", dataset.dataset_id, None)
     job = app.queue.jobs.pop()
     with pytest.raises(RuntimeError, match="fallo inesperado"):
-        app.run_training().execute(job)
-    record = app.get_model().execute(TENANT, "boom", model_id)
+        app.run_fit().execute(job)
+    record = app.get_fit().execute(TENANT, "t2mrcd", fit_id)
     assert record.status is JobStatus.FAILED
     assert record.error is not None
     assert record.error.code == INTERNAL_ERROR
@@ -217,17 +241,19 @@ def test_unexpected_error_is_internal_error_and_reraised() -> None:
 
 def test_unexpected_phase2_error_is_internal_error_and_reraised() -> None:
     app = App(charts={"boom": _BoomChart()})
-    model_id = app.train().execute(TENANT, "boom", small_data(), object())
+    record = ModelRecord(TENANT, "boom", "m-1", JobStatus.QUEUED, {}, small_data(), T0)
+    app.models.add(record)
+    model_id = record.model_id
     key = (TENANT, "boom", model_id)
     app.models.records[key] = _succeeded(app, key)
     monitoring_id = app.monitor().execute(TENANT, "boom", model_id, small_data(2, 4), _dates(2))
     job = app.queue.jobs.pop()
     with pytest.raises(RuntimeError):
         app.run_monitoring().execute(job)
-    record = app.get_monitoring().execute(TENANT, "boom", model_id, monitoring_id)
-    assert record.status is JobStatus.FAILED
-    assert record.error is not None
-    assert record.error.code == INTERNAL_ERROR
+    record_m = app.get_monitoring().execute(TENANT, "boom", model_id, monitoring_id)
+    assert record_m.status is JobStatus.FAILED
+    assert record_m.error is not None
+    assert record_m.error.code == INTERNAL_ERROR
 
 
 class _FakeModel:
@@ -243,12 +269,15 @@ def _succeeded(app: App, key: tuple[str, str, str]) -> object:
 
 def test_jobs_are_idempotent() -> None:
     app = _t2mrcd_app()
-    model_id = app.train().execute(TENANT, "t2mrcd", small_data(), fast_params())
+    dataset = app.upload().execute(TENANT, small_data())
+    app.request_fit().execute(TENANT, "t2mrcd", dataset.dataset_id, None)
     job = app.queue.jobs[0]
     app.run_all()
-    before = len(app.models.history)
-    app.run_training().execute(job)
-    assert len(app.models.history) == before
+    fit_before = app.fits.get(TENANT, "t2mrcd", job.resource_id)
+    app.run_fit().execute(job)
+    assert app.fits.get(TENANT, "t2mrcd", job.resource_id) is not None
+    assert fit_before is not None
+    model_id = _trained(app)
     monitoring_id = app.monitor().execute(TENANT, "t2mrcd", model_id, small_data(2, 4), _dates(2))
     mjob = app.queue.jobs[0]
     app.run_all()
@@ -274,21 +303,21 @@ def test_monitoring_fails_if_model_disappears() -> None:
 
 def test_job_kind_mismatch_and_missing_resources() -> None:
     app = _t2mrcd_app()
-    train_job = JobRequest(JobKind.TRAIN, TENANT, "t2mrcd", "nope")
-    monitor_job = JobRequest(JobKind.MONITOR, TENANT, "t2mrcd", "nope", "m")
-    assert train_job.resource_id == "nope"
-    assert monitor_job.resource_id == "m"
-    with pytest.raises(ValueError, match="train"):
-        app.run_training().execute(monitor_job)
-    with pytest.raises(ValueError, match="monitor"):
-        app.run_monitoring().execute(train_job)
-    with pytest.raises(ModelNotFoundError):
-        app.run_training().execute(train_job)
+    fit_job = JobRequest(JobKind.MRCD_FIT, TENANT, "t2mrcd", "nope")
+    score_job = JobRequest(JobKind.SCORE, TENANT, "t2mrcd", "m", model_id="nope")
+    assert fit_job.resource_id == "nope"
+    assert score_job.resource_id == "m"
+    with pytest.raises(ValueError, match="mrcd_fit"):
+        app.run_fit().execute(score_job)
+    with pytest.raises(ValueError, match="score"):
+        app.run_monitoring().execute(fit_job)
+    with pytest.raises(FitNotFoundError):
+        app.run_fit().execute(fit_job)
     with pytest.raises(MonitoringNotFoundError):
-        app.run_monitoring().execute(monitor_job)
+        app.run_monitoring().execute(score_job)
 
 
-@pytest.mark.parametrize(("kind", "monitoring_id"), [(JobKind.MONITOR, None), (JobKind.TRAIN, "m")])
-def test_job_request_consistency(kind: JobKind, monitoring_id: str | None) -> None:
-    with pytest.raises(ValueError, match="monitoring_id"):
-        JobRequest(kind, TENANT, "t2mrcd", "id", monitoring_id)
+@pytest.mark.parametrize(("kind", "model_id"), [(JobKind.SCORE, None), (JobKind.MRCD_FIT, "m")])
+def test_job_request_consistency(kind: JobKind, model_id: str | None) -> None:
+    with pytest.raises(ValueError, match="model_id"):
+        JobRequest(kind, TENANT, "t2mrcd", "id", model_id)

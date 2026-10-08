@@ -49,9 +49,10 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
   documentado allí queda como **decisión abierta**.
 - **Sin placeholders estadísticos.** MRCD se ajusta con `pymrcd` (el port de `rrcov::CovMrcd`, ADR 0006).
   Con los defaults decididos la Fase I se ejecuta completa; si un campo decisivo se pasa explícitamente como
-  `None`, la Fase I de T²MRCD termina en `failed / T2MRCD_DECISION_PENDING` con `details.pending` (lista de
-  campos pendientes), comprobado **antes** de ajustar nada; la recalibración, mientras las pruebas formales de S y
-  μ no tengan cita, responde igual salvo `force_replace`. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
+  `None`, la Fase I de T²MRCD no se ejecuta: el dominio responde `T2MRCD_DECISION_PENDING` con `details.pending` (lista de
+  campos pendientes), comprobado **antes** de ajustar nada (la API por pasos lo comprueba de forma síncrona, 422);
+  la recalibración, mientras las pruebas formales de S y μ no tengan cita, responde
+  `422 RECALIBRATION_DECISION_PENDING` salvo `force_replace`. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
   `tests/support/`, nunca en `src/`. Nada de covarianza clásica «mientras tanto».
 
 ## 2. Arquitectura (hexagonal)
@@ -61,25 +62,27 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
-| Ejecución de Fase I y II | `JobQueue` | `InlineJobQueue` | `CeleryJobQueue` |
-| Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) |
-| Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) |
-| Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` |
-| Versiones, observaciones, anotaciones, eventos y recalibraciones (puertos definidos en 2b.2) | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria (solo `tests/support/`) | Postgres (TimescaleDB) |
-| Tenant | `TenantContext` | cabecera `X-Tenant-ID` | JWT/OIDC |
+| Ejecución de los pasos | `JobQueue` | `InlineJobQueue` (un hilo-pool por carril: estimation, calibration, light, orchestration) | `CeleryJobQueue` |
+| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `DepurationRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | en memoria (seguros entre hilos, con `claim`) | Postgres (TimescaleDB) |
+| Datos de entrada | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash) | `S3DatasetStorage` |
+| Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria (altas atómicas) | Postgres (TimescaleDB) |
+| Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta |
+| Reparto de réplicas | `TaskMapper` | `SerialTaskMapper` o `ProcessPoolTaskMapper` | Celery/Dask |
+| Tenant | `TenantContext` | cabecera `X-Tenant-ID` (`400 TENANT_REQUIRED`) | JWT/OIDC |
 
-Puertos del ciclo de vida (definidos en el Paso 2b.2): `ModelVersionRepository` (append-only, con CAS de
-estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository` y
-`RecalibrationRepository`; adaptadores reales (Postgres) en el Paso 3.
+Puertos auxiliares: `IdGenerator` y `Clock` (`UuidIdGenerator`, `SystemClock`). El `JobQueue` recibe un
+`JobRequest` con solo identificadores. Variables: `VORACIOUS_LOG_LEVEL`, `_MRCD_THREADS`, `_JOB_BACKEND`,
+`_REPOSITORY`, `_STORAGE` (`memory|local`), `_STORAGE_DIR`, `_REPLICATE_PROCESSES`,
+`_QUEUE_WORKERS_{ESTIMATION,CALIBRATION,LIGHT,ORCHESTRATION}` y `_MAX_UPLOAD_MB` (tabla en
+[`docs/arquitectura.md`](docs/arquitectura.md)).
 
-Puertos auxiliares: `IdGenerator` y `Clock` (application) y `TaskMapper` (reparto de tareas independientes, como
-las réplicas bootstrap; vive en `domain/common/parallel.py` y su adaptador con procesos irá en `infrastructure`).
-El `JobQueue` recibe un `JobRequest` con solo identificadores.
-
-API por carta (más endpoints del ciclo de vida previstos para el Paso 3, ADR 0005 enmendado), asíncrona en ambas fases ([ADR 0003](docs/adr/0003-api-asincrona.md),
-[ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)): `POST /v1/charts/<carta>/models` → `202` + `model_id`;
-`GET /v1/charts/<carta>/models/{id}`; `POST …/models/{id}/monitorings` → `202` + `monitoring_id`;
-`GET …/monitorings/{id}`. Estados `queued | running | succeeded | failed`.
+API **por pasos independientes, encadenables por id** ([ADR 0009](docs/adr/0009-api-por-pasos-encadenables.md);
+rutas y catálogo de códigos en la enmienda del Paso 3 del [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)),
+asíncrona ([ADR 0003](docs/adr/0003-api-asincrona.md)): `/v1/datasets`, `/v1/charts/t2mrcd/{fits,limits,depurations,models,pipelines}`
+y, bajo `…/models/{id}`, `scores`, `observations`, `structural-events`, `recalibrations`, `comparisons` y `versions`.
+Cada `POST` de cómputo responde `202 {id, status:"queued"}`. Estados `queued | running | succeeded | failed`.
+Encadenar los pasos, la tubería y `fit_phase1`/`recalibrate` dan el mismo modelo **en bits**; no se rompe esa
+equivalencia al tocar un paso. MRCD se expone bajo la carta con `alpha` parametrizable (default 0.75); no hay «MRCD puro».
 
 Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md)): `domain/charts/<carta>/`,
 `domain/estimators/<estimador>/` y `domain/common/`. Cada carta implementa el `Protocol` `ControlChart`
@@ -97,7 +100,7 @@ Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md
 | `voracious.config` | stdlib, `pydantic-settings` | cualquier capa del proyecto |
 
 Orden real de capas (contrato `layers`): `api | workers` → `container` → `infrastructure` → `application`
-→ `domain`; `config` queda fuera del orden. Hay **13 contratos vigentes** en `pyproject.toml`
+→ `domain`; `config` queda fuera del orden. Hay **14 contratos vigentes** en `pyproject.toml`
 (`[tool.importlinter]`):
 
 1. capas;
@@ -113,11 +116,11 @@ Orden real de capas (contrato `layers`): `api | workers` → `container` → `in
 10. `independence` entre estimadores;
 11. `estimators ↛ charts`;
 12. `common ↛ charts|estimators`;
-13. solo `domain.estimators.mrcd` importa `pymrcd`.
+13. solo `domain.estimators.mrcd` importa `pymrcd`;
+14. `workers ↛ infrastructure|config` (solo vía `container`).
 
-Los contratos 5, 6 y 13 usan `allow_indirect_imports` porque `api → container → config|infrastructure` y
-`charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos. Falta `workers ↛ infrastructure|config`
-(deuda del Paso 3).
+Los contratos 5, 6, 13 y 14 usan `allow_indirect_imports` porque `api|workers → container → config|infrastructure` y
+`charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos.
 
 Estructura de dominio: `domain/charts/<carta>/`, `domain/estimators/<estimador>/`, `domain/common/`
 (`ControlChart` en `common/chart.py`, `TaskMapper` en `common/parallel.py`). Los contratos `independence` ya

@@ -272,6 +272,45 @@ secciones anteriores.
 - **Limitación conocida:** `T2MRCDModel.params` (el objeto modelo) aún lleva las estrategias como objetos; solo
   los **registros** guardan datos. Persistir el objeto modelo es deuda del Paso 3.
 
+## API por pasos: semilla por linaje, exclusión humana y herencia de parámetros (Paso 3)
+
+La API por pasos ([ADR 0009](../adr/0009-api-por-pasos-encadenables.md)) ejecuta por separado lo que
+`fit_phase1` y `recalibrate` ejecutan juntos, y debe dar **los mismos bits**. Estas reglas lo garantizan; no
+añaden estadística nueva y no tienen fuente en `rrcov` (son decisiones de diseño del proyecto).
+
+**Semilla por linaje.** El cliente nunca elige el hueco de semilla de una calibración; se deduce de la cadena de
+datasets (`stage_lineage` en la aplicación, `stage_spawn_key` en la carta, mapa de huecos en `seeds.py`):
+
+- *Operación* = origen del dataset **raíz**: subida del cliente → `PHASE1` → hueco `(0, r)`; candidatas de una
+  recalibración → `NEW_ROWS` → `(1, r)`; base ampliada de una recalibración → `EXTENSION` → `(0, 0)`.
+- *Ronda `r`* = `lineage_round` del último dataset de la cadena. La raíz vale 0 y **solo sube en 1 cuando una
+  ronda de depuración automática quitó filas** (la exclusión humana no cuenta como ronda). Es la misma ronda que
+  numera `fit_phase1`: si una ronda no quita nada, la depuración converge y no hay ronda siguiente.
+
+Por qué así: en `fit_phase1` la ronda `r` calibra con el hueco `(0, r)` aunque la ejecución sea de una pieza; el
+linaje reconstruye ese número desde los datos, de modo que el resultado no depende de cómo se encadenó ni de qué
+proceso lo corrió. El resto de huecos (`(2,)`, `(3,)` para las pruebas de S y μ) no cambian.
+
+**Exclusión humana solo al inicio.** La exclusión por causa asignable (`assignable_cause`) se admite únicamente
+sobre el dataset **raíz** (`422 INVALID_INPUT`, `details.reason = human_exclusion_only_at_start`). Por qué: en
+`fit_phase1` la exclusión humana es el paso 3, anterior a todas las rondas, y no consume ronda de semilla; una
+exclusión humana a mitad de cadena no tendría equivalente en `fit_phase1` y rompería la igualdad en bits. Se aplica
+sobre el dataset sin ajuste adicional. En una recalibración, la exclusión humana de las candidatas se toma de las
+anotaciones de las señales (P4) y debe hacerse antes de cualquier ajuste (`human_exclusion_required`).
+
+**Herencia de parámetros.** Los parámetros se fijan en el primer ajuste y los hereda toda la cadena: el ajuste exige
+los parámetros de ajuste (`T2MRCD_FIT_PARAMS_MISMATCH`), los límites de un dataset derivado toman los de su
+cadena y se rechazan si difieren (`LIMITS_PARAMS_MISMATCH`), y en una recalibración los parámetros son los
+heredados de la sesión (Q8, [ADR 0008](../adr/0008-ciclo-de-vida-de-la-carta.md)) en **todas** las rondas. Por qué:
+`fit_phase1` usa un único `T2MRCDParams`; admitir cambios entre rondas produciría un modelo que `fit_phase1`
+no puede reproducir. Los campos decisivos pendientes (`None`) se comprueban de forma síncrona, antes de encolar.
+
+**Equivalencia comprobada.** Cadena HTTP = tubería = `fit_phase1` en Fase I; y la recalibración por pasos o por
+tubería = `recalibrate` en EXTEND, REPLACE forzado e INSUFFICIENT (pruebas de integración de cadena). Con
+reemplazo forzado no hay comparación S/μ; sin él, las pruebas formales siguen **sin cita** y la comparación
+responde `422 RECALIBRATION_DECISION_PENDING` (decisión abierta, ver abajo). `mrcd_threads` solo afecta al
+rendimiento.
+
 ## Tests golden
 
 Referencia de la carta (distinta de la del estimador). Los tests del Paso 2 usan implementaciones «SOLO TEST»

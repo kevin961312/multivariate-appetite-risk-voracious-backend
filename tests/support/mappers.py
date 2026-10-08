@@ -1,15 +1,15 @@
-"""``TaskMapper`` de prueba: orden inverso y procesos reales (``ProcessPoolExecutor``).
+"""``TaskMapper`` de prueba: orden inverso; los procesos reales son el adaptador de producción.
 
-``ProcessPoolTaskMapper`` es el boceto del adaptador del Paso 3: el contexto viaja **una vez** por
-proceso en el ``initializer`` y cada tarea solo lleva su índice y su semilla (M4).
+``ProcessPoolTaskMapper`` se reexporta desde ``voracious.infrastructure.parallel`` (el boceto del
+Paso 2 pasó a producción en el Paso 3). ``boom_task`` es una tarea a nivel de módulo que falla,
+para comprobar que la excepción de un proceso llega al llamador.
 """
 
 from collections.abc import Callable, Sequence
-from concurrent.futures import ProcessPoolExecutor
-from typing import cast
 
-_WORKER_STATE: dict[str, object] = {}
-"""Función y contexto del proceso de trabajo, fijados por el ``initializer``."""
+from voracious.infrastructure.parallel import ProcessPoolTaskMapper
+
+__all__ = ["ProcessPoolTaskMapper", "ReversedTaskMapper", "boom_task"]
 
 
 class ReversedTaskMapper:
@@ -26,24 +26,8 @@ class ReversedTaskMapper:
         return [results[i] for i in range(len(tasks))]
 
 
-def _init_worker(fn: Callable[[object, object], object], context: object) -> None:
-    _WORKER_STATE["fn"] = fn
-    _WORKER_STATE["context"] = context
-
-
-def _call(task: object) -> object:
-    fn = cast("Callable[[object, object], object]", _WORKER_STATE["fn"])
-    return fn(_WORKER_STATE["context"], task)
-
-
-class ProcessPoolTaskMapper:
-    """Reparte las tareas en procesos; el contexto se envía una vez por proceso."""
-
-    def __init__(self, max_workers: int = 2) -> None:
-        self.max_workers = max_workers
-
-    def map[C, T, R](self, fn: Callable[[C, T], R], context: C, tasks: Sequence[T]) -> list[R]:
-        with ProcessPoolExecutor(
-            max_workers=self.max_workers, initializer=_init_worker, initargs=(fn, context)
-        ) as pool:
-            return cast("list[R]", list(pool.map(_call, tasks)))
+def boom_task(context: object, task: int) -> int:
+    """Devuelve ``task`` salvo en la tarea 3, que lanza ``ValueError``."""
+    if task == 3:
+        raise ValueError(f"tarea {task} falló")
+    return task

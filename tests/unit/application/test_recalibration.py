@@ -13,6 +13,7 @@ from support.app import (
     App,
     hours,
     lifecycle_app,
+    queued_model,
     score,
     trained_model,
 )
@@ -23,6 +24,7 @@ from voracious.application.errors import (
     ModelNotReadyError,
     NotASignalError,
     ObservationNotFoundError,
+    PipelineNotFoundError,
     ProposalPendingError,
     RangeBeforeStructuralEventError,
     RecalibrationDecisionPendingError,
@@ -269,25 +271,24 @@ def test_recalibration_job_failures_and_idempotency() -> None:
     key = (TENANT, CHART, model_id, rid)
     app.recalibrations.records[key] = replace(app.recalibrations.records[key], params={"seed": -1})
     job = app.queue.jobs[0]
+    assert job.kind is JobKind.PIPELINE
     app.run_all()
     failed = app.get_recalibration().execute(TENANT, CHART, model_id, rid)
     assert failed.status is JobStatus.FAILED
     assert failed.error is not None
     assert failed.error.code == "INVALID_INPUT"
-    app.run_recalibration().execute(job)  # idempotente: ya no está queued
+    app.run_recalibration().execute(job)  # idempotente: la tubería ya no está queued
     assert app.get_recalibration().execute(TENANT, CHART, model_id, rid) is failed
 
-    with pytest.raises(ValueError, match="recalibrate"):
-        app.run_recalibration().execute(JobRequest(JobKind.TRAIN, TENANT, CHART, model_id))
-    with pytest.raises(RecalibrationNotFoundError):
-        app.run_recalibration().execute(
-            JobRequest(JobKind.RECALIBRATE, TENANT, CHART, model_id, recalibration_id="nope")
-        )
+    with pytest.raises(ValueError, match="pipeline"):
+        app.run_recalibration().execute(JobRequest(JobKind.MRCD_FIT, TENANT, CHART, model_id))
+    with pytest.raises(PipelineNotFoundError):
+        app.run_recalibration().execute(JobRequest(JobKind.PIPELINE, TENANT, CHART, "nope"))
 
 
 def test_recalibration_requires_ready_model() -> None:
     app = lifecycle_app()
-    model_id = app.train().execute(TENANT, CHART, small_data(), fast_params())
+    model_id = queued_model(app)
     with pytest.raises(ModelNotReadyError):
         _request(app, model_id)
     with pytest.raises(ModelNotReadyError):
@@ -307,10 +308,7 @@ def test_revalidation_due_by_months_and_by_observations() -> None:
 
     counted = App(charts={CHART: solo_test_chart()})
     policy = LifecyclePolicy(revalidate_every_months=None, revalidate_every_observations=N)
-    counted_id = counted.train().execute(
-        TENANT, CHART, small_data(), fast_params(), lifecycle_policy=policy
-    )
-    counted.run_all()
+    counted_id = counted.train(TENANT, CHART, small_data(), fast_params(), policy=policy)
     assert not counted.status().execute(TENANT, CHART, counted_id).revalidation_due
     _scored(counted, counted_id)
     status = counted.status().execute(TENANT, CHART, counted_id)

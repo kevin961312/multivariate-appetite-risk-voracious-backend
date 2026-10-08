@@ -1,7 +1,8 @@
 """Registro de observaciones, anotaciones de señales y eventos estructurales (ADR 0008).
 
-``ListObservations``, ``AnnotateSignal`` y ``RegisterStructuralEvent``. Las anotaciones y los
-eventos solo se añaden (D8); de una observación vale la anotación más reciente.
+``ListObservations``, ``AnnotateSignal``, ``RegisterStructuralEvent`` y
+``ListStructuralEvents``. Las anotaciones y los eventos solo se añaden (D8); de una observación
+vale la anotación más reciente.
 """
 
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ __all__ = [
     "AnnotateSignal",
     "AnnotatedObservation",
     "ListObservations",
+    "ListStructuralEvents",
     "RegisterStructuralEvent",
 ]
 
@@ -277,3 +279,37 @@ class RegisterStructuralEvent:
                 ]
             )
         return event
+
+
+@dataclass(frozen=True)
+class ListStructuralEvents:
+    """Lista los eventos estructurales de un modelo.
+
+    Attributes:
+        charts: Cartas registradas.
+        models: Repositorio de modelos.
+        events: Eventos estructurales.
+    """
+
+    charts: ChartRegistry
+    models: ModelRepository
+    events: StructuralEventRepository
+
+    def execute(self, tenant_id: str, chart_id: str, model_id: str) -> list[StructuralEvent]:
+        """Devuelve los eventos ordenados por ``occurred_at``.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+
+        Returns:
+            Los eventos.
+
+        Raises:
+            UnknownChartError: Si la carta no existe.
+            ModelNotFoundError: Si el modelo no existe para ese tenant y esa carta.
+        """
+        resolve_chart(self.charts, chart_id)
+        get_model(self.models, tenant_id, chart_id, model_id)
+        return self.events.list(tenant_id, chart_id, model_id)

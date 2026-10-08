@@ -1,0 +1,23 @@
+{
+  "generated_on": [
+    "Darwin",
+    "arm64"
+  ],
+  "hashes": {
+    "phase1/contaminated": "b7e6b33ca82789eeef6a1ccbdfdd55c5fcb123cf3c8b793d41110992d5ea295f",
+    "phase1/human_exclusion": "57f495628402938ce53a1bdd1463de71d025acf79292dbc12d4616dc105c08bd",
+    "phase1/max_rounds": "c4a1a2e21ead7c8d880695ddc1b091a4594007227e3683b2f27e56ebbab5c818",
+    "phase1/n_gt_p": "a7de624cf01f6a577bd66342a9f0073f83463ce52dcac008ef5c214d354d3f40",
+    "phase1/p_gt_n": "b83545a43e93419a9280f67f08b219c1191ee14e143c91893cf49642c0346ad2",
+    "recalibration/extend": "0185d52ce24fb6897a14cda7a76dc37f6e01c32643d7bf03244c560522bf1a21",
+    "recalibration/forced": "03298673ecad2bed97bb5e4737f19578c82cc25d77f2e501cc972979cbde95b0",
+    "recalibration/insufficient": "4750263e1b4478bf98c31fd0bd88235365c5d1248459bc9e1a853c5c73739591",
+    "recalibration/insufficient_in_loop": "e3f3ac503f7b3265e43827f7e35df3ca9cba5479c49a1982431fdb84b15938cb",
+    "recalibration/replace": "b7e5830e6e4df781dde49fd5c488e0161688624de992d47807778cae2a3ca15e"
+  },
+  "numpy": "2.5.3",
+  "platform": [
+    "Darwin",
+    "arm64"
+  ]
+}

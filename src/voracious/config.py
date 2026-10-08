@@ -1,5 +1,6 @@
 """Configuración de Voracious leída exclusivamente de variables de entorno ``VORACIOUS_*``."""
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -24,7 +25,22 @@ class Settings(BaseSettings):
             cualquier valor (``docs/metodos/mrcd-especificacion.md`` §3.12.9 e) y no se guarda en
             las versiones de la carta. ``None`` ⇒ ``pymrcd`` decide (``PYMRCD_NUM_THREADS`` o
             todos los CPU visibles). Con réplicas en procesos conviene fijarlo (procesos por hilos).
-            El cableado en ``container`` llega en el Paso 3.
+            Con réplicas en procesos se fija en cada proceso (``PYMRCD_NUM_THREADS``); el
+            cableado a la carta llega en la vuelta 3.2.
+        job_backend: Adaptador de la cola de trabajos (hoy solo ``inline``).
+        repository: Adaptador de los repositorios (hoy solo ``memory``).
+        storage: Almacenamiento de datasets: ``memory`` (en el proceso) o ``local`` (``.npy`` en
+            disco con huella, mejora M6).
+        storage_dir: Directorio base de ``storage=local`` (``VORACIOUS_STORAGE_DIR``);
+            obligatorio con ``local``.
+        replicate_processes: Procesos para repartir las réplicas bootstrap; ``None`` = en serie.
+            Rendimiento: el resultado es idéntico bit a bit con cualquier valor.
+        queue_workers_estimation: Hilos del carril ``estimation`` de la cola.
+        queue_workers_calibration: Hilos del carril ``calibration``.
+        queue_workers_light: Hilos del carril ``light``.
+        queue_workers_orchestration: Hilos del carril ``orchestration``.
+        max_upload_mb: Tamaño máximo del cuerpo de una subida de dataset (``POST /v1/datasets``)
+            en MiB; por encima, ``413 PAYLOAD_TOO_LARGE``.
     """
 
     model_config = SettingsConfigDict(
@@ -33,3 +49,13 @@ class Settings(BaseSettings):
 
     log_level: LogLevel = "INFO"
     mrcd_threads: int | None = Field(default=None, ge=1)
+    job_backend: Literal["inline"] = "inline"
+    repository: Literal["memory"] = "memory"
+    storage: Literal["memory", "local"] = "memory"
+    storage_dir: Path | None = None
+    replicate_processes: int | None = Field(default=None, ge=1)
+    queue_workers_estimation: int = Field(default=1, ge=1)
+    queue_workers_calibration: int = Field(default=1, ge=1)
+    queue_workers_light: int = Field(default=4, ge=1)
+    queue_workers_orchestration: int = Field(default=2, ge=1)
+    max_upload_mb: int = Field(default=50, ge=1)

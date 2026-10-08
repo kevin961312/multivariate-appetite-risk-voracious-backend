@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -44,3 +46,55 @@ def test_invalid_mrcd_threads_raises(monkeypatch: pytest.MonkeyPatch, value: str
     monkeypatch.setenv("VORACIOUS_MRCD_THREADS", value)
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_paso3_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "JOB_BACKEND",
+        "REPOSITORY",
+        "STORAGE",
+        "REPLICATE_PROCESSES",
+        "QUEUE_WORKERS_LIGHT",
+        "MAX_UPLOAD_MB",
+    ):
+        monkeypatch.delenv(f"VORACIOUS_{name}", raising=False)
+    s = Settings()
+    assert (s.job_backend, s.repository, s.storage) == ("inline", "memory", "memory")
+    assert s.replicate_processes is None
+    assert (
+        s.queue_workers_estimation,
+        s.queue_workers_calibration,
+        s.queue_workers_light,
+        s.queue_workers_orchestration,
+    ) == (1, 1, 4, 2)
+    assert s.max_upload_mb >= 1
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("JOB_BACKEND", "celery"),
+        ("REPOSITORY", "postgres"),
+        ("STORAGE", "s3"),
+        ("REPLICATE_PROCESSES", "0"),
+        ("QUEUE_WORKERS_LIGHT", "0"),
+        ("MAX_UPLOAD_MB", "0"),
+    ],
+)
+def test_invalid_paso3_values_fail(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
+    monkeypatch.setenv(f"VORACIOUS_{name}", value)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_replicate_processes_is_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VORACIOUS_REPLICATE_PROCESSES", "3")
+    assert Settings().replicate_processes == 3
+
+
+def test_storage_dir_is_read_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VORACIOUS_STORAGE", "local")
+    monkeypatch.setenv("VORACIOUS_STORAGE_DIR", str(tmp_path))
+    s = Settings()
+    assert (s.storage, s.storage_dir) == ("local", tmp_path)
+    assert Settings.model_construct().storage_dir is None

@@ -1,4 +1,4 @@
-"""Schemas Pydantic de las respuestas HTTP."""
+"""Schemas de los endpoints de vida y disponibilidad."""
 
 from typing import Literal
 

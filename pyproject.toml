@@ -12,6 +12,7 @@ dependencies = [
     "pymrcd",
     "scipy>=1.18.1",
     "structlog>=26.1.0",
+    "threadpoolctl>=3.7.0",
     "uvicorn>=0.54.0",
 ]
 
@@ -66,7 +67,8 @@ convention = "google"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = "src"
+# typings/: stubs tipados mínimos de dependencias sin anotaciones (hoy, threadpoolctl).
+mypy_path = "src:typings"
 plugins = ["pydantic.mypy"]
 warn_unreachable = true
 
@@ -234,4 +236,13 @@ source_modules = [
 ]
 forbidden_modules = ["pymrcd"]
 # Indirecto permitido: p. ej. charts.t2mrcd -> estimators.mrcd -> pymrcd es el camino legítimo.
+allow_indirect_imports = true
+
+# --- Paso 3: workers sin infraestructura ni configuración directas ---------------
+[[tool.importlinter.contracts]]
+name = "workers no importa infrastructure ni config (solo a través de container)"
+type = "forbidden"
+source_modules = ["voracious.workers"]
+forbidden_modules = ["voracious.infrastructure", "voracious.config"]
+# Indirecto permitido: workers -> container -> infrastructure|config es el camino legítimo.
 allow_indirect_imports = true

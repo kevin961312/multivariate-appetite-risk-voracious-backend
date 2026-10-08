@@ -96,3 +96,20 @@ El texto original no se reescribe; esto lo concreta tras implementar el Paso 2.
   `row_disposition`; informe de recalibración con `row_disposition`. Son estructurales (`Protocol`), así que no
   crean dependencia de `application` hacia una carta concreta.
 
+
+## Nota 2026-10-07 (Paso 3): MRCD bajo la carta y pasos por puerto y adaptador
+
+- **MRCD se expone bajo la carta** (`/v1/charts/t2mrcd/fits`), no como carta ni API propia, y con `alpha`
+  parametrizable (default 0.75, decisión del dueño P1). Por qué: en este producto MRCD no se vende por separado y
+  un «MRCD puro» con otros defaults duplicaría el estimador y abriría la confusión entre métodos (ver
+  [ADR 0009](0009-api-por-pasos-encadenables.md)). Un estimador futuro con identidad propia seguiría el punto 2
+  (su propio paquete, API y documento).
+- **Los pasos son por carta, vía puerto + adaptador.** `application` define lo que un paso necesita
+  (`Phase1Steps`, `RecalibrationSteps`, en `application/`) y el adaptador de cada carta vive en
+  `infrastructure/charts/` (`t2mrcd_steps.py`, `t2mrcd_recalibration_steps.py`), que se registra en `container`. Así
+  los casos de uso de pasos son genéricos y una carta nueva aporta su adaptador sin tocar los de T²MRCD. El
+  `ControlChart` conserva solo el contrato mínimo de las dos fases; las piezas públicas del dominio de T²MRCD
+  (`fit_base`, `calibrate`, …) son de esa carta, no del `Protocol` común.
+- **Vocabulario común sin estadística:** `domain/common/lineage.py` (`StageKind`, `StageLineage`) y
+  `domain/common/codec.py` (arreglos exactos) son lo único que las cartas comparten para el encadenamiento y la
+  persistencia; cada carta traduce el linaje a sus semillas.

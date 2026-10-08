@@ -1,7 +1,8 @@
 """Registros persistentes del ciclo de vida de una carta, comunes a todas las cartas.
 
-Modelos (Fase I), monitoreos (Fase II), versiones, observaciones, anotaciones, eventos
-estructurales y recalibraciones (ADR 0005, ADR 0008). Los registros son inmutables; cada
+Datasets, pasos encadenables de la Fase I (ajustes, límites, depuraciones y tuberías; vuelta 3.3
+del Paso 3), modelos (Fase I), monitoreos (Fase II), versiones, observaciones, anotaciones,
+eventos estructurales y recalibraciones (ADR 0005, ADR 0008). Los registros son inmutables; cada
 transición de estado crea uno nuevo con ``dataclasses.replace`` y se guarda con ``update`` (o, en
 las versiones, con el comparar-y-cambiar de ``ModelVersionRepository``). El modelo y los informes
 de cada carta se guardan como ``object``: solo la carta los interpreta. Los parámetros se guardan
@@ -14,31 +15,54 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
+import numpy as np
+import numpy.typing as npt
+
 from voracious.domain.common import (
+    BoolVector,
     FloatMatrix,
     FloatVector,
     InvalidInputError,
     RecalibrationDecision,
+    RowDisposition,
 )
 
 __all__ = [
+    "AssignableCause",
     "BaseRowRef",
     "BaseRowSource",
+    "ComparisonRecord",
+    "DatasetRecord",
+    "DatasetSource",
+    "DepurationRecord",
     "ErrorInfo",
     "Exclusion",
     "ExclusionReason",
+    "FitRecord",
+    "IndexVector",
     "JobStatus",
     "LifecyclePolicy",
+    "LimitsRecord",
+    "ModelProvenance",
     "ModelRecord",
     "ModelVersion",
     "MonitoringRecord",
     "MonitoringSummary",
+    "NextStep",
     "ObservationRecord",
+    "PipelineKind",
+    "PipelineRecord",
+    "PipelineStep",
+    "ProposalRequest",
+    "RecalibrationMode",
     "RecalibrationRecord",
     "SignalAnnotation",
     "StructuralEvent",
     "VersionStatus",
 ]
+
+IndexVector = npt.NDArray[np.int64]
+"""Índices de fila (base 0)."""
 
 DEFAULT_REVALIDATE_EVERY_MONTHS = 6
 """Revalidación periódica por defecto: documento de diseño del dueño (2026-10-07), sin cita."""
@@ -51,6 +75,8 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+    """Cancelado por una persona (hoy solo una recalibración paso a paso sin propuesta pedida)."""
 
 
 @dataclass(frozen=True)
@@ -120,6 +146,9 @@ class ModelRecord:
         model: Modelo de la carta si ``succeeded`` (el de la versión 0).
         error: Error si ``failed``.
         lifecycle_policy: Política de revalidación periódica.
+        provenance: Recursos de los que se ensambló (vuelta 3.3): dataset raíz, ajuste, límites y
+            depuraciones; ``None`` en un modelo sin cadena de pasos.
+        pipeline_id: Tubería que lo pidió, si la hay (al terminar se la avisa).
     """
 
     tenant_id: str
@@ -134,6 +163,300 @@ class ModelRecord:
     model: object | None = None
     error: ErrorInfo | None = None
     lifecycle_policy: LifecyclePolicy = field(default_factory=LifecyclePolicy)
+    provenance: "ModelProvenance | None" = None
+    pipeline_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ModelProvenance:
+    """De qué recursos se ensambló un modelo (la cadena de Fase I por pasos).
+
+    Attributes:
+        root_dataset_id: Dataset raíz (el histórico subido): ``training_data`` del modelo.
+        fit_id: Ajuste final.
+        limits_id: Límites finales.
+        depuration_ids: Depuraciones de la cadena, de la primera a la última (vacía si el modelo
+            se pidió con ``{fit_id, limits_id}`` sin depuraciones previas).
+    """
+
+    root_dataset_id: str
+    fit_id: str
+    limits_id: str
+    depuration_ids: tuple[str, ...] = ()
+
+
+class DatasetSource(StrEnum):
+    """Origen de un dataset."""
+
+    UPLOAD = "upload"
+    """Subido por el cliente (raíz de una Fase I)."""
+
+    DEPURATION_OUTPUT = "depuration_output"
+    """Filas conservadas por una depuración (``parent[rows]``)."""
+
+    RECALIBRATION_CANDIDATES = "recalibration_candidates"
+    """Observaciones candidatas de una recalibración (raíz de su depuración; vuelta 3.4)."""
+
+    RECALIBRATION_EXTENSION = "recalibration_extension"
+    """Base ampliada de una recalibración (``vstack(base, nuevas)``; vuelta 3.4)."""
+
+
+@dataclass(frozen=True, eq=False)
+class DatasetRecord:
+    """Matriz ``n x p`` inmutable de un tenant, con su linaje.
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        dataset_id: Identificador.
+        data: Matriz ``n x p`` ``float64`` contigua.
+        content_hash: Huella del contenido (``base_content_hash``).
+        source: Origen.
+        created_at: Instante de creación (UTC).
+        parent_id: Dataset del que deriva (``None`` en una raíz).
+        rows: Índices de sus filas en ``parent_id`` (``data == parent.data[rows]``); ``None`` en
+            una raíz.
+        lineage_round: Rondas de depuración automática que quitaron filas en su ascendencia
+            (``0`` en una raíz): el número de ronda de la calibración sobre este dataset.
+        origin_ref: Recurso que lo creó (la depuración o la recalibración), si lo hay.
+    """
+
+    tenant_id: str
+    dataset_id: str
+    data: FloatMatrix
+    content_hash: str
+    source: DatasetSource
+    created_at: datetime
+    parent_id: str | None = None
+    rows: IndexVector | None = None
+    lineage_round: int = 0
+    origin_ref: str | None = None
+
+
+@dataclass(frozen=True, eq=False)
+class FitRecord:
+    """Ajuste del estimador de una carta sobre un dataset (``/fits``).
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        chart_id: Carta bajo la que se ajusta.
+        fit_id: Identificador.
+        dataset_id: Dataset ajustado.
+        status: Estado del trabajo.
+        params: Parámetros del estimador codificados como datos.
+        created_at: Instante de creación (UTC).
+        started_at: Instante en que pasó a ``running`` (UTC).
+        finished_at: Instante en que terminó (UTC).
+        result: Ajuste del estimador si ``succeeded``.
+        error: Error si ``failed``.
+        pipeline_id: Tubería que lo pidió, si la hay.
+    """
+
+    tenant_id: str
+    chart_id: str
+    fit_id: str
+    dataset_id: str
+    status: JobStatus
+    params: Mapping[str, object]
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    result: object | None = None
+    error: ErrorInfo | None = None
+    pipeline_id: str | None = None
+
+
+@dataclass(frozen=True, eq=False)
+class LimitsRecord:
+    """Calibración de límites sobre un ajuste (``/limits``).
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        chart_id: Carta.
+        limits_id: Identificador.
+        fit_id: Ajuste calibrado.
+        status: Estado del trabajo.
+        params: Parámetros de la carta codificados como datos.
+        seed: Semilla raíz de la calibración.
+        stage_kind: Operación del linaje (``phase1``, ``new_rows`` o ``extension``).
+        round: Ronda del linaje (deducida del dataset, nunca la elige el cliente).
+        spawn_key: Hueco de semilla de la ronda (``stage_spawn_key``).
+        created_at: Instante de creación (UTC).
+        recalibration_id: Recalibración de la que forma parte, si la hay (vuelta 3.4).
+        started_at: Instante en que pasó a ``running`` (UTC).
+        finished_at: Instante en que terminó (UTC).
+        result: Límites de la carta si ``succeeded``.
+        clean_rows: Filas limpias del ajuste (máscara sobre las filas del dataset) si
+            ``succeeded``.
+        error: Error si ``failed``.
+        pipeline_id: Tubería que lo pidió, si la hay.
+    """
+
+    tenant_id: str
+    chart_id: str
+    limits_id: str
+    fit_id: str
+    status: JobStatus
+    params: Mapping[str, object]
+    seed: int
+    stage_kind: str
+    round: int
+    spawn_key: tuple[int, ...]
+    created_at: datetime
+    recalibration_id: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    result: object | None = None
+    clean_rows: BoolVector | None = None
+    error: ErrorInfo | None = None
+    pipeline_id: str | None = None
+
+
+@dataclass(frozen=True)
+class AssignableCause:
+    """Fila excluida por una persona (causa asignable confirmada).
+
+    Attributes:
+        row: Índice de la fila en el dataset del ajuste (base 0).
+        cause: Cuál fue la causa.
+        annotation_id: Anotación de la que sale la exclusión (al recalibrar, la exclusión humana
+            se toma de las anotaciones con causa asignable confirmada; ``None`` en la Fase I).
+    """
+
+    row: int
+    cause: str | None = None
+    annotation_id: str | None = None
+
+
+class NextStep(StrEnum):
+    """Paso que sigue a una depuración."""
+
+    FIT = "fit"
+    """Quitó filas: hay que ajustar el dataset derivado."""
+
+    MODEL = "model"
+    """Es final: se puede ensamblar el modelo."""
+
+
+@dataclass(frozen=True, eq=False)
+class DepurationRecord:
+    """Depuración de un dataset: exclusión humana o una ronda de la automática (``/depurations``).
+
+    La exclusión humana referencia el dataset (sin ajuste: se aplica antes de ajustar nada, como
+    en ``fit_phase1``); la ronda automática, el ajuste y sus límites (el dataset es el del ajuste).
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        chart_id: Carta.
+        depuration_id: Identificador.
+        dataset_id: Dataset depurado (la entrada).
+        status: Estado del trabajo.
+        assignable_cause: Filas excluidas por una persona.
+        round: Ronda (la del dataset depurado).
+        created_at: Instante de creación (UTC).
+        fit_id: Ajuste evaluado en la ronda automática (``None``: exclusión humana).
+        limits_id: Límites con los que se evalúa la ronda automática (``None``: solo exclusión
+            humana).
+        started_at: Instante en que pasó a ``running`` (UTC).
+        finished_at: Instante en que terminó (UTC).
+        result: Destino de cada fila del dataset si ``succeeded``.
+        converged: Convergencia de la ronda automática (``None`` si no la hubo).
+        final: ``True`` si la depuración terminó en esta ronda (el modelo se ensambla con ella).
+        exhausted: ``True`` si quitó todas las filas (no hay ronda final).
+        output_dataset_id: Dataset derivado con las filas conservadas, si quitó alguna.
+        next_step: Paso siguiente.
+        error: Error si ``failed``.
+        pipeline_id: Tubería que lo pidió, si la hay.
+    """
+
+    tenant_id: str
+    chart_id: str
+    depuration_id: str
+    dataset_id: str
+    status: JobStatus
+    assignable_cause: tuple[AssignableCause, ...]
+    round: int
+    created_at: datetime
+    fit_id: str | None = None
+    limits_id: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    result: tuple[RowDisposition, ...] | None = None
+    converged: bool | None = None
+    final: bool | None = None
+    exhausted: bool | None = None
+    output_dataset_id: str | None = None
+    next_step: NextStep | None = None
+    error: ErrorInfo | None = None
+    pipeline_id: str | None = None
+
+
+class PipelineKind(StrEnum):
+    """Tipo de tubería."""
+
+    PHASE1 = "phase1"
+    """Fase I completa: ajuste, límites y depuraciones hasta el modelo."""
+
+    RECALIBRATION = "recalibration"
+    """Recalibración completa (modo ``pipeline``): depuración de las filas nuevas, comparación,
+    extensión y propuesta de versión (vuelta 3.4)."""
+
+
+@dataclass(frozen=True)
+class PipelineStep:
+    """Paso de una tubería: el recurso que creó.
+
+    Attributes:
+        kind: ``fit``, ``limits``, ``depuration``, ``model``, ``comparison`` o ``version``.
+        resource_id: Identificador del recurso.
+    """
+
+    kind: str
+    resource_id: str
+
+
+@dataclass(frozen=True, eq=False)
+class PipelineRecord:
+    """Orquestación de pasos encadenados: solo referencias, sin cómputo.
+
+    ``PHASE1`` (``/pipelines/phase1``) o ``RECALIBRATION`` (recalibración en modo ``pipeline``).
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        chart_id: Carta.
+        pipeline_id: Identificador.
+        kind: Tipo de tubería.
+        status: Estado.
+        dataset_id: Dataset raíz (en una recalibración, el de candidatas).
+        params: Parámetros de la carta codificados (en una recalibración, los heredados).
+        assignable_cause: Filas del dataset raíz excluidas por una persona (en una
+            recalibración, vacía: la exclusión humana sale de las anotaciones).
+        lifecycle_policy: Política del modelo resultante.
+        created_at: Instante de creación (UTC).
+        steps: Recursos creados, en orden.
+        started_at: Instante en que pasó a ``running`` (UTC).
+        finished_at: Instante en que terminó (UTC).
+        model_id: Modelo resultante si ``succeeded`` (Fase I) o modelo recalibrado, fijado al
+            crearla (recalibración).
+        error: Error si ``failed`` (el del paso que falló, con ``details.step``).
+        recalibration_id: Recalibración que orquesta (solo ``RECALIBRATION``).
+    """
+
+    tenant_id: str
+    chart_id: str
+    pipeline_id: str
+    kind: PipelineKind
+    status: JobStatus
+    dataset_id: str
+    params: Mapping[str, object]
+    assignable_cause: tuple[AssignableCause, ...]
+    lifecycle_policy: LifecyclePolicy
+    created_at: datetime
+    steps: tuple[PipelineStep, ...] = ()
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    model_id: str | None = None
+    error: ErrorInfo | None = None
+    recalibration_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -405,9 +728,44 @@ class StructuralEvent:
     registered_at: datetime
 
 
+class RecalibrationMode(StrEnum):
+    """Cómo se ejecuta una recalibración (vuelta 3.4)."""
+
+    PIPELINE = "pipeline"
+    """Todo junto: una tubería encadena los pasos (orquestación pura)."""
+
+    STEPWISE = "stepwise"
+    """Paso a paso: el cliente pide cada paso por su API y los encadena por id."""
+
+
+@dataclass(frozen=True)
+class ProposalRequest:
+    """Pasos con los que se pidió la versión propuesta de una recalibración (``/versions``).
+
+    Attributes:
+        fit_id: Ajuste final (filas nuevas en REPLACE; base ampliada en EXTEND).
+        limits_id: Límites de ese ajuste.
+        comparison_id: Comparación de bases (``None`` en un reemplazo forzado).
+        status: Estado del trabajo de la propuesta.
+        requested_at: Instante de la petición (UTC).
+    """
+
+    fit_id: str
+    limits_id: str
+    comparison_id: str | None
+    status: JobStatus
+    requested_at: datetime
+
+
 @dataclass(frozen=True, eq=False)
 class RecalibrationRecord:
     """Trabajo de recalibración a petición (ADR 0008, punto 4).
+
+    Es también la **sesión** de la recalibración por pasos (vuelta 3.4): fija al pedirla las
+    observaciones candidatas (en orden), las que ya estaban en la base y los parámetros de la
+    carta heredados de la versión base con la semilla de la recalibración (Q8). Mientras está
+    ``running`` admite pasos; termina al proponer la versión, al quedar ``insufficient`` o al
+    fallar.
 
     Attributes:
         tenant_id: Tenant propietario.
@@ -429,6 +787,15 @@ class RecalibrationRecord:
         report: Informe de la carta si ``succeeded``.
         proposed_version: Número de la versión creada, si se creó.
         error: Error si ``failed``.
+        mode: ``pipeline`` o ``stepwise``.
+        inherited_params: Parámetros de la carta heredados de la versión base con la semilla de
+            la recalibración, codificados (los usan los límites de la recalibración).
+        candidate_ids: Observaciones candidatas (las nuevas del rango), en orden: fila ``i`` del
+            dataset de candidatas.
+        already_in_base_ids: Observaciones del rango que ya estaban en la base vigente.
+        candidates_dataset_id: Dataset ``recalibration_candidates``.
+        pipeline_id: Tubería que la orquesta (modo ``pipeline``).
+        proposal: Petición de la versión propuesta, si se hizo.
     """
 
     tenant_id: str
@@ -450,3 +817,53 @@ class RecalibrationRecord:
     report: object | None = None
     proposed_version: int | None = None
     error: ErrorInfo | None = None
+    mode: RecalibrationMode = RecalibrationMode.PIPELINE
+    inherited_params: Mapping[str, object] = field(default_factory=dict)
+    candidate_ids: tuple[str, ...] = ()
+    already_in_base_ids: tuple[str, ...] = ()
+    candidates_dataset_id: str | None = None
+    pipeline_id: str | None = None
+    proposal: ProposalRequest | None = None
+
+
+@dataclass(frozen=True, eq=False)
+class ComparisonRecord:
+    """Comparación de la base vigente con las filas nuevas depuradas (``/comparisons``).
+
+    Attributes:
+        tenant_id: Tenant propietario.
+        chart_id: Carta.
+        model_id: Modelo recalibrado.
+        comparison_id: Identificador.
+        recalibration_id: Recalibración a la que pertenece.
+        depuration_id: Depuración final de las filas nuevas.
+        fit_id: Ajuste de esa ronda final (``μ₁``, ``S₁``).
+        limits_id: Límites de esa ronda final.
+        status: Estado del trabajo.
+        created_at: Instante de creación (UTC).
+        started_at: Instante en que pasó a ``running`` (UTC).
+        finished_at: Instante en que terminó (UTC).
+        result: Comparación de la carta si ``succeeded``.
+        decision: ``extend`` o ``replace`` si ``succeeded``.
+        extension_dataset_id: Dataset ``recalibration_extension`` (base + nuevas) si ``extend``.
+        error: Error si ``failed``.
+        pipeline_id: Tubería que la pidió, si la hay.
+    """
+
+    tenant_id: str
+    chart_id: str
+    model_id: str
+    comparison_id: str
+    recalibration_id: str
+    depuration_id: str
+    fit_id: str
+    limits_id: str
+    status: JobStatus
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    result: object | None = None
+    decision: RecalibrationDecision | None = None
+    extension_dataset_id: str | None = None
+    error: ErrorInfo | None = None
+    pipeline_id: str | None = None

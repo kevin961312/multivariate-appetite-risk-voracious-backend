@@ -204,15 +204,15 @@ def test_version_repository_cas_is_atomic_and_append_only() -> None:
     assert not repo.apply_status_changes([missing])
 
 
-def test_job_request_recalibrate_coherence() -> None:
-    job = JobRequest(JobKind.RECALIBRATE, "t", "c", "m", recalibration_id="r")
+def test_job_request_version_proposal_coherence() -> None:
+    job = JobRequest(JobKind.VERSION_PROPOSAL, "t", "c", "r", model_id="m")
     assert job.resource_id == "r"
-    with pytest.raises(ValueError, match="recalibration_id"):
-        JobRequest(JobKind.RECALIBRATE, "t", "c", "m")
-    with pytest.raises(ValueError, match="recalibration_id"):
-        JobRequest(JobKind.TRAIN, "t", "c", "m", recalibration_id="r")
-    with pytest.raises(ValueError, match="monitoring_id"):
-        JobRequest(JobKind.RECALIBRATE, "t", "c", "m", monitoring_id="x", recalibration_id="r")
+    with pytest.raises(ValueError, match="model_id"):
+        JobRequest(JobKind.VERSION_PROPOSAL, "t", "c", "r")
+    with pytest.raises(ValueError, match="model_id"):
+        JobRequest(JobKind.MRCD_FIT, "t", "c", "m", model_id="m")
+    with pytest.raises(ValueError, match="resource_id"):
+        JobRequest(JobKind.VERSION_PROPOSAL, "t", "c", "", model_id="m")
 
 
 def test_frozen_base_is_read_only_copy() -> None:

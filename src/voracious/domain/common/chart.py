@@ -8,7 +8,9 @@ de datos de cada versión también (``recalibrate`` la recibe de vuelta).
 Para que modelos, versiones y recalibraciones se puedan persistir sin guardar objetos invocables,
 cada carta codifica sus parámetros como **datos** (números, textos, booleanos, ``None`` y
 diccionarios, con cada estrategia por su nombre estable) y los decodifica antes de usarlos
-(mejora M1 del Paso 2b.2).
+(mejora M1 del Paso 2b.2). Lo mismo con su modelo y su informe de recalibración (vuelta 3.2 del
+Paso 3): ``encode_model``/``decode_model`` y ``encode_report``/``decode_report`` dan datos
+serializables cuya ida y vuelta conserva cada bit.
 """
 
 from collections.abc import Mapping
@@ -68,6 +70,17 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
         """
         ...
 
+    def validate_phase1_input(self, x: FloatMatrix) -> None:
+        """Valida de forma síncrona el histórico de Fase I antes de encolarlo.
+
+        Args:
+            x: Datos históricos ``n x p``.
+
+        Raises:
+            InvalidInputError: Si la carta no los admite.
+        """
+        ...
+
     def validate_phase2_input(self, model: ModelT, x_new: FloatMatrix) -> None:
         """Valida de forma síncrona las observaciones de Fase II antes de encolarlas.
 
@@ -124,6 +137,64 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
 
         Raises:
             InvalidInputError: Si los datos no son válidos o nombran una estrategia desconocida.
+        """
+        ...
+
+    def encode_model(self, model: ModelT) -> dict[str, object]:
+        """Codifica el modelo de Fase I como datos serializables (ida y vuelta exacta en bits).
+
+        Args:
+            model: Modelo de la carta.
+
+        Returns:
+            Diccionario con números, textos, booleanos, ``None``, listas y diccionarios.
+
+        Raises:
+            InvalidInputError: Si algún elemento no se puede codificar.
+        """
+        ...
+
+    def decode_model(self, data: Mapping[str, object]) -> ModelT:
+        """Decodifica el modelo (inversa de ``encode_model``).
+
+        Args:
+            data: Modelo codificado.
+
+        Returns:
+            El modelo.
+
+        Raises:
+            InvalidInputError: Si los datos no son válidos (un campo desconocido es un error).
+        """
+        ...
+
+    def encode_report(self, report: object) -> dict[str, object]:
+        """Codifica el informe de una recalibración como datos serializables.
+
+        Recibe ``object`` porque ``ReportT_co`` es covariante; la carta comprueba el tipo.
+
+        Args:
+            report: Informe producido por ``recalibrate`` de esta carta.
+
+        Returns:
+            Diccionario serializable.
+
+        Raises:
+            TypeError: Si ``report`` no es un informe de esta carta.
+        """
+        ...
+
+    def decode_report(self, data: Mapping[str, object]) -> ReportT_co:
+        """Decodifica el informe de una recalibración (inversa de ``encode_report``).
+
+        Args:
+            data: Informe codificado.
+
+        Returns:
+            El informe.
+
+        Raises:
+            InvalidInputError: Si los datos no son válidos (un campo desconocido es un error).
         """
         ...
 

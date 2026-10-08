@@ -22,25 +22,26 @@ Ver [ADR 0001](adr/0001-hexagonal.md).
                      Kubernetes con autoescalado
 ```
 
-## Arquitectura de hoy y del Paso 2 en adelante
+## Arquitectura de hoy (Pasos 1 a 3)
 
-Existe hoy (Pasos 1 y 2): `config`, `container`, `api` con `/health` y `/ready`, logging en `infrastructure`, el
-dominio (`common`, `estimators/mrcd`, `charts/t2mrcd`) y `application` (casos de uso, puertos y registros).
-Siguen siendo **objetivo del Paso 3**: los adaptadores de `infrastructure` (cola, repositorios, `TaskMapper` con
-procesos), el cableado en `container`, `workers` y las rutas de la API.
+Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, tenant), `workers`
+(punto de entrada sin lógica), `infrastructure` (cola en hilos por carriles, repositorios en memoria, almacenamiento,
+`ProcessPoolTaskMapper`, reloj, ids, logging), `application` (casos de uso, puertos, registros) y el dominio. Siguen
+siendo **objetivo** (Paso 4+): Celery, Postgres/TimescaleDB, S3, JWT/OIDC, Docker y CI.
 
 ```
- HTTP ─▶ api/ (routers por carta, schemas, errores, tenant por X-Tenant-ID)
- workers/ (futuro: Celery)            │
+ HTTP ─▶ api/ (routers por paso y por carta, schemas, errores, tenant por X-Tenant-ID)
+ workers/ (run.handle; Celery después)│
             └────────┬────────────────┘
                      ▼ ambos usan
                 container.py (cableado: único lugar que conoce todo)
                      │ construye
                      ▼
-          infrastructure/ (InlineJobQueue, repos en memoria, almacenamiento local, logging)
+          infrastructure/ (InlineJobQueue por carriles, repos en memoria, almacenamiento, pasos por carta, logging)
                      │ implementa los puertos de
                      ▼
-          application/ (TrainModel, GetModel, MonitorObservations, GetMonitoring; puertos Protocol)
+          application/ (casos de uso por paso: ajuste, límites, depuración, modelo, tubería, puntuación,
+          recalibración, comparación, versión; puertos Protocol)
                      │ usa
                      ▼
           domain/
@@ -74,7 +75,8 @@ todas las cartas pueden compartir sin importarse entre sí):
 **`TaskMapper`** (`domain/common/parallel.py`) es el puerto con el que una carta pide ejecutar tareas
 independientes (las réplicas bootstrap de T²MRCD) sin saber cómo: el dominio no puede importar procesos ni hilos
 (contrato `domain` limpio). `SerialTaskMapper` es el adaptador en serie; el de procesos
-(`ProcessPoolTaskMapper`) irá en `infrastructure` (Paso 3). El contexto compartido se entrega una vez y las
+(`ProcessPoolTaskMapper`, `infrastructure/parallel.py`) usa contexto `spawn`, `threadpoolctl` a 1 hilo de BLAS por proceso
+y fija `PYMRCD_NUM_THREADS`; su resultado es idéntico en bits al de serie. Crea un pool **por llamada** (spawn caro: deuda). El contexto compartido se entrega una vez y las
 tareas llevan solo índice y semilla, de modo que el resultado no depende del número de procesos.
 
 `application` e `infrastructure` trabajan contra este contrato; añadir una carta no las modifica, solo se
@@ -89,7 +91,7 @@ registra en `container.py`.
 | `infrastructure` | Adaptadores que implementan los puertos (y logging). | `application`, `domain` |
 | `container` | Cableado: elige adaptadores según `config`. Único lugar que conoce todo. | todas |
 | `api` | FastAPI: app factory, routers, schemas Pydantic, dependencias, mapeo de errores. | `application`, `domain`, `container` |
-| `workers` | (vacío) Punto de entrada de Celery en el futuro. | `application`, `domain`, `container` |
+| `workers` | `run.handle(JobRequest)`: ejecuta un trabajo con el manejador del contenedor; sin lógica. Punto de entrada de Celery en el futuro. | `application`, `domain`, `container` |
 | `config` | `pydantic-settings`, prefijo `VORACIOUS_`. | — |
 
 ### Por qué este orden de capas
@@ -103,7 +105,7 @@ expresar que `container` está en medio. `config` queda fuera del orden (`exhaus
 
 ### Contratos de `import-linter` vigentes (`pyproject.toml`, `[tool.importlinter]`)
 
-Son 13; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2. En resumen:
+Son 14; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2. En resumen:
 
 1. Capas: `api | workers` → `container` → `infrastructure` → `application` → `domain` (exhaustivo).
 2. `domain` no importa configuración, `container`, frameworks ni IO; desde el Paso 2 (M1) tampoco
@@ -116,42 +118,48 @@ Son 13; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2
 9. y 10. `independence`: cartas entre sí; estimadores entre sí.
 11. `estimators ↛ charts`; 12. `common ↛ charts|estimators`.
 13. Solo `domain.estimators.mrcd` importa `pymrcd`.
+14. `workers` no importa `infrastructure` ni `config` (solo vía `container`).
 
-Los contratos 5, 6 y 13 llevan `allow_indirect_imports = true`: `api → container → config|infrastructure` y
+Los contratos 5, 6, 13 y 14 llevan `allow_indirect_imports = true`: `api|workers → container → config|infrastructure` y
 `charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos y, sin esa opción, import-linter los contaría
 como violación; lo que se prohíbe es el import directo.
 
-**Deuda:** `workers ↛ infrastructure|config` (Paso 3, cuando `workers` tenga contenido).
 
 ## Puertos y adaptadores
 
-Los puertos están fijados (Paso 2) y viven en `application/ports.py`, salvo `TaskMapper` (dominio). Los
-adaptadores de la columna «hoy» son **objetivo del Paso 3**.
+Los puertos viven en `application/ports.py`, salvo `TaskMapper` (dominio). Los adaptadores «hoy» existen desde el Paso 3;
+los de la columna «después» son objetivo (Paso 4+).
 
 | Pieza | Puerto | Adaptador hoy | Adaptador después | Variable |
 | --- | --- | --- | --- | --- |
-| Ejecución de Fase I y Fase II | `JobQueue` (recibe `JobRequest`) | `InlineJobQueue` (mismo proceso) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
-| Persistencia de modelos (Fase I) | `ModelRepository` | en memoria | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
-| Persistencia de monitoreos (Fase II) | `MonitoringRepository` | en memoria | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
-| Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio); procesos en el Paso 3 | `ProcessPoolTaskMapper`, luego Celery/Dask | _por definir_ |
-| Identificadores y reloj | `IdGenerator`, `Clock` | _Paso 3_ | — | — |
-| Datos de entrada | `DatasetStorage` | `LocalDatasetStorage` | `S3DatasetStorage` | `VORACIOUS_STORAGE=local` |
-| Versiones, observaciones, anotaciones, eventos estructurales y recalibraciones (puertos **definidos** en 2b.2) | `ModelVersionRepository` (append-only, CAS de estado), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria solo en `tests/support/`; reales en el Paso 3 | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
-| Tenant | `TenantContext` | cabecera `X-Tenant-ID` (sin auth real) | JWT/OIDC | — |
+| Ejecución de trabajos | `JobQueue` (recibe `JobRequest`) | `InlineJobQueue`: un `ThreadPoolExecutor` por carril ([ADR 0003](adr/0003-api-asincrona.md)) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
+| Datasets (linaje, huella) | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash, M6) | `S3DatasetStorage` | `VORACIOUS_STORAGE`, `VORACIOUS_STORAGE_DIR` |
+| Ajustes, límites, depuraciones, tuberías, comparaciones | `FitRepository`, `LimitsRepository`, `DepurationRepository`, `PipelineRepository`, `ComparisonRepository` | en memoria, seguros entre hilos, con `claim` (CAS `queued → running`) | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
+| Modelos y puntuaciones | `ModelRepository`, `MonitoringRepository` | en memoria, con `claim` | Postgres (TimescaleDB) | ídem |
+| Ciclo de vida | `ModelVersionRepository` (append-only, CAS de estado, `add_proposal_if_none`), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` (`add_if_none_in_progress`) | en memoria; altas atómicas (D6) | Postgres (TimescaleDB) | ídem |
+| Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta nueva | — |
+| Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio) o `ProcessPoolTaskMapper` | Celery/Dask | `VORACIOUS_REPLICATE_PROCESSES` |
+| Identificadores y reloj | `IdGenerator`, `Clock` | `UuidIdGenerator`, `SystemClock` | — | — |
+| Tenant | `TenantContext` | cabecera `X-Tenant-ID` (`400 TENANT_REQUIRED` si falta; sin auth real) | JWT/OIDC | — |
 
 Decisiones de diseño de los puertos y registros:
 
-- **`JobRequest` solo lleva identificadores** (`kind`, `tenant_id`, `chart_id`, `model_id`, `monitoring_id`): los
-  datos están en el repositorio y el mensaje sirve para cualquier cola (Celery incluido).
+- **`JobRequest` solo lleva identificadores** (`kind`, `tenant_id`, `scope` = la carta, `resource_id` y, en los
+  hijos de un modelo, `model_id`): los datos están en el repositorio y el mensaje sirve para cualquier cola.
+- **`JobKind` y carriles** (`lane_of`): `mrcd_fit` → `estimation`; `limits`, `depuration`, `comparison` →
+  `calibration`; `model_assembly`, `score`, `version_proposal` → `light`; `pipeline` → `orchestration`. Separarlos
+  evita que un bootstrap de minutos bloquee una puntuación (ADR 0003, enmienda). `TRAIN`, `MONITOR` y `RECALIBRATE`
+  se retiraron: ya no hay trabajos monolíticos (ADR 0009).
 - **Todo `get` exige `tenant_id`** y devuelve `None` si el recurso es de otro tenant: un recurso ajeno es
-  indistinguible de uno inexistente, y el aislamiento no depende de que el llamador se acuerde de comprobarlo.
-- **Registros inmutables** (`ModelRecord`, `MonitoringRecord`) con `created_at`, `started_at` y `finished_at`
-  (UTC, de `Clock`); cada transición crea un registro nuevo (`dataclasses.replace`) que se guarda con `update`.
-  El modelo y el resultado de la carta se guardan como `object`: solo la carta los interpreta.
-- **Casos de uso** (`application/use_cases/`): `TrainModel`, `GetModel`, `MonitorObservations`, `GetMonitoring`
-  (los que usa la API) y `RunTrainingJob`, `RunMonitoringJob` (los que ejecuta el worker; idempotentes).
-
-Las variables de esta tabla son **objetivo**; hoy solo existe `VORACIOUS_LOG_LEVEL`.
+  indistinguible de uno inexistente.
+- **Registros inmutables** con `created_at`, `started_at` y `finished_at` (UTC, de `Clock`); cada transición crea un
+  registro nuevo. **Los repositorios guardan datos codificados** (M1: arreglos base64 con dtype y forma, estrictos,
+  con `format_version`), no objetos: un adaptador Postgres guardará lo mismo.
+- **Atomicidad:** `claim` (CAS `queued → running`), `add_if_none_in_progress` y `add_proposal_if_none` son
+  atómicos en los adaptadores en memoria, y su contrato lo es para los futuros.
+- **Casos de uso** (`application/use_cases/`): uno o varios por paso (`steps`, `pipelines`, `comparisons`, `proposals`,
+  `recalibration_chain`, `monitoring`, `observations`, `recalibration`, `training`, `versions`), `dispatch` que lleva un `JobRequest` a su
+  manejador, y los que ejecuta el worker (idempotentes por `claim`).
 
 ## Configuración
 
@@ -161,37 +169,47 @@ producción se configuren igual (plantilla en `.env.example`).
 | Variable | Valores | Default | Efecto |
 | --- | --- | --- | --- |
 | `VORACIOUS_LOG_LEVEL` | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR` | `INFO` | Nivel mínimo de los logs JSON (structlog). Un valor inválido falla al arrancar. |
-| `VORACIOUS_MRCD_THREADS` | entero ≥ 1, o vacío | vacío (= no definida) | Hilos de la extensión C de `pymrcd` por ajuste MRCD. Solo rendimiento: no cambia ningún resultado ni se guarda en las versiones de la carta ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07). Vacío: `pymrcd` usa `PYMRCD_NUM_THREADS` o todos los CPU visibles. **Existe en `Settings` pero aún no está cableada** en `container` (Paso 3). |
+| `VORACIOUS_MRCD_THREADS` | entero ≥ 1, o vacío | vacío | Hilos de la extensión C de `pymrcd` por ajuste MRCD. Solo rendimiento: no cambia ningún resultado ni se guarda en las versiones ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07). Vacío: `pymrcd` usa `PYMRCD_NUM_THREADS` o todos los CPU visibles. Cableada en `container`. |
+| `VORACIOUS_JOB_BACKEND` | `inline` | `inline` | Adaptador de la cola. |
+| `VORACIOUS_REPOSITORY` | `memory` | `memory` | Adaptador de los repositorios. |
+| `VORACIOUS_STORAGE` | `memory` \| `local` | `memory` | Almacenamiento de datasets. |
+| `VORACIOUS_STORAGE_DIR` | ruta | vacío | Directorio base; obligatorio con `local`. |
+| `VORACIOUS_REPLICATE_PROCESSES` | entero ≥ 1, o vacío | vacío (serie) | Procesos para repartir réplicas bootstrap. Solo rendimiento. |
+| `VORACIOUS_QUEUE_WORKERS_ESTIMATION` / `_CALIBRATION` / `_LIGHT` / `_ORCHESTRATION` | entero ≥ 1 | 1 / 1 / 4 / 2 | Hilos de cada carril. |
+| `VORACIOUS_MAX_UPLOAD_MB` | entero ≥ 1 | 50 | Tamaño máximo del cuerpo de `POST /v1/datasets`; por encima, `413`. |
 
 **Sobresuscripción.** Cada ajuste MRCD usa hilos y el bootstrap puede repartir réplicas en procesos
-(`TaskMapper`): procesos × hilos no debe superar los núcleos. Con réplicas en procesos conviene fijar
+(`TaskMapper`): procesos × hilos no debe superar los núcleos (se avisa al arrancar). Con réplicas en procesos conviene fijar
 `VORACIOUS_MRCD_THREADS` (p. ej. núcleos ÷ procesos); con un solo proceso, dejarla vacía.
 
 ## Contrato de la API
 
-Asíncrona desde el día uno ([ADR 0003](adr/0003-api-asincrona.md)) y organizada por carta con Fase I y
-Fase II ([ADR 0005](adr/0005-api-fase-i-fase-ii.md)). **Objetivo del Paso 3**; `<carta>` es p. ej. `t2mrcd`:
+Asíncrona ([ADR 0003](adr/0003-api-asincrona.md)), por carta y **por pasos independientes encadenables por
+id** ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); rutas y códigos definitivos en la enmienda del Paso 3
+del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
 
-| Fase | Ruta | Respuesta |
+| Paso | Rutas | Respuesta |
 | --- | --- | --- |
-| I | `POST /v1/charts/<carta>/models` (n×p en JSON o CSV + parámetros) | `202 {model_id}` |
-| I | `GET /v1/charts/<carta>/models/{model_id}` | `queued \| running \| succeeded \| failed`; si `succeeded`, el modelo |
-| II | `POST /v1/charts/<carta>/models/{model_id}/monitorings` | `202 {monitoring_id}` |
-| II | `GET /v1/charts/<carta>/models/{model_id}/monitorings/{monitoring_id}` | estado; si `succeeded`, estadístico y señales |
+| Dataset | `POST /v1/datasets`, `GET /v1/datasets/{id}` | `201`; JSON, CSV o multipart |
+| Fase I | `POST/GET <c>/fits`, `<c>/limits`, `<c>/depurations`; `POST <c>/models` (solo referencias) | `202 {id, status:"queued"}` + `GET` |
+| Orquestación | `POST <c>/pipelines/phase1`, `GET <c>/pipelines/{id}` | `202`; encadena los pasos anteriores |
+| Fase II | `POST <c>/models/{id}/scores`, `GET …/scores/{id}` | `202` + `GET` |
+| Ciclo de vida | `…/observations`, `…/annotations` (POST), `…/structural-events`, `…/recalibrations` (+ `cancel`), `…/comparisons`, `…/versions` (+ `approve`, `reject`), `…/status` | ver ADR 0005 |
 
-- Fase II exige un modelo `succeeded`, del mismo tenant y de la misma carta: `409` si no está listo o falló,
-  `404` si no existe o es de otro tenant.
-- Errores con formato uniforme `{code, message, details}`.
-- Toda ruta de negocio exige tenant; un tenant nunca ve recursos de otro.
-- Con los defaults de T²MRCD (P2–P6 cerradas) la Fase I se ejecuta completa; si un campo decisivo se pasa como
-  `None`, termina en `failed` con `T2MRCD_DECISION_PENDING` y `details.pending`. Fase I y Fase II tienen límites distintos que comparten réplicas (ADR 0007, enmienda del Paso 2b). Catálogo completo de códigos en la enmienda del
-  [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
+- Estados `queued | running | succeeded | failed`. Un fallo de dominio **de un trabajo** queda en el registro y el
+  `GET` responde `200`; los errores **síncronos** usan el formato `{code, message, details}` y los estados de
+  `CODE_TO_STATUS` (`api/errors.py`).
+- Toda ruta de negocio exige `X-Tenant-ID` (`400 TENANT_REQUIRED`); un tenant nunca ve recursos de otro.
+- `?include=` (M3) pide las matrices grandes de modelos, versiones y recalibraciones; por defecto no se envían.
+- Con los defaults de T²MRCD la Fase I se ejecuta completa; si un campo decisivo se pasa como `None`, el rechazo es
+  síncrono (`T2MRCD_DECISION_PENDING` con `details.pending`). Fase I y Fase II tienen límites distintos que
+  comparten réplicas (ADR 0007).
 
-### Ciclo de vida de la carta (casos de uso en 2b.2; rutas y adaptadores en el Paso 3)
+### Ciclo de vida de la carta (implementado: dominio 2b.1, aplicación 2b.2, rutas y adaptadores Paso 3)
 
 Decidido en el [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md): el backend posee versiones, observaciones,
 anotaciones, eventos estructurales, propuesta/aprobación y avisos; el front solo muestra y pide. Endpoints
-previstos en el [ADR 0005](adr/0005-api-fase-i-fase-ii.md) (enmienda 2026-10-07). Flujo:
+definitivos en el [ADR 0005](adr/0005-api-fase-i-fase-ii.md) (enmienda del Paso 3). Flujo:
 
 ```
  Fase I (v0, límites I y II) ─▶ vigilancia con límite de Fase I (provisional y fijo)
@@ -223,6 +241,5 @@ la base) y su `justification` (`initial_fit`, `structural_event`, `forced_replac
 
 - `GET /health` es **liveness**: el proceso responde. No comprueba dependencias, para que un fallo de una
   dependencia externa no haga que el orquestador reinicie un proceso sano.
-- `GET /ready` es **readiness**: el proceso puede recibir tráfico. `checks` va vacío porque aún no hay
-  dependencias externas; irán entrando con cada adaptador (BD, Redis, S3).
+- `GET /ready` es **readiness**: el proceso puede recibir tráfico. `checks` va vacío (deuda: no comprueba cola ni almacenamiento); irán entrando con cada adaptador (BD, Redis, S3).
 - **Decisión abierta:** código HTTP de `/ready` cuando un check falle (típicamente `503`; no está decidido).

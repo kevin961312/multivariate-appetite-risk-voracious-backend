@@ -1,10 +1,18 @@
 """Casos de uso del ciclo de vida de una carta, comunes a todas las cartas.
 
-Fase I (entrenar), Fase II (monitorear y registrar observaciones), versiones, anotaciones,
-eventos estructurales, recalibración y estado de la carta (ADR 0005, ADR 0008).
+Fase I por pasos encadenables (datasets, ajustes, límites, depuraciones, modelo y tubería), Fase II
+(puntuar y registrar observaciones), versiones, anotaciones, eventos estructurales, recalibración
+(paso a paso: comparación y propuesta de versión; o tubería) y estado de la carta (ADR 0005,
+ADR 0008).
 """
 
 from voracious.application.use_cases.common import INTERNAL_ERROR
+from voracious.application.use_cases.comparisons import (
+    GetComparison,
+    RequestComparison,
+    RunComparisonJob,
+)
+from voracious.application.use_cases.dispatch import RunPipelineJob
 from voracious.application.use_cases.monitoring import (
     GetMonitoring,
     MonitorObservations,
@@ -14,14 +22,42 @@ from voracious.application.use_cases.observations import (
     AnnotatedObservation,
     AnnotateSignal,
     ListObservations,
+    ListStructuralEvents,
     RegisterStructuralEvent,
 )
+from voracious.application.use_cases.pipelines import (
+    GetPipeline,
+    RequestPhase1Pipeline,
+    RunPhase1Pipeline,
+)
+from voracious.application.use_cases.proposals import (
+    RequestVersionProposal,
+    RunVersionProposalJob,
+)
 from voracious.application.use_cases.recalibration import (
+    CancelRecalibration,
     GetRecalibration,
     RequestRecalibration,
     RunRecalibrationJob,
 )
-from voracious.application.use_cases.training import GetModel, RunTrainingJob, TrainModel
+from voracious.application.use_cases.recalibration_chain import RecalibrationChain
+from voracious.application.use_cases.steps import (
+    DatasetLineage,
+    GetDataset,
+    GetDepuration,
+    GetFit,
+    GetLimits,
+    RequestDepuration,
+    RequestFit,
+    RequestLimits,
+    RequestModel,
+    RunDepurationJob,
+    RunFitJob,
+    RunLimitsJob,
+    RunModelAssemblyJob,
+    UploadDataset,
+)
+from voracious.application.use_cases.training import GetModel
 from voracious.application.use_cases.versions import (
     ApproveVersion,
     GetChartStatus,
@@ -35,19 +71,43 @@ __all__ = [
     "AnnotateSignal",
     "AnnotatedObservation",
     "ApproveVersion",
+    "CancelRecalibration",
+    "DatasetLineage",
     "GetChartStatus",
+    "GetComparison",
+    "GetDataset",
+    "GetDepuration",
+    "GetFit",
+    "GetLimits",
     "GetModel",
     "GetMonitoring",
+    "GetPipeline",
     "GetRecalibration",
     "GetVersion",
     "ListObservations",
+    "ListStructuralEvents",
     "ListVersions",
     "MonitorObservations",
+    "RecalibrationChain",
     "RegisterStructuralEvent",
     "RejectVersion",
+    "RequestComparison",
+    "RequestDepuration",
+    "RequestFit",
+    "RequestLimits",
+    "RequestModel",
+    "RequestPhase1Pipeline",
     "RequestRecalibration",
+    "RequestVersionProposal",
+    "RunComparisonJob",
+    "RunDepurationJob",
+    "RunFitJob",
+    "RunLimitsJob",
+    "RunModelAssemblyJob",
     "RunMonitoringJob",
+    "RunPhase1Pipeline",
+    "RunPipelineJob",
     "RunRecalibrationJob",
-    "RunTrainingJob",
-    "TrainModel",
+    "RunVersionProposalJob",
+    "UploadDataset",
 ]

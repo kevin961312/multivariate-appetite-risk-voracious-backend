@@ -48,8 +48,10 @@ __all__ = [
     "BEST_SUBSET_CRITERION_NAME",
     "DEFAULT_STRATEGIES",
     "T2MRCDStrategies",
+    "decode_mrcd_params",
     "decode_params",
     "decode_recalibration_params",
+    "encode_mrcd_params",
     "encode_params",
     "encode_recalibration_params",
 ]
@@ -336,6 +338,33 @@ def _decode_mrcd(data: object) -> MRCDParams:
         target=target,
         maxcond=_float(raw["maxcond"], "mrcd.maxcond") if "maxcond" in raw else base.maxcond,
     )
+
+
+def encode_mrcd_params(params: MRCDParams) -> dict[str, object]:
+    """Codifica los parámetros de MRCD de la carta (ajuste suelto ``/fits``, vuelta 3.3).
+
+    Args:
+        params: Parámetros de MRCD.
+
+    Returns:
+        Diccionario con los seis campos (el mismo que ``encode_params(...)["mrcd"]``).
+    """
+    return _encode_mrcd(params)
+
+
+def decode_mrcd_params(data: object) -> MRCDParams:
+    """Decodifica los parámetros de MRCD; un campo ausente toma el default de la carta.
+
+    Args:
+        data: Diccionario de MRCD.
+
+    Returns:
+        Los parámetros.
+
+    Raises:
+        InvalidInputError: Si un campo es desconocido o tiene un tipo inválido.
+    """
+    return _decode_mrcd(data)
 
 
 def encode_params(

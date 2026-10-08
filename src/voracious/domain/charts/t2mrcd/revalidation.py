@@ -49,11 +49,13 @@ __all__ = [
     "DEFAULT_RELATIVE_CHANGE_THRESHOLD",
     "DepurationResult",
     "DepurationStage",
+    "DepurationStep",
     "LimitsSnapshot",
     "T2MRCDRecalibrationParams",
     "T2MRCDRecalibrationReport",
     "decide",
     "depurate",
+    "depuration_step",
 ]
 
 DEFAULT_MIN_OBSERVATIONS: Final = 25
@@ -195,6 +197,75 @@ class DepurationResult[StageT: DepurationStage]:
     converged: bool
 
 
+@dataclass(frozen=True, eq=False)
+class DepurationStep:
+    """Resultado de evaluar una ronda de la depuración automática (``depuration_step``).
+
+    Attributes:
+        kept: Filas conservadas tras la ronda (máscara sobre la entrada; copia propia).
+        excluded_automatic_now: Filas que esta ronda quita (máscara sobre la entrada).
+        above_t2: Filas de la ronda con ``T² > límite de Fase I`` (máscara sobre ``rows``).
+        converged: ``True`` si ninguna fila de la ronda supera el límite.
+        final: ``True`` si la depuración termina en esta ronda: convergió, se agotaron las rondas
+            (la ronda queda como final, sin quitar filas) o, tras quitar filas, quedan menos de
+            ``min_rows`` (``exhausted``: no hay ronda final).
+    """
+
+    kept: BoolVector
+    excluded_automatic_now: BoolVector
+    above_t2: BoolVector
+    converged: bool
+    final: bool
+
+    @property
+    def exhausted(self) -> bool:
+        """``True`` si la depuración terminó por quedar menos de ``min_rows`` filas."""
+        return self.final and bool(self.excluded_automatic_now.any())
+
+
+def depuration_step(
+    stage: DepurationStage,
+    x_rows: FloatMatrix,
+    rows: IndexVector,
+    kept: BoolVector,
+    round_index: int,
+    *,
+    max_rounds: int,
+    min_rows: int = 1,
+) -> DepurationStep:
+    """Una ronda de la depuración automática (Q3, Q5), sin ajustar nada (función pura).
+
+    Con la ronda ``round_index`` ya ajustada sobre ``x_rows`` (las filas ``rows`` de la entrada,
+    las conservadas en ``kept``): si ninguna supera el límite de Fase I (estricto), converge; si
+    alguna lo supera y ya se hicieron ``max_rounds`` rondas de exclusión, termina sin converger y
+    sin quitar filas; si no, quita **todas** las que lo superan y termina solo si quedan menos de
+    ``min_rows`` filas.
+
+    Args:
+        stage: Ronda ajustada (límite de Fase I y T²).
+        x_rows: Filas de la ronda (``x[rows]``).
+        rows: Índices de esas filas en la entrada.
+        kept: Filas conservadas antes de la ronda (máscara sobre la entrada; no se muta).
+        round_index: Número de la ronda (desde 0) = rondas de exclusión ya hechas.
+        max_rounds: Rondas máximas de exclusión (``>= 0``).
+        min_rows: Mínimo de filas para seguir ajustando (``>= 1``).
+
+    Returns:
+        El resultado de la ronda.
+    """
+    above = stage.t2(x_rows) > stage.phase1_limit
+    kept = kept.copy()
+    now = np.zeros(kept.shape[0], dtype=np.bool_)
+    if not bool(above.any()):
+        return DepurationStep(kept, now, above, converged=True, final=True)
+    if round_index >= max_rounds:
+        return DepurationStep(kept, now, above, converged=False, final=True)
+    removed = rows[above]
+    kept[removed] = False
+    now[removed] = True
+    return DepurationStep(kept, now, above, converged=False, final=int(kept.sum()) < min_rows)
+
+
 def depurate[StageT: DepurationStage](
     x: FloatMatrix,
     kept: BoolVector,
@@ -203,11 +274,11 @@ def depurate[StageT: DepurationStage](
     max_rounds: int,
     min_rows: int,
 ) -> DepurationResult[StageT]:
-    """Depuración automática iterativa (Q3, Q5).
+    """Depuración automática iterativa (Q3, Q5): bucle de ``depuration_step``.
 
     En cada ronda ``r`` (desde 0) se ajusta ``fit_round(x[rows], rows, r)`` con las filas
-    conservadas; si alguna tiene ``T² > límite de Fase I`` (estricto) se quitan **todas** las que lo
-    superan y se repite. Termina cuando ninguna lo supera (``converged``), cuando ya se hicieron
+    conservadas y se evalúa con ``depuration_step``; se repite hasta que la ronda sea final.
+    Termina cuando ninguna fila supera el límite (``converged``), cuando ya se hicieron
     ``max_rounds`` rondas de exclusión (la ronda final se ajusta igual y ``converged = False``) o
     cuando quedan menos de ``min_rows`` filas (``stage = None``, sin ajustar).
 
@@ -224,18 +295,21 @@ def depurate[StageT: DepurationStage](
     kept = kept.copy()
     automatic = np.zeros(x.shape[0], dtype=np.bool_)
     rounds = 0
+    if int(kept.sum()) < min_rows:
+        return DepurationResult(None, kept, automatic, rounds, converged=False)
     while True:
         rows = np.flatnonzero(kept).astype(np.int64)
-        if rows.size < min_rows:
-            return DepurationResult(None, kept, automatic, rounds, converged=False)
-        stage = fit_round(x[rows], rows, rounds)
-        above = stage.t2(x[rows]) > stage.phase1_limit
-        if not bool(above.any()):
-            return DepurationResult(stage, kept, automatic, rounds, converged=True)
-        if rounds >= max_rounds:
-            return DepurationResult(stage, kept, automatic, rounds, converged=False)
-        kept[rows[above]] = False
-        automatic[rows[above]] = True
+        x_rows = x[rows]
+        stage = fit_round(x_rows, rows, rounds)
+        step = depuration_step(
+            stage, x_rows, rows, kept, rounds, max_rounds=max_rounds, min_rows=min_rows
+        )
+        kept = step.kept
+        automatic |= step.excluded_automatic_now
+        if step.exhausted:
+            return DepurationResult(None, kept, automatic, rounds + 1, converged=False)
+        if step.final:
+            return DepurationResult(stage, kept, automatic, rounds, converged=step.converged)
         rounds += 1
 
 
