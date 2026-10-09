@@ -64,7 +64,15 @@ jobs:
       - name: docker-compose.yml válido
         run: docker compose config --quiet
       - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
-        run: docker build --progress=plain --target runtime -t voracious:ci .
+        # Hasta 3 intentos: un 504 pasajero de Docker Hub se reintenta; un fallo real del build
+        # (p. ej. FMA en el binario) falla los 3 y el job sale en rojo igual.
+        run: |
+          for i in 1 2 3; do
+            docker build --progress=plain --target runtime -t voracious:ci . && exit 0
+            echo "build falló (intento $i de 3)"
+            [ "$i" -lt 3 ] && sleep 30
+          done
+          exit 1
       - name: Arranque en solo lectura
         run: |
           docker run -d --name voracious --read-only --tmpfs /tmp \

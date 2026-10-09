@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Imagen de Voracious (Paso 4). Tres etapas sobre la misma base:
 #   builder  compila la extensión C de pymrcd con gcc y comprueba que el binario no tiene FMA
 #            (docs/metodos/mrcd-especificacion.md §3.12.9 b, punto 4); la build falla si la hay.
