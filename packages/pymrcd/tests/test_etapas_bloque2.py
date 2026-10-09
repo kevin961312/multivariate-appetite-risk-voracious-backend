@@ -20,8 +20,17 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from fixtures_r import EPS, INTER_CASES, FloatArray, Inter, assert_r_equal
-from pymrcd._rbase import r_colmedians, r_order, r_rowmeans
+from fixtures_r import (
+    EPS,
+    INTER_CASES,
+    DivergenciaR1,
+    FloatArray,
+    Inter,
+    assert_r_equal,
+    null_space_evidence,
+    r1_second_channel,
+)
+from pymrcd._rbase import r_colmedians, r_cor, r_order, r_rowmeans, r_tanh
 from pymrcd._rlinalg import (
     r_eigen_sym,
     r_eigen_values,
@@ -112,7 +121,11 @@ def test_eigen_eq_and_rotation(inter: Inter) -> None:
 
 def test_r6pack_set_matrices(inter: Inter) -> None:
     x = inter.get("r6_x")
-    assert_r_equal(set1_matrix(x), inter.get("r6_R1"), "L", "r6_R1")
+    # R1 = cor(tanh(x)) (detmrcd.R:132-133): y1 es L; R1 es E sobre la entrada de R (r6.y1), §11
+    # fila R1 (corrección 2026-10-09, §11.1). set1_matrix es exactamente r_cor(r_tanh(x)).
+    assert_r_equal(r_tanh(x), inter.get("r6_y1"), "L", "r6_y1")
+    assert_r_equal(r_cor(inter.get("r6_y1")), inter.get("r6_R1"), "E", "r6_R1")
+    assert np.array_equal(set1_matrix(x), r_cor(r_tanh(x)), equal_nan=True)  # detmrcd.R:132-133
     assert_r_equal(set2_matrix(x), inter.get("r6_R2"), "E", "r6_R2")
     assert_r_equal(set3_matrix(x), inter.get("r6_R3"), "L", "r6_R3")
     assert_r_equal(set4_matrix(x), inter.get("r6_SCM"), "B", "r6_SCM")
@@ -150,9 +163,55 @@ def test_r6pack_eigen_declared_tolerance(
         )
 
 
+class _StagesR1:
+    """Comprobación de las etapas de ``initset`` sujetas a la regla D1 (§6, §11.1).
+
+    Si ``soft`` es ``False`` cada etapa se exige con su clase (``assert_r_equal``). Si es ``True``
+    (segundo canal de R1 fuera de la referencia) se mide el error relativo de cada etapa
+    (``max|Δ| / max|ref|``) y las posiciones distintas del orden, y las que no cumplen su clase se
+    acumulan para el aviso ``DivergenciaR1`` en lugar de fallar.
+    """
+
+    def __init__(self, soft: bool) -> None:
+        self.soft = soft
+        self.measures: dict[str, float] = {}
+        self.outside: list[str] = []
+
+    def values(self, actual: FloatArray, expected: FloatArray, klass: str, what: str) -> None:
+        if not self.soft:
+            assert_r_equal(actual, expected, klass, what)
+            return
+        scale = float(np.max(np.abs(expected))) or 1.0
+        rel = float(np.max(np.abs(actual - expected))) / scale
+        self.measures[what] = rel
+        try:
+            assert_r_equal(actual, expected, klass, what)
+        except AssertionError:
+            self.outside.append(f"{what} max rel {rel:.3g}")
+
+    def order(self, actual: np.ndarray, expected: np.ndarray, what: str) -> None:
+        if not self.soft:
+            np.testing.assert_array_equal(actual, expected, err_msg=what)
+            return
+        distinct = int(np.sum(np.asarray(actual) != np.asarray(expected)))
+        self.measures[what] = float(distinct)
+        if distinct:
+            self.outside.append(f"{what} {distinct}/{len(expected)} posiciones distintas")
+
+
 @pytest.mark.parametrize("k", [1, 2, 3, 4, 5, 6])
-def test_initset_stages(inter: Inter, k: int) -> None:
-    """``initset`` (detmrcd.R:65-76), cada etapa con las entradas de R."""
+def test_initset_stages(
+    inter: Inter, k: int, record_property: Callable[[str, object], None]
+) -> None:
+    """``initset`` (detmrcd.R:65-76), cada etapa con las entradas de R.
+
+    D1 (enmienda 2026-10-09, §6 «Segundo canal de R1», §11.1): fuera de la plataforma de
+    referencia, si ``k`` no es exigido (``required_sets(n, p)``) y el ``lambda`` de R prueba un
+    espacio nulo (``min/max <= 10·p·eps``), ``is_colmed``, ``is_estloc``, ``is_centeredx``,
+    ``is_dist`` y el orden (``is_ord``, y el de la cadena completa ``initset``, que es el mismo)
+    se registran como ``DivergenciaR1`` con su error medido en lugar de fallar. ``is_proj``,
+    ``is_lambda``, ``is_sqrtcov`` e ``is_sqrtinvcov`` se exigen siempre.
+    """
     x = inter.get("r6_x")
     p_mat = inter.get(f"r6_P{k}")
     h = int(inter.scalar("pre_h"))
@@ -165,19 +224,68 @@ def test_initset_stages(inter: Inter, k: int) -> None:
     sqrtinvcov = inter.get(f"is_sqrtinvcov_k{k}")
     assert_r_equal(r_matprod(p_mat, lam[:, None] * pt), sqrtcov, "B", "is_sqrtcov")  # :71
     assert_r_equal(r_matprod(p_mat, pt / lam[:, None]), sqrtinvcov, "B", "is_sqrtinvcov")  # :72
+    n, p = x.shape
+    soft = r1_second_channel(k, n, p, lam)
+    record_property("d1_segundo_canal_r1", soft)
+    chk = _StagesR1(soft)
     colmed = inter.get(f"is_colmed_k{k}").ravel()
-    assert_r_equal(r_colmedians(r_matprod(x, sqrtinvcov)), colmed, "B", "is_colmed")  # :73
+    chk.values(r_colmedians(r_matprod(x, sqrtinvcov)), colmed, "B", "is_colmed")  # :73
     estloc = inter.get(f"is_estloc_k{k}").ravel()
-    assert_r_equal(r_vecmat(colmed, sqrtcov), estloc, "B", "is_estloc")  # :73
+    chk.values(r_vecmat(colmed, sqrtcov), estloc, "B", "is_estloc")  # :73
     centeredx = inter.get(f"is_centeredx_k{k}")
-    assert_r_equal(r_matprod(x - estloc[None, :], p_mat), centeredx, "B", "is_centeredx")  # :74
+    chk.values(r_matprod(x - estloc[None, :], p_mat), centeredx, "B", "is_centeredx")  # :74
     dist = inter.get(f"is_dist_k{k}").ravel()
-    assert_r_equal(r_mahalanobis_d(centeredx, lam), dist, "E", "is_dist")  # :75
+    chk.values(r_mahalanobis_d(centeredx, lam), dist, "E", "is_dist")  # :75
     ord_r = inter.ints(f"is_ord_k{k}")
-    np.testing.assert_array_equal(r_order(dist)[:h] + 1, ord_r)  # :75
+    chk.order(r_order(dist)[:h] + 1, ord_r, "is_ord")  # :75
     full = initset(x, p_mat, h)  # cadena completa con P de R
-    np.testing.assert_array_equal(full.ord + 1, ord_r)
-    np.testing.assert_array_equal(_hs(inter)[:, k - 1] + 1, ord_r)
+    chk.order(full.ord + 1, ord_r, "initset_ord")
+    np.testing.assert_array_equal(_hs(inter)[:, k - 1] + 1, ord_r)  # R contra R: siempre
+    for name, value in chk.measures.items():
+        record_property(f"d1_{name}", value)
+    if chk.outside:
+        lam_ratio = float(np.min(lam)) / float(np.max(lam))
+        warnings.warn(
+            f"{inter.case} (n={n}, p={p}), conjunto {k}: segundo canal de R1 fuera de la "
+            f"referencia (D1; min/max lambda = {lam_ratio:.3g} <= {10 * p * EPS:.3g}): "
+            f"{'; '.join(chk.outside)}",
+            DivergenciaR1,
+            stacklevel=1,
+        )
+
+
+@pytest.mark.parametrize(
+    ("k", "n", "p", "lam", "reference", "expected"),
+    [
+        # C1-4 (n = 50, p = 200): conjunto R1 y min/max = 1.7e-16 <= 4.4e-13 -> registro.
+        (4, 50, 200, np.array([1.0, 1.7e-16]), False, True),
+        # Misma situación en la plataforma de referencia: nunca aplica.
+        (4, 50, 200, np.array([1.0, 1.7e-16]), True, False),
+        # Conjunto exigido (6 con p >= n): se exige aunque haya espacio nulo.
+        (6, 50, 200, np.array([1.0, 1.7e-16]), False, False),
+        # Conjunto R1 sin prueba de espacio nulo: se exige.
+        (4, 50, 200, np.array([1.0, 1e-3]), False, False),
+        # Frontera exacta de la cota: 10·p·eps incluido.
+        (1, 50, 200, np.array([1.0, 10 * 200 * EPS]), False, True),
+        (1, 50, 200, np.array([1.0, np.nextafter(10 * 200 * EPS, 1.0)]), False, False),
+        # Régimen intermedio: el 5 es R1, el 1 es exigido.
+        (5, 60, 40, np.array([2.0, 0.0]), False, True),
+        (1, 60, 40, np.array([2.0, 0.0]), False, False),
+        # p < ceil(n/2): todos exigidos.
+        (5, 61, 30, np.array([2.0, 0.0]), False, False),
+    ],
+)
+def test_r1_second_channel_condition(
+    k: int, n: int, p: int, lam: FloatArray, reference: bool, expected: bool
+) -> None:
+    """Condición D1 (§6 «Segundo canal de R1»): fuera de la referencia, R1 y espacio nulo."""
+    assert r1_second_channel(k, n, p, lam, reference=reference) is expected
+
+
+def test_null_space_evidence_without_scale() -> None:
+    """Sin escala (``max(lambda) <= 0``) no hay prueba de espacio nulo: se exige todo."""
+    assert not null_space_evidence(np.zeros(3), 3)
+    assert null_space_evidence(np.array([0.0, 1.0]), 2)
 
 
 # --------------------------------------------------------------------------------- rho (§3.7)

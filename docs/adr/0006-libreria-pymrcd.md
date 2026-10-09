@@ -171,3 +171,47 @@ esta extensión C. Cualquier otro código compilado necesita su propia decisión
   `-fassociative-math`, `-freciprocal-math`): depende de que `-fno-fast-math` quede al final (riesgo bajo).
 - Rendimiento medido: ver `docs/ESTADO.md` (M5). El objetivo de 10× con un hilo **no** se alcanzó (4.1×): exigiría
   cambiar el algoritmo, que la especificación prohíbe.
+
+## Enmienda 2026-10-09 (Paso 4: validación en Linux)
+
+**Decisión del dueño, 2026-10-09**, escrita **antes** de volver a comparar. Precisa el punto 6 («fuera de la
+plataforma de referencia rigen las tolerancias declaradas») para tres casos que no tenían regla. En la plataforma
+de referencia (macOS arm64; `REFERENCE_PLATFORM`, `packages/pymrcd/tests/fixtures_r.py:34`) **no cambia nada**:
+se sigue exigiendo bit a bit donde la especificación lo dice. Detalle, evidencia y alcance exacto en
+`docs/metodos/mrcd-especificacion.md` §6 («Segundo canal de R1») y §11.1.
+
+**Origen.** Dictamen del validador estadístico sobre la etapa `gate` de la imagen Docker (Linux arm64 nativo y
+amd64 emulado; gcc + OpenBLAS + glibc): **ningún defecto del port**. Dos fallos eran defectos del test y se
+corrigen con clases ya declaradas en §11:
+- `test_etapas_bloque2.py:115` aplicaba a `r6_R1` la clase L de `y1`; lo declarado es E sobre entradas de R
+  (`r_cor(r6.y1 de R)`).
+- `test_zeroin.py:61` comparaba `root` como E aunque la función de prueba depende de libm; es L (y queda en D3).
+
+**D1 — R1 en los tests por etapa.** Con p ≥ n, `SCM` tiene espacio nulo estructural; `lambda` (Qn de las
+proyecciones) vale ≈ 5e-16 en esas direcciones y `sqrtinvcov` ~1e15, así que 1 ulp de BLAS en
+`x %*% sqrtinvcov`/`estloc` domina `dist` y cambia el orden de `initset` (C1-4, n = 50, p = 200: `dist` hasta
+6.9 %, orden distinto en 20/25; amd64: `is_colmed` 13.8 relativo, `lambda` 0.195 en 150 columnas). Fuera de la
+referencia, si y solo si el conjunto no es exigido (`required_sets(n, p)`) **y** `min(lambda)/max(lambda) ≤
+10·p·eps` (C1-4: 1.7e-16), las etapas posteriores a `is_lambda` y el orden se registran como `DivergenciaR1` con
+su medición en lugar de fallar; `is_proj`, `is_lambda`, `sqrtcov` y `sqrtinvcov` se siguen exigiendo.
+
+**D2 — `target = equicorrelation`.** La entrada de `doScale` es `mW = mU %*% mQ` (`dgemm`, clase B); fuera de la
+referencia `r6.center`, `r6.scale`, `r6.x` y la `U` de OGK calculadas desde cero heredan la clase B (rtol 1e-12,
+atol `1e-14·max`), con rtol 2^-23 si un Qn salta a f32. Medido (amd64, C8_eq): `r6_x` 7.29e-16·max, `r6_U`
+6.55e-15·max. Con entradas de R siguen siendo exactos.
+
+**D3 — `uniroot` con funciones sintéticas de libm.** Los casos sintéticos de `test_zeroin.py` cuya función usa
+`tanh`, `cos`, `exp` u otra función de libm son solo de la plataforma de referencia (bit a bit allí) y fuera de
+ella se saltan con motivo explícito: `root` sería L y `f_root` sufre cancelación (5.4e-10 relativo con 1 ulp)
+sin tolerancia declarada. La fidelidad de `R_zeroin2` fuera de la referencia la cubren los 38 casos `fncond`
+reales (0 bits distintos en Linux) y los sintéticos aritméticos. Pendiente de confirmar: los casos con `x^3`
+llaman a `pow` de libm y, por la letra de la regla, también quedan solo en la referencia.
+
+**No contradice «nunca se relaja una tolerancia».** Ninguna tolerancia existente se afloja: D2 aplica una clase
+ya declarada (B) a cantidades que dependen de una entrada B; D3 retira casos sin regla fuera de la referencia sin
+tocar su exigencia en ella; D1 cambia el veredicto (fallo → aviso medido) solo cuando concurren el régimen R1 ya
+declarado (punto 6.3, enmienda 2026-10-06 c) y la prueba numérica del espacio nulo.
+
+**Consecuencia de producto (ya declarada en «Consecuencias»).** En Linux con p ≥ n el modelo ajustado puede
+diferir del obtenido en macOS, igual que el propio `rrcov` entre plataformas. La decisión sobre una versión
+canónica determinista sigue abierta.

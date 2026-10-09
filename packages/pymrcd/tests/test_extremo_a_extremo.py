@@ -32,8 +32,9 @@ tolerancia B de autovectores (§11: módulo signo, autoespacios con gap relativo
 ``10·p·eps·λmax/gap``) **y** ``initset(r6.x, P_R, h)`` con la ``P`` de R reproduce el subconjunto
 de R; entonces se registra (aviso ``DivergenciaD9``) con la diferencia de ``P``
 medida (``max|Δ|`` módulo signo). Si no, falla. Siempre se exige lo que no depende de ``eigen``
-(``doScale`` y la ``U`` de OGK, bit a bit) y, si algún conjunto difiere, la coherencia interna
-(mismo resultado al reinyectar los subconjuntos propios).
+(``doScale`` y la ``U`` de OGK, bit a bit; con ``target = equicorrelation`` fuera de la plataforma
+de referencia, clase B por D2, enmienda 2026-10-09) y, si algún conjunto difiere, la coherencia
+interna (mismo resultado al reinyectar los subconjuntos propios).
 """
 
 from __future__ import annotations
@@ -51,9 +52,11 @@ from fixtures_r import (
     EPS,
     INTER_CASES,
     REFERENCE_PLATFORM,
+    DivergenciaR1,
     FloatArray,
     Inter,
     assert_r_equal,
+    required_sets,
 )
 from pymrcd import MrcdResult, cov_mrcd
 from pymrcd.ogk import ogk_u
@@ -70,33 +73,12 @@ TOL_MARGEN = 1e-12
 RecordProperty = Callable[[str, object], None]
 
 
-class DivergenciaR1(UserWarning):
-    """Divergencia documentada del nivel iii en un subconjunto R1 del régimen (§6)."""
-
-
 class DivergenciaD9(UserWarning):
     """Divergencia documentada atribuible a ``eigen`` de Accelerate (D9), con su medida."""
 
 
 class MargenesDecision(UserWarning):
     """Aviso informativo con los márgenes de ``initV`` y de la selección del mejor."""
-
-
-def required_sets(n: int, p: int) -> frozenset[int]:
-    """Subconjuntos iniciales (base 1) exigidos iguales a R desde cero (§6 punto 3b).
-
-    Args:
-        n: Observaciones.
-        p: Variables.
-
-    Returns:
-        Conjunto de índices exigidos.
-    """
-    if p >= n:
-        return frozenset({6})
-    if p >= math.ceil(n / 2):
-        return frozenset({1, 2, 3, 4, 6})
-    return frozenset({1, 2, 3, 4, 5, 6})
 
 
 def _run(inter: Inter, with_hsets: bool) -> MrcdResult:
@@ -344,10 +326,15 @@ def test_nivel_iii_desde_cero(case: str, record_property: RecordProperty) -> Non
     assert r6 is not None
     # Lo que no depende de eigen es exacto siempre (si el intermedio está versionado; en los casos
     # grandes solo vive en local y el resto del nivel iii usa únicamente ficheros versionados).
+    # D2 (enmienda 2026-10-09, §11 filas `x` de doScale y U de OGK, §11.1): con equicorrelación y
+    # fuera de la referencia, la entrada de doScale es mW = mU %*% mQ (dgemm, detmrcd.R:432,
+    # clase B), así que r6.x y la U calculada desde cero heredan la clase B. En la referencia, y
+    # con target identity, siguen exactos.
+    klass_r6 = "B" if inter.equicorrelation and not REFERENCE_PLATFORM else "E"
     if inter.has("r6_x"):
-        assert_r_equal(r6.x, inter.get("r6_x"), "E", "r6_x")
+        assert_r_equal(r6.x, inter.get("r6_x"), klass_r6, "r6_x")
     if inter.has("r6_U"):
-        assert_r_equal(ogk_u(r6.x), inter.get("r6_U"), "E", "r6_U")
+        assert_r_equal(ogk_u(r6.x), inter.get("r6_U"), klass_r6, "r6_U")
     n, p = res.n_obs, res.cov.shape[0]
     required = required_sets(n, p)
     record_property("exigidos", sorted(required))

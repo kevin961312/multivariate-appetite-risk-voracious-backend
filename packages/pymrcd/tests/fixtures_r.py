@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 import platform
 from dataclasses import dataclass
 from pathlib import Path
@@ -241,3 +242,72 @@ def assert_r_equal(actual: object, expected: object, klass: str, what: str = "")
     finite = np.isfinite(e)
     scale = float(np.max(np.abs(e[finite]))) if finite.any() else 0.0
     np.testing.assert_allclose(a, e, rtol=rtol, atol=atol_rel * scale, equal_nan=True, err_msg=what)
+
+
+class DivergenciaR1(UserWarning):
+    """Divergencia documentada de un subconjunto R1 (especificación §6), con su medida.
+
+    Nivel iii (desde cero): subconjunto R1 del régimen distinto de R. Nivel i (tests por etapa de
+    ``initset`` fuera de la referencia, enmienda D1 del 2026-10-09): segundo canal de R1.
+    """
+
+
+def required_sets(n: int, p: int) -> frozenset[int]:
+    """Subconjuntos iniciales (base 1) exigidos iguales a R desde cero (§6 punto 3b).
+
+    Args:
+        n: Observaciones.
+        p: Variables.
+
+    Returns:
+        Conjunto de índices exigidos.
+    """
+    if p >= n:
+        return frozenset({6})
+    if p >= math.ceil(n / 2):
+        return frozenset({1, 2, 3, 4, 6})
+    return frozenset({1, 2, 3, 4, 5, 6})
+
+
+def null_space_evidence(lam: FloatArray, p: int) -> bool:
+    """Prueba estructural de espacio nulo de §6 («Segundo canal de R1»), condición 2 de D1.
+
+    ``min(lambda) / max(lambda) <= 10·p·eps`` sobre el ``lambda`` de R (``is.k.lambda``). Con
+    ``max(lambda) <= 0`` (sin escala) no hay prueba y devuelve ``False`` (se exige todo).
+
+    Args:
+        lam: ``lambda`` de R del conjunto ``k`` (``detmrcd.R:70``).
+        p: Variables.
+
+    Returns:
+        ``True`` si hay prueba numérica del espacio nulo.
+    """
+    lam_max = float(np.max(lam))
+    if not lam_max > 0:
+        return False
+    return float(np.min(lam)) / lam_max <= 10 * p * EPS
+
+
+def r1_second_channel(
+    k: int, n: int, p: int, lam: FloatArray, *, reference: bool = REFERENCE_PLATFORM
+) -> bool:
+    """Regla D1 (enmienda 2026-10-09, §6 «Segundo canal de R1» y §11.1).
+
+    Las etapas de ``initset`` posteriores a ``is_lambda`` (``is_colmed``, ``is_estloc``,
+    ``is_centeredx``, ``is_dist``) y el orden ``is_ord`` se registran como ``DivergenciaR1`` en
+    lugar de fallar si y solo si: fuera de la plataforma de referencia, ``k`` no es exigido
+    (``required_sets(n, p)``) **y** hay prueba de espacio nulo (``null_space_evidence``).
+
+    Args:
+        k: Conjunto inicial (base 1).
+        n: Observaciones.
+        p: Variables.
+        lam: ``lambda`` de R del conjunto ``k``.
+        reference: ``True`` en la plataforma de referencia (allí nunca aplica).
+
+    Returns:
+        ``True`` si rige el registro en lugar del fallo.
+    """
+    if reference:
+        return False
+    return k not in required_sets(n, p) and null_space_evidence(lam, p)

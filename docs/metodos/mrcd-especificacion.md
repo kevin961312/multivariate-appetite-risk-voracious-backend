@@ -2,6 +2,21 @@
 
 ## Registro de cambios
 
+- **2026-10-09** — Paso 4 (validación en Linux): **enmienda de tolerancias fuera de la plataforma de
+  referencia**, decisión del dueño escrita **antes** de volver a comparar. Origen: dictamen del validador sobre
+  la etapa `gate` de Docker (Linux arm64 nativo y amd64 emulado; gcc + OpenBLAS + glibc), sin defecto del port.
+  (1) **D1:** segundo canal de R1 en los tests por etapa de `initset` (§6, «Segundo canal de R1»; fila nueva
+  en §11): con `k ∉ required_sets(n, p)` y `min(lambda)/max(lambda) ≤ 10·p·eps`, las etapas posteriores a
+  `is_lambda` y `is_ord` se registran como `DivergenciaR1`. (2) **D2:** con `target = equicorrelation`,
+  `r6.center`, `r6.scale`, `r6.x` y la `U` de OGK desde cero heredan la clase B de `mW` (filas `U` y `x` de
+  `doScale` de §11). (3) **D3:** casos sintéticos de `uniroot` con libm, solo en la referencia (fila nueva en
+  §11). (4) Dos defectos de test corregidos con clases ya declaradas (`test_etapas_bloque2.py:115`,
+  `test_zeroin.py:61`). Detalle y evidencia en **§11.1**; resumen en ADR 0006, enmienda 2026-10-09. En la
+  plataforma de referencia no cambia nada. **Pendiente de confirmar por el dueño:** por la letra de D3
+  («`tanh`, `cos`, `exp` u otra función de libm»), los casos `x^3 - 2` y `(x-0.3)^3` también son
+  solo-referencia, porque `r_pow` con exponente 3 llama a `pow` de libm (`_rbase.py:106`); el dictamen los
+  agrupaba con los aritméticos («poly…»). Se aplica la letra (más estricta en cobertura fuera, sin relajar
+  nada) salvo que el dueño diga otra cosa.
 - **2026-10-07** — M5, tarea T6: §3.12.9 alineada con el código implementado. (1) módulo real `pymrcd._qn_ext`
   (no `_qnc`) y API con búfer de salida `out`; (2) hilos por defecto resueltos en C; (3) fallo de `pthread_create`
   ⇒ `OSError` (decisión del dueño; sustituye a e.8); (4) `R_qsort`/`rPsort`/`whimed_i` se prueban contra la
@@ -1018,6 +1033,44 @@ la supera, lo registra como caso límite en lugar de relajar una tolerancia (dec
 Con D9, un conjunto exigido que difiera por `eigen` se registra con la diferencia de `P` medida. Para el
 régimen intermedio se añade el golden **C11 (60×40)**.
 
+**Segundo canal de R1: tests por etapa fuera de la plataforma de referencia (añadido 2026-10-09, decisión del
+dueño D1; Paso 4, validación en Linux).** La tabla anterior describe R1 **desde cero** (nivel iii), donde la
+divergencia entra por la base que `eigen` elige dentro del espacio nulo. Fuera de `REFERENCE_PLATFORM`
+(`packages/pymrcd/tests/fixtures_r.py:34`: macOS arm64), R1 tiene un segundo canal que alcanza también a los
+tests **por etapa** (nivel i), **aunque la `P` sea la de R**:
+
+- *Mecanismo.* Con p ≥ n, `SCM` (y `R1`–`R3`) tiene espacio nulo estructural (punto 1). Si la `P` de R lo
+  contiene, las columnas de `data %*% P` (`detmrcd.R:70`) correspondientes a esos autovectores son ruido de
+  redondeo, su Qn `lambda` es ≈ 5e-16 y `sqrtinvcov = P %*% (t(P) / lambda)` (`:72`) tiene entradas ~1e15. Una
+  diferencia de 1 ulp de BLAS (OpenBLAS frente a Accelerate) en `data %*% sqrtinvcov` (`:73`), en `estloc`
+  (`:73`, `dgemv`) o en `centeredx` (`:74`) queda amplificada por `1/lambda` y domina `dist` (`:75`); el orden
+  `sort.list(dist)` (`:75`) cambia. Es el mismo fenómeno de R1 (dependencia del redondeo dentro del espacio
+  nulo), no un defecto del port.
+- *Evidencia medida (2026-10-09, imagen Docker `gate`, gcc + OpenBLAS + glibc; Linux arm64 nativo y amd64
+  emulado).* Caso **C1, conjunto 4** (n = 50, p = 200): `dist` difiere hasta **6.9 %** relativo y `ord`
+  difiere en **20 de 25** posiciones; en amd64, `is_colmed` difiere **13.8** en relativo y `lambda` **0.195**
+  en **150** columnas (las del espacio nulo, p − n = 150); `min(lambda)/max(lambda) = 1.7e-16`.
+- *Regla (alcance exacto).* En los tests por etapa de `initset` (`test_etapas_bloque2.py:154`,
+  `test_initset_stages`) **fuera de la plataforma de referencia**, si y solo si se cumplen **las dos**
+  condiciones:
+  1. el conjunto `k` **no** pertenece a `required_sets(n, p)` (la misma regla del protocolo iii,
+     `test_extremo_a_extremo.py:85`, tabla anterior); **y**
+  2. hay **prueba estructural de espacio nulo**: `min(lambda) / max(lambda) ≤ 10·p·eps` sobre el `lambda` de R
+     (`is.k.lambda`, §10; en C1-4 vale 1.7e-16 frente a la cota 10·200·2.22e-16 = 4.4e-13),
+
+  entonces las etapas **posteriores a `is_lambda`** que dependen de `1/lambda` (`is_colmed`, `is_estloc`,
+  `is_centeredx`, `is_dist`) y el orden `is_ord` se **registran** como `DivergenciaR1` (aviso con el error
+  medido de cada una: máximo relativo, número de posiciones distintas en `ord`) en lugar de hacer fallar el test.
+  Se **siguen exigiendo** con su clase de §11: `is_proj` (B), `is_lambda` (E dada `is_proj` de R),
+  `is_sqrtcov` (B) e `is_sqrtinvcov` (B). Si falla cualquiera de las dos condiciones, todas las etapas se exigen
+  como hasta ahora (§11).
+- *En la plataforma de referencia no cambia nada:* allí las mismas etapas se siguen exigiendo con las clases de
+  §11 (bit a bit donde §11 lo dice), también para los conjuntos R1. Ninguna tolerancia se relaja; la regla
+  cambia el veredicto (fallo → aviso medido) solo cuando concurren el régimen R1 y la prueba numérica del
+  espacio nulo.
+- *Consecuencia de producto (ya declarada en ADR 0006, «Consecuencias»):* en Linux con p ≥ n el modelo puede
+  diferir del de macOS (`rrcov` mismo no es reproducible entre plataformas en ese régimen).
+
 ## 7. OGK con Qn para todo p: vectorización sin cambiar el método
 
 Coste: `p(p−1)` llamadas a Qn de longitud n (**[S6]** `n=40, p=600`: 6.9 s en R). Regla: se vectoriza **entre
@@ -1142,11 +1195,11 @@ siempre con tolerancia.
 | --- | --- | --- | --- | --- |
 | enteros (`h`, `hsets`, `index`, `best`, `iBest`, `n.csteps`, `numit`, `initV`, `setsV`, `ord`) | E | exacto | exacto (salvo R1, §6) | discretos |
 | medianas (`vmx`, centros de `doScale`, `colMedians`, `cutoffrho`) | E | **exacto** | exacto | selección + media de 2 en IEEE |
-| `Qn`, `vsd`, `r6.scale`, U de OGK | E | **exacto** (endurece 1e-14) | `vsd` y U exactos; `lambda` ver abajo | qn0 = restas, comparaciones, 2 operaciones finales |
+| `Qn`, `vsd`, `r6.scale`, U de OGK | E | **exacto** (endurece 1e-14) | `vsd` y U exactos; `lambda` ver abajo. **`target = equicorrelation` fuera de la referencia (D2, 2026-10-09):** `r6.scale` y la U calculada desde cero (`ogk_u` sobre la `x` de Python) heredan la clase **B** de `mW` (rtol 1e-12, atol `1e-14·max|ref|`), con la salvedad de la fila `lambda` (rtol 2^-23 si Qn salta a f32); `ogk_u(x de R)` sigue siendo E exacto | qn0 = restas, comparaciones, 2 operaciones finales; con equicorrelación la entrada `mW = mU %*% mQ` es `dgemm` (`detmrcd.R:432`) |
 | `lambda` de `initset` | E dada su entrada | exacto | **rtol 2^-23** (≈1.19e-7) si la proyección `data %*% P` no es bit a bit | T1/T2: Qn salta entre `d` y `f32(d)` ante cambios de 1 ulp; no es relajar el port sino la propiedad de qn0 |
-| `mU`, `x` de `doScale`, `x.nrmd`, `znorm`, rangos | E | **exacto** (endurece 1e-13) | exacto | resta/división/sqrt IEEE |
+| `mU`, `x` de `doScale`, `x.nrmd`, `znorm`, rangos | E | **exacto** (endurece 1e-13) | exacto. **`target = equicorrelation` fuera de la referencia (D2, 2026-10-09):** `r6.center`, `r6.scale` y `r6.x` calculados desde `mW` de Python heredan la clase **B** de `mW` (rtol 1e-12, atol `1e-14·max|ref|`; si `r6.scale` salta a f32, rtol 2^-23 en `r6.scale` y `r6.x`); `doScale(mW de R)` sigue siendo E exacto | resta/división/sqrt IEEE; con equicorrelación la entrada de `doScale` (`detmrcd.R:124`) es `mW = mU %*% mQ` (`:432`, clase B) |
 | `y1`, `cortmp_sin`, `y3` | L | rtol 1e-15 (`math.*`, AS241 portado) | idem | ≤ 4 ulp entre libm |
-| `R1`, `R2`, `R3`, `covx`, `constcor` | E (L si entra `y1`) | **exacto** sobre entradas de R (endurece 1e-12) | rtol 1e-12, atol 1e-14 | fórmula secuencial con el patrón FMA de cada rama (§3.12.4, §3.12.8) [S11] |
+| `R1`, `R2`, `R3`, `covx`, `constcor` | E (L si entra `y1`) | **exacto** sobre entradas de R (endurece 1e-12). Para `R1`, «entrada de R» es `r6.y1`: `r_cor(r6.y1 de R)` es E (como `test_intermedios_bloque1.py:78`); la clase L es la de `y1` y no se traslada a `R1` (corrección 2026-10-09 de `test_etapas_bloque2.py:115`) | rtol 1e-12, atol 1e-14 | fórmula secuencial con el patrón FMA de cada rama (§3.12.4, §3.12.8) [S11] |
 | `SCM` | B | rtol 1e-12, atol 1e-14 | idem | `dsyrk`; bit a bit con mismo BLAS |
 | productos `dgemm` (`proj`, `sqrtcov`, `mS`, `W`, `G`…) | B | rtol 1e-12, atol `1e-14·max|ref|` | idem | error de `dgemm` ≤ k·eps·(|A||B|) |
 | autovalores | B (también en el oráculo, D9) | atol `10·p·eps·λmax` (≤ 1e-10·λmax para p ≤ 4.5e4; endurece) | idem | `dsyevr` es estable hacia atrás: `O(p·eps·‖A‖)`. **[S12]** Accelerate vs Rlapack ≤ 5.2·eps·λmax (p ≤ 120) |
@@ -1154,6 +1207,8 @@ siempre con tolerancia.
 | `scfac` | L (tras D10) | **exacto en la plataforma de referencia** (nmath portado con las FMA de §3.12.8 y la libm del Mac, D10); **fuera de ella, rtol 1e-14** (otra libm en `lgamma`/`log`/`exp`, otro patrón FMA) | idem | scipy: medido 6.5e-15 [S5]; nmath portado: mismas operaciones y libm que R, de ahí la exactitud solo en la referencia |
 | `e1`, `ep` | B | atol `10·p·eps·λmax` | idem | autovalores |
 | `rho_k`, `rho` (uniroot o rejilla) | E dada `(e1,ep)` | **exacto** (endurece 1e-12) | atol 1e-12 | `R_zeroin2` es escalar puro |
+| `uniroot` sintético con libm (`root`, `f_root`, `f_lower`, `f_upper`) (D3, 2026-10-09) | L (`root`); `f_root` sin tolerancia declarada | **solo en la plataforma de referencia**, bit a bit; fuera de ella el caso se **salta** con motivo explícito | — | la función de prueba llama a libm; `f_root` sufre cancelación (5.4e-10 relativo con 1 ulp); ver nota D3 |
+| etapas de `initset` posteriores a `is_lambda` y `is_ord`, conjunto R1 con espacio nulo, fuera de la referencia (D1, 2026-10-09) | B amplificada por `1/lambda` | **registro** `DivergenciaR1` con error medido (no falla) si y solo si `k ∉ required_sets(n, p)` **y** `min(lambda)/max(lambda) ≤ 10·p·eps`; si no, su clase habitual | (nivel iii ya cubierto por §6) | segundo canal de R1 (§6); en la referencia, sin cambio |
 | `rcov`, `inv_rcov`, `vdst` de C-step | B | rtol 1e-12, atol `1e-14·max|ref|`; `vdst` rtol 1e-12 | idem | dgemm/dpotrf/dpotri con cond ≤ `maxcond` en espacio estandarizado |
 | `obj`/`det` por conjunto | B | rtol 1e-12 | rtol 1e-12 | |
 | `center` (target=0) | E dado `hindex` | **exacto** | exacto | `rowMeans` + escalado exacto (T9) |
@@ -1164,6 +1219,60 @@ siempre con tolerancia.
 Nota: el `atol` absoluto de `cov`/`icov` depende de la escala de los datos (con retornos ~1e-2, `icov` ~1e4);
 los fixtures deberían incluir datos de escala O(1) y otros de escala financiera, y el test debe informar el
 error relativo a `max|ref|` además del absoluto.
+
+### 11.1 Enmienda 2026-10-09: tolerancias fuera de la plataforma de referencia (Paso 4)
+
+**Decisión del dueño, 2026-10-09**, tomada tras el dictamen del validador estadístico sobre la etapa `gate` de la
+imagen Docker (Linux arm64 nativo y amd64 emulado; gcc + OpenBLAS + glibc) y **escrita antes de volver a
+comparar**. Principio sin cambios: en la plataforma de referencia (`REFERENCE_PLATFORM`,
+`packages/pymrcd/tests/fixtures_r.py:34`; P6) **no se relaja nada** y se sigue exigiendo bit a bit donde la tabla
+lo dice. Fuera de ella rigen las clases de la tabla; esta enmienda declara tres casos que no tenían regla y
+registra dos defectos de test que se corrigen con clases **ya declaradas**. El validador no encontró ningún
+defecto del port.
+
+**Defectos de test (se corrigen con las clases existentes, sin regla nueva):**
+- `test_etapas_bloque2.py:115` comparaba `set1_matrix(x)` contra `r6_R1` con la clase **L** de `y1` (fila
+  `y1`). Lo declarado es la fila `R1`: **E sobre entradas de R**, es decir, `r_cor(r6.y1 de R)` exacto; `y1`
+  se prueba aparte con L (ya lo hace `test_intermedios_bloque1.py:77-78`).
+- `test_zeroin.py:61` comparaba `root` como **E** en casos cuya función usa libm. Por la definición de la clase
+  L («dependen de libm», inicio de §11) `root` es **L** en esos casos; queda cubierto por D3.
+
+**D1 — R1 en los tests por etapa fuera de la referencia.** Mecanismo, evidencia (C1-4, n = 50, p = 200: `dist`
+hasta 6.9 %, `ord` distinto en 20/25; amd64: `is_colmed` 13.8 relativo, `lambda` 0.195 en 150 columnas;
+`min(lambda)/max(lambda)` = 1.7e-16) y regla completa en **§6, «Segundo canal de R1»**. Alcance:
+`test_initset_stages` (`test_etapas_bloque2.py:154`); cantidades `is_colmed`, `is_estloc`, `is_centeredx`,
+`is_dist`, `is_ord`; condición: fuera de la referencia **y** `k ∉ required_sets(n, p)`
+(`test_extremo_a_extremo.py:85`) **y** `min(lambda)/max(lambda) ≤ 10·p·eps`. Efecto: aviso `DivergenciaR1` con
+la medición en lugar de fallo. Se siguen exigiendo `is_proj` (B), `is_lambda` (E), `is_sqrtcov` e
+`is_sqrtinvcov` (B). En la referencia: sin cambio.
+
+**D2 — `target = equicorrelation`.** *Mecanismo:* la entrada de `doScale` en `r6pack` (`detmrcd.R:124`) es
+`mW = mU %*% mQ %*% misqL` (`:432`); el producto `mU %*% mQ` es `dgemm` (clase B, fila de productos `dgemm`),
+así que fuera de la referencia `mW` puede diferir en ulps y todo lo que se calcula desde cero a partir de él
+hereda esa clase. *Evidencia medida (amd64, caso C8_eq):* `r6_x` 7.29e-16·max, `r6_U` 6.55e-15·max (dentro de
+B). *Alcance:* `r6.center`, `r6.scale`, `r6.x` y la `U` de OGK calculados desde cero en la cadena con
+equicorrelación → **B** (rtol 1e-12, atol `1e-14·max|ref|`), con la salvedad de la fila `lambda`: si un Qn
+(`r6.scale` o un elemento de `U`) salta entre `d` y `f32(d)` por la diferencia de entrada, rtol **2^-23** en esa
+cantidad y en las que la dividen (`r6.x`). *Sin cambio:* con entradas de R (`doScale(mW de R)`,
+`ogk_u(r6.x de R)`) siguen siendo **E exactos** en cualquier plataforma (Qn en C no depende de libm ni de BLAS,
+ADR 0006 enmienda 2026-10-07 punto 7). Con `target = identity` no cambia nada (`mU` es E). En la referencia:
+sin cambio.
+
+**D3 — funciones sintéticas trascendentales de `uniroot`.** *Mecanismo:* los casos sintéticos de
+`test_zeroin.py` (`_NAMED`, `test_zeroin.py:25-36`) cuya función llama a libm (`math.cos`, `math.exp`,
+`math.tanh` u otra; fuera de la referencia la libm es glibc, no la del Mac) evalúan `f` con otros bits; `root`
+pasa a ser L y `f_root`, evaluado junto a la raíz, sufre **cancelación**: con 1 ulp de diferencia en `root` se
+midió **5.4e-10 relativo**, y no hay tolerancia declarada para él. *Regla:* esos casos son **solo de la
+plataforma de referencia** (allí, bit a bit: `root`, `f_root`, `iter`, `estim_prec`, `f_lower`, `f_upper`);
+fuera de ella se **saltan** con motivo explícito (D3). *Por qué no se pierde cobertura:* la fidelidad de
+`R_zeroin2` fuera de la referencia la cubren los **38 casos `fncond` reales** (`detmrcd.R:479-484`; dan 0 bits
+distintos en Linux) y los sintéticos puramente aritméticos, que se siguen exigiendo como E en todas las
+plataformas. Si alguna vez se compara `root` de un caso con libm fuera de la referencia, su clase es **L**.
+*Precisión de alcance:* `r_pow` con exponente distinto de 2 llama a `pow` de libm
+(`packages/pymrcd/src/pymrcd/_rbase.py:106`, port de `R_pow`), así que por la letra de la regla los casos
+`x^3 - 2` y `(x-0.3)^3 (raiz triple)` son de libm y quedan **solo en la referencia**; son puramente aritméticos
+`x*x - 2`, `3*x - 1`, `x - 1e-5`, `x*x + 1` y `1/x - 7` (`r_pow` con `y == 2` es `x*x`, `_rbase.py:94-95`).
+Ver pregunta abierta en el registro de cambios.
 
 ## 12. Preguntas abiertas
 

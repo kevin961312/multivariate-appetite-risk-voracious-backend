@@ -8,7 +8,7 @@ from collections.abc import Callable
 import numpy as np
 import pytest
 
-from fixtures_r import Case, assert_r_equal, case_params
+from fixtures_r import REFERENCE_PLATFORM, Case, assert_r_equal, case_params
 from pymrcd._errors import RError
 from pymrcd._rbase import r_pow
 from pymrcd._rzeroin import UNIROOT_TOL, _fcn2, r_uniroot, r_zeroin2
@@ -36,6 +36,25 @@ _NAMED: dict[str, Callable[[float], float]] = {
 }
 
 
+_LIBM: frozenset[str] = frozenset(
+    {
+        "x^3 - 2",  # r_pow(x, 3) -> pow de libm (_rbase.py, R_pow)
+        "cos(x) - x",
+        "exp(x) - 5",
+        "(x-0.3)^3 (raiz triple)",  # r_pow(·, 3) -> pow de libm
+        "tanh(x) - 0.5",
+    }
+)
+"""Casos sintéticos cuya función llama a libm: solo en la plataforma de referencia (D3).
+
+Enmienda 2026-10-09 (especificación §11, fila «``uniroot`` sintético con libm», y §11.1 D3;
+ADR 0006): fuera de la referencia ``root`` sería L y ``f_root`` sufre cancelación sin tolerancia
+declarada. Por la letra de la regla («u otra función de libm») incluye ``x^3`` vía ``r_pow``.
+Los aritméticos puros (``x*x - 2``, ``3*x - 1``, ``x - 1e-5``, ``x*x + 1``, ``1/x - 7``) y los
+``fncond`` reales se exigen en todas las plataformas.
+"""
+
+
 def _function(case: Case) -> Callable[[float], float]:
     if "e1" in case.inputs:
         return _fncond(
@@ -47,6 +66,13 @@ def _function(case: Case) -> Callable[[float], float]:
 @pytest.mark.parametrize("case", case_params("uniroot"))
 def test_uniroot(case: Case) -> None:
     f = _function(case)
+    name = None if "e1" in case.inputs else str(case.extra["f"])
+    if name in _LIBM and not REFERENCE_PLATFORM:
+        pytest.skip(
+            f"{case.id} ({name}): función sintética con libm, solo en la plataforma de referencia "
+            "(D3, enmienda 2026-10-09, especificación §11.1; root sería L y f_root sufre "
+            "cancelación sin tolerancia declarada)"
+        )
     lower = case.inputs["lower"].item() if "lower" in case.inputs else float(case.extra["lower"])
     upper = case.inputs["upper"].item() if "upper" in case.inputs else float(case.extra["upper"])
     path = int(case.outputs["path"].item())
@@ -58,7 +84,9 @@ def test_uniroot(case: Case) -> None:
             r_uniroot(f, lower, upper)
         return
     res = r_uniroot(f, lower, upper)
-    assert_r_equal(res.root, case.outputs["root"].item(), "E", case.id)
+    # root es L si la función usa libm (§11.1); los casos con libm solo llegan aquí en la
+    # referencia (bit a bit) y los aritméticos y fncond no dependen de libm.
+    assert_r_equal(res.root, case.outputs["root"].item(), "L", case.id)
     assert_r_equal(res.f_root, case.outputs["f_root"].item(), "E", case.id)
     assert res.iter == int(case.outputs["iter"].item())
     assert_r_equal(res.estim_prec, case.outputs["estim_prec"].item(), "E", case.id)
