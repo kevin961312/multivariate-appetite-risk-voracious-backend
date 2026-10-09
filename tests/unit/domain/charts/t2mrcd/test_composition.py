@@ -179,9 +179,11 @@ def test_without_automatic_depuration_the_base_keeps_every_row_also_when_p_gt_n(
     """Decisión del dueño (2026-10-09): sin cascada; con p > n (30 x 40) la base son las 30 filas.
 
     Con la depuración automática iterativa la base se encogía en cada ronda (MRCD deja fuera un
-    25 % de lo que recibe) y no convergía. En este caso 4 filas superan el límite de Fase I (la
-    depuración las habría quitado y habría repetido); ahora siguen en la base, y las filas fuera
-    de ``best`` solo no entran en la estimación ni en el bootstrap.
+    25 % de lo que recibe) y no convergía. En este caso hay filas que superan el límite de Fase I
+    (la depuración las habría quitado y habría repetido); ahora siguen en la base, y las filas
+    fuera de ``best`` solo no entran en la estimación ni en el bootstrap. Cuántas lo superan
+    depende de la plataforma con p > n (R1, ADR 0006): en macOS arm64 son 4 y en Linux x86-64 2,
+    así que el test no fija el número.
     """
     x = np.random.default_rng(30).normal(size=(30, 40))
     model = T2MRCDChart().fit_phase1(x, fast_params(), mapper=MAPPER)
@@ -189,7 +191,9 @@ def test_without_automatic_depuration_the_base_keeps_every_row_also_when_p_gt_n(
     assert bool(model.base_mask.all())
     assert set(model.row_disposition) == {RowDisposition.KEPT}
     assert int(model.clean_mask.sum()) == model.mrcd.h < 30
-    assert int(model.historical_outlier.sum()) == 4
+    above = int(model.historical_outlier.sum())
+    assert 0 < above < 30
+    assert int(model.historical_outlier[model.base_mask].sum()) == above
 
 
 @pytest.mark.parametrize("name", sorted(RECALIBRATION))
