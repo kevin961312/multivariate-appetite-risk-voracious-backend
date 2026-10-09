@@ -1,8 +1,9 @@
 """Pasos de la Fase I de T²MRCD bajo ``/v1/charts/t2mrcd`` (vuelta 3.3, ADR 0005 enmendado).
 
 APIs independientes y encadenables por id, cada una con su trabajo asíncrono y su carril:
-``/fits`` (MRCD bajo la carta, ``alpha`` 0.75 por defecto) → ``/limits`` → ``/depurations`` →
-``/models`` (solo referencias). ``/pipelines/phase1`` encadena los mismos pasos (orquestación
+(opcional) ``/exclusions`` (exclusión humana) → ``/fits`` (MRCD bajo la carta, ``alpha`` 0.75
+por defecto) → ``/limits`` → ``/models`` (solo referencias). Sin depuración automática iterativa
+(decisión del dueño, 2026-10-09). ``/pipelines/phase1`` encadena los mismos pasos (orquestación
 pura). Cada ``POST`` responde ``202`` con el id y se consulta con ``GET``. Solo traducen HTTP ↔
 casos de uso.
 """
@@ -14,9 +15,9 @@ from fastapi import APIRouter, Depends, Query, status
 from voracious.api.deps import get_container
 from voracious.api.schemas.common import AcceptedJob, ErrorResponse
 from voracious.api.schemas.t2mrcd_phase1 import (
-    DepurationInclude,
-    DepurationRequest,
-    DepurationResponse,
+    ExclusionInclude,
+    ExclusionRequest,
+    ExclusionResponse,
     FitInclude,
     FitRequest,
     FitResponse,
@@ -96,9 +97,8 @@ def request_limits(body: LimitsRequest, tenant: TenantDep, c: ContainerDep) -> A
     """Valida el ajuste y encola la calibración de límites (carril ``calibration``).
 
     Con ``recalibration_id`` (filas nuevas o base ampliada de una recalibración) los parámetros
-    se heredan de la versión base y el linaje es ``new_rows`` o ``extension``. Sin él, sobre un
-    dataset derivado de una ronda automática se heredan de los límites que lo produjeron.
-    Las decisiones pendientes responden ``422`` aquí, antes de encolar.
+    se heredan de la versión base y la operación es ``new_rows`` o ``extension``; sin él,
+    ``params`` es obligatorio. Las decisiones pendientes responden ``422`` aquí, antes de encolar.
 
     Args:
         body: Ajuste y parámetros de la carta (o la recalibración).
@@ -139,60 +139,55 @@ def get_limits(
 
 
 @router.post(
-    "/depurations",
+    "/exclusions",
     status_code=status.HTTP_202_ACCEPTED,
     response_model=AcceptedJob,
     tags=["t2mrcd-phase1"],
 )
-def request_depuration(body: DepurationRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
-    """Valida y encola una depuración (exclusión humana o ronda automática).
+def request_exclusion(body: ExclusionRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+    """Valida y encola una exclusión humana (sin ajuste; carril ``light``).
 
-    Exclusión humana ``{dataset_id, assignable_cause}`` (sin ajuste, solo al principio) o ronda
-    automática ``{fit_id, limits_id}``. Sobre las candidatas de una recalibración la exclusión
-    humana sale de las anotaciones: se pide con ``{dataset_id}`` solo.
+    ``{dataset_id, assignable_cause}`` sobre el dataset subido (Fase I). Sobre las candidatas de
+    una recalibración las filas salen de las anotaciones: se pide con ``{dataset_id}`` solo.
 
     Args:
-        body: Dataset y filas con causa asignable, o ajuste y límites.
+        body: Dataset y filas con causa asignable.
         tenant: Tenant.
         c: Contenedor.
 
     Returns:
-        El ``id`` de la depuración, ``queued``.
+        El ``id`` de la exclusión, ``queued``.
     """
     return AcceptedJob(
-        id=c.use_cases.request_depuration.execute(
+        id=c.use_cases.request_exclusion.execute(
             tenant,
             CHART_ID,
-            dataset_id=body.dataset_id,
-            fit_id=body.fit_id,
-            limits_id=body.limits_id,
-            assignable_cause=[a.to_record() for a in body.assignable_cause],
+            body.dataset_id,
+            [a.to_record() for a in body.assignable_cause],
         )
     )
 
 
-@router.get(
-    "/depurations/{depuration_id}", response_model=DepurationResponse, tags=["t2mrcd-phase1"]
-)
-def get_depuration(
-    depuration_id: str,
+@router.get("/exclusions/{exclusion_id}", response_model=ExclusionResponse, tags=["t2mrcd-phase1"])
+def get_exclusion(
+    exclusion_id: str,
     tenant: TenantDep,
     c: ContainerDep,
-    include: Annotated[list[DepurationInclude] | None, Query()] = None,
-) -> DepurationResponse:
-    """Estado de la depuración (M3: destino por fila con ``include=row_disposition``).
+    include: Annotated[list[ExclusionInclude] | None, Query()] = None,
+) -> ExclusionResponse:
+    """Estado de la exclusión (M3: destino por fila con ``include=row_disposition``).
 
     Args:
-        depuration_id: Depuración.
+        exclusion_id: Exclusión.
         tenant: Tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
-        La depuración.
+        La exclusión.
     """
-    record = c.use_cases.get_depuration.execute(tenant, CHART_ID, depuration_id)
-    return DepurationResponse.of(record, include or ())
+    record = c.use_cases.get_exclusion.execute(tenant, CHART_ID, exclusion_id)
+    return ExclusionResponse.of(record, include or ())
 
 
 @router.post(
@@ -205,7 +200,7 @@ def request_model(body: ModelFromRefsRequest, tenant: TenantDep, c: ContainerDep
     """Encola el ensamblado del modelo a partir de referencias (sin datos ni cómputo nuevo).
 
     Args:
-        body: ``{depuration_id}`` o ``{fit_id, limits_id}`` y política.
+        body: ``{fit_id, limits_id}`` y política.
         tenant: Tenant.
         c: Contenedor.
 
@@ -217,7 +212,6 @@ def request_model(body: ModelFromRefsRequest, tenant: TenantDep, c: ContainerDep
         id=c.use_cases.request_model.execute(
             tenant,
             CHART_ID,
-            depuration_id=body.depuration_id,
             fit_id=body.fit_id,
             limits_id=body.limits_id,
             lifecycle_policy=policy,

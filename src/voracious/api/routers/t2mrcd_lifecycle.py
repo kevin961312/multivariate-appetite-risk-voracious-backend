@@ -4,7 +4,7 @@ Solo traducen HTTP ↔ casos de uso: ninguna lógica estadística ni de ciclo de
 cómputo responden ``202`` con el identificador y se consultan con ``GET`` (estado
 ``queued | running | succeeded | failed``); los comandos sin cómputo responden ``201``/``200``.
 La recalibración paso a paso (vuelta 3.4) abre su sesión con ``201`` y se encadena por id con
-``/fits``, ``/limits``, ``/depurations``, ``…/comparisons`` y ``…/versions``.
+``/exclusions``, ``/fits``, ``/limits``, ``…/comparisons`` y ``…/versions``.
 ``POST /models`` (solo referencias) está en ``t2mrcd_phase1.py`` con el resto de los pasos de la
 Fase I; aquí queda la consulta del modelo y su ciclo de vida.
 """
@@ -467,7 +467,7 @@ def request_comparison(
 
     Args:
         model_id: Modelo.
-        body: Recalibración y depuración final de las filas nuevas.
+        body: Recalibración, ajuste y límites de las filas nuevas conservadas.
         tenant: Tenant.
         c: Contenedor.
 
@@ -475,7 +475,12 @@ def request_comparison(
         El ``id`` de la comparación, ``queued``.
     """
     comparison_id = c.use_cases.request_comparison.execute(
-        tenant, CHART_ID, model_id, body.recalibration_id, body.depuration_id
+        tenant,
+        CHART_ID,
+        model_id,
+        body.recalibration_id,
+        fit_id=body.fit_id,
+        limits_id=body.limits_id,
     )
     return AcceptedJob(id=comparison_id)
 

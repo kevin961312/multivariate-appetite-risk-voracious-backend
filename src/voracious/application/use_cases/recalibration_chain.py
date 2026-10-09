@@ -2,13 +2,13 @@
 
 La recalibración es la **sesión** de sus pasos: al pedirla se fijan las candidatas (en orden),
 los parámetros heredados (Q8) y el dataset ``recalibration_candidates``. Los pasos de la Fase I
-(ajuste, límites y depuración) reconocen que un dataset es de una recalibración por su raíz y le
-piden aquí lo propio de ella: la sesión en curso, la exclusión humana (de las anotaciones), los
-límites de la depuración (``max_depuration_rounds`` y ``min_observations``) y el cierre
-``insufficient`` cuando la depuración se agota.
+(exclusión humana, ajuste y límites) reconocen que un dataset es de una recalibración por su raíz y
+le piden aquí lo propio de ella: la sesión en curso, la exclusión humana (de las anotaciones), el
+mínimo de filas (``min_observations``) y el cierre ``insufficient`` cuando la exclusión humana deja
+menos.
 
-``candidate_outcome`` reconstruye, a partir del linaje de datasets y depuraciones, el destino de
-cada candidata, las anotaciones que excluyeron filas y las rondas, igual que la depuración de
+``candidate_outcome`` reconstruye, a partir del linaje del dataset y de su exclusión humana, el
+destino de cada candidata y las anotaciones que excluyeron filas, igual que
 ``ControlChart.recalibrate``.
 """
 
@@ -22,7 +22,7 @@ from voracious.application.errors import (
 )
 from voracious.application.ports import (
     Clock,
-    DepurationRepository,
+    ExclusionRepository,
     ModelVersionRepository,
     RecalibrationRepository,
     SignalAnnotationRepository,
@@ -34,23 +34,19 @@ from voracious.application.recalibration_steps import (
 from voracious.application.records import (
     AssignableCause,
     DatasetRecord,
-    DepurationRecord,
-    IndexVector,
+    ExclusionRecord,
     JobStatus,
     RecalibrationRecord,
 )
 from voracious.application.use_cases.common import get_version
-from voracious.application.use_cases.steps import (
-    RecalibrationLinks,
-    get_depuration,
-    root_indices,
-)
+from voracious.application.use_cases.steps import RecalibrationLinks, get_exclusion
 from voracious.domain.common import RecalibrationDecision, RowDisposition
 
 __all__ = [
     "CandidateOutcome",
     "RecalibrationChain",
     "candidate_outcome",
+    "exclusion_outcome",
     "get_recalibration",
     "open_session",
 ]
@@ -113,85 +109,58 @@ def open_session(record: RecalibrationRecord) -> RecalibrationRecord:
 
 @dataclass(frozen=True)
 class CandidateOutcome:
-    """Destino de las candidatas según el linaje de la depuración de las filas nuevas.
+    """Destino de las candidatas según su exclusión humana.
 
     Attributes:
         dispositions: Destino de cada candidata (``kept`` o excluida), en orden.
-        annotation_ids: Fila de candidatas → anotación que la excluyó (exclusión humana).
-        rounds: Rondas de depuración automática que quitaron filas (como ``recalibrate``).
+        annotation_ids: Fila de candidatas → anotación que la excluyó.
     """
 
     dispositions: tuple[RowDisposition, ...]
     annotation_ids: dict[int, str]
-    rounds: int
 
 
-def _apply(
-    depuration: DepurationRecord,
-    rows: IndexVector,
-    dispositions: list[RowDisposition],
-    annotation_ids: dict[int, str],
-) -> bool:
-    """Vuelca el resultado de una depuración sobre las candidatas.
+def exclusion_outcome(exclusion: ExclusionRecord | None, n_candidates: int) -> CandidateOutcome:
+    """Destino de las candidatas según una exclusión humana terminada (o ninguna).
 
     Args:
-        depuration: Depuración terminada.
-        rows: Índices en las candidatas de las filas de su dataset.
-        dispositions: Destinos (se modifican).
-        annotation_ids: Anotaciones de las excluidas por una persona (se modifican).
+        exclusion: Exclusión de las candidatas, o ``None`` si no la hubo (se conservan todas).
+        n_candidates: Número de candidatas.
 
     Returns:
-        ``True`` si quitó filas de forma automática.
+        El destino de las candidatas.
     """
-    removed = False
-    for i, disposition in enumerate(depuration.result or ()):
-        if disposition is not RowDisposition.KEPT:
-            dispositions[int(rows[i])] = disposition
-        removed |= disposition is RowDisposition.EXCLUDED_AUTOMATIC
-    for cause in depuration.assignable_cause:
-        if cause.annotation_id is not None:
-            annotation_ids[int(rows[cause.row])] = cause.annotation_id
-    return removed
+    if exclusion is None or exclusion.result is None:
+        return CandidateOutcome((RowDisposition.KEPT,) * n_candidates, {})
+    annotation_ids = {
+        cause.row: cause.annotation_id
+        for cause in exclusion.assignable_cause
+        if cause.annotation_id is not None
+    }
+    return CandidateOutcome(tuple(exclusion.result), annotation_ids)
 
 
 def candidate_outcome(
-    depurations: DepurationRepository,
-    chart_id: str,
-    chain: Sequence[DatasetRecord],
-    final: DepurationRecord | None,
+    exclusions: ExclusionRepository, chart_id: str, chain: Sequence[DatasetRecord]
 ) -> CandidateOutcome:
-    """Destino de cada candidata a partir de la ascendencia del último dataset depurado.
+    """Destino de cada candidata a partir de la ascendencia del dataset de las filas nuevas.
 
-    Cada dataset derivado de la cadena guarda la depuración que lo creó (``origin_ref``); la
-    depuración ``final`` (si se pasa y no creó dataset: agotada o final) se aplica sobre el
-    último. Las rondas son las del último dataset más la ronda que agotó la depuración, si la
-    agotó una ronda automática (igual que ``depurate`` del dominio).
+    Si el dataset deriva de la exclusión humana de las candidatas (``origin_ref``), se aplica su
+    resultado; si es el propio dataset de candidatas, se conservan todas.
 
     Args:
-        depurations: Repositorio de depuraciones.
+        exclusions: Repositorio de exclusiones.
         chart_id: Carta.
         chain: Ascendencia desde el dataset de candidatas.
-        final: Depuración que cierra la cadena, o ``None``.
 
     Returns:
         El destino de las candidatas.
     """
     first = chain[0]
-    indices = root_indices(chain)
-    dispositions = [RowDisposition.KEPT] * first.data.shape[0]
-    annotation_ids: dict[int, str] = {}
-    applied: set[str] = set()
-    for parent_rows, derived in zip(indices[:-1], chain[1:], strict=True):
-        if derived.origin_ref is None:
-            continue
-        depuration = get_depuration(depurations, first.tenant_id, chart_id, derived.origin_ref)
-        _apply(depuration, parent_rows, dispositions, annotation_ids)
-        applied.add(depuration.depuration_id)
-    rounds = chain[-1].lineage_round
-    if final is not None and final.depuration_id not in applied:
-        removed = _apply(final, indices[-1], dispositions, annotation_ids)
-        rounds += 1 if final.exhausted and removed else 0
-    return CandidateOutcome(tuple(dispositions), annotation_ids, rounds)
+    exclusion = None
+    if len(chain) > 1 and chain[-1].origin_ref is not None:
+        exclusion = get_exclusion(exclusions, first.tenant_id, chart_id, chain[-1].origin_ref)
+    return exclusion_outcome(exclusion, first.data.shape[0])
 
 
 @dataclass(frozen=True)
@@ -203,7 +172,6 @@ class RecalibrationChain:
         recalibrations: Repositorio de recalibraciones.
         versions: Repositorio de versiones (la versión base del informe).
         annotations: Anotaciones (exclusión humana).
-        depurations: Repositorio de depuraciones (linaje del informe).
         clock: Reloj.
     """
 
@@ -211,7 +179,6 @@ class RecalibrationChain:
     recalibrations: RecalibrationRepository
     versions: ModelVersionRepository
     annotations: SignalAnnotationRepository
-    depurations: DepurationRepository
     clock: Clock
 
     def session_for(
@@ -258,35 +225,29 @@ class RecalibrationChain:
                 out.append(AssignableCause(row, annotation.cause, annotation.annotation_id))
         return tuple(out)
 
-    def bounds(self, session: RecalibrationRecord) -> tuple[int, int]:
-        """``(max_rounds, min_rows)`` de la depuración de las filas nuevas.
+    def min_observations(self, session: RecalibrationRecord) -> int:
+        """Mínimo de filas nuevas conservadas tras la exclusión humana.
 
         Args:
             session: Recalibración.
 
         Returns:
-            Las cotas.
+            El mínimo.
         """
         steps = resolve_recalibration_steps(self.recalibration_steps, session.chart_id)
-        return steps.depuration_bounds(session.params)
+        return steps.min_observations(session.params)
 
-    def close_insufficient(
-        self,
-        session: RecalibrationRecord,
-        chain: Sequence[DatasetRecord],
-        final: DepurationRecord,
-    ) -> None:
+    def close_insufficient(self, session: RecalibrationRecord, exclusion: ExclusionRecord) -> None:
         """Cierra la recalibración ``succeeded / insufficient`` con su informe (sin versión).
 
         Args:
             session: Recalibración.
-            chain: Ascendencia del dataset depurado.
-            final: Depuración agotada (con su resultado).
+            exclusion: Exclusión de las candidatas (con su resultado).
         """
         steps = resolve_recalibration_steps(self.recalibration_steps, session.chart_id)
         key = (session.tenant_id, session.chart_id, session.model_id)
         active = get_version(self.versions, *key, session.base_version_number)
-        outcome = candidate_outcome(self.depurations, session.chart_id, chain, final)
+        outcome = exclusion_outcome(exclusion, len(session.candidate_ids))
         report = steps.report(
             active.model,
             decision=RecalibrationDecision.INSUFFICIENT,
@@ -294,8 +255,6 @@ class RecalibrationChain:
             n_base=int(active.base_data.shape[0]),
             new_dispositions=outcome.dispositions,
             recalibration_params=session.params,
-            depuration_rounds=outcome.rounds,
-            depuration_converged=None,
             comparison=None,
             model=None,
         )

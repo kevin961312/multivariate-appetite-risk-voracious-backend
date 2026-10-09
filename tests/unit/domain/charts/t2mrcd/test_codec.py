@@ -9,6 +9,7 @@ from support.bits import canonical
 from support.composition_cases import active_case, recalibration_cases
 from voracious.domain.charts.t2mrcd import (
     MODEL_FORMAT_VERSION,
+    REPORT_FORMAT_VERSION,
     T2MRCDChart,
     T2MRCDModel,
     T2MRCDRecalibrationReport,
@@ -121,6 +122,33 @@ def test_unknown_missing_and_versioned_fields_are_errors(
     with pytest.raises(InvalidInputError) as info:
         CHART.decode_report({**report, "extra": None})
     assert info.value.details["reason"] == "unknown_fields"
+
+
+def test_format_1_with_depuration_fields_is_rejected_by_its_version(
+    outcomes: tuple[T2MRCDModel, np.ndarray, dict[str, RecalibrationOutcome]],
+) -> None:
+    """Registros anteriores a quitar la depuración automática (dueño, 2026-10-09)."""
+    assert MODEL_FORMAT_VERSION == REPORT_FORMAT_VERSION == 2
+    legacy_model = {
+        **CHART.encode_model(outcomes[0]),
+        "format_version": 1,
+        "depuration_rounds": 0,
+        "depuration_converged": True,
+        "final_depuration_skipped": False,
+    }
+    with pytest.raises(InvalidInputError) as info:
+        CHART.decode_model(legacy_model)
+    assert info.value.details["reason"] == "unknown_format_version"
+    legacy_report = {
+        **CHART.encode_report(outcomes[2]["extend"].report),
+        "format_version": 1,
+        "n_excluded_automatic": 0,
+        "depuration_rounds": 0,
+        "depuration_converged": True,
+    }
+    with pytest.raises(InvalidInputError) as info:
+        CHART.decode_report(legacy_report)
+    assert info.value.details["reason"] == "unknown_format_version"
 
 
 def test_encode_report_checks_its_type() -> None:

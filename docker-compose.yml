@@ -1,0 +1,65 @@
+# Voracious con Docker Compose (Paso 4.1): hoy solo la API, con el estado en el proceso.
+#   docker compose up -d --build
+#   docker compose ps          # salud del servicio
+# La API escucha solo en 127.0.0.1 del anfitrión: no se expone a la red. Para usarla desde otra
+# máquina, túnel SSH (ssh -L 8000:127.0.0.1:8000 usuario@servidor).
+# La imagen se construye en local y no se publica en ningún registro (pymrcd es GPL-3.0-or-later).
+
+name: voracious
+
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    image: voracious:local
+    init: true
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:8000:8000"
+    # .env opcional (plantilla en .env.example); sin él valen los valores de abajo y los de config.py.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      VORACIOUS_STORAGE: local
+      VORACIOUS_STORAGE_DIR: /data/datasets
+    volumes:
+      - datasets:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4); sys.exit(0 if r.status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # M7: límites modestos para un servidor de 2 vCPU y 3.7 GiB (perfil en .env.example). Con la cola
+    # en el proceso, la memoria crece con los trabajos en curso y los datasets en memoria.
+    mem_limit: 2g
+    memswap_limit: 2g
+    cpus: 1.5
+    pids_limit: 512
+
+  # --- Llegan en 4.2 / después (ADR 0001: un adaptador nuevo + una variable de configuración) ------
+  # postgres:      # 4.2: ModelRepository y demás repositorios en Postgres (TimescaleDB), con backup.
+  #   image: timescale/timescaledb:<versión fijada por digest>
+  #   ports: no se publica; solo red interna de compose.
+  #   volumes: [pgdata:/var/lib/postgresql/data]
+  # redis:         # después: broker de la cola distribuida (CeleryJobQueue).
+  #   image: redis:<versión fijada por digest>
+  # worker:        # después: workers de Celery con la misma imagen runtime.
+  #   command: [celery, ...]
+
+volumes:
+  datasets:

@@ -1,14 +1,13 @@
-"""Depuración, decisión e informe de la recalibración de T²MRCD (``docs/metodos/t2mrcd.md``).
+"""Decisión e informe de la recalibración de T²MRCD (``docs/metodos/t2mrcd.md``).
 
-Decisiones del dueño (2026-10-07):
+Decisiones del dueño:
 
-- **Q3, depuración:** primero la exclusión humana (filas con causa asignable confirmada); después la
-  automática iterativa: ajuste + límites de Fase I por bootstrap, quitar las filas con
-  ``T² > límite de Fase I``, repetir. Se aplica a la versión inicial y a las filas nuevas.
-- **Q5:** como mucho ``max_depuration_rounds`` rondas (5, parámetro técnico); si no converge se
-  sigue con ``converged = False`` en el informe.
-- **Mínimo de filas:** ``min_observations = 25`` (documento del dueño), sin regla por variable; por
-  debajo, ``INSUFFICIENT``: no se crea modelo ni se lanza excepción.
+- **Sin depuración automática iterativa (2026-10-09):** las filas nuevas pasan solo por la
+  exclusión humana (anotaciones con causa asignable confirmada); después se recalibra como una
+  Fase I, en una sola pasada. Quitar las filas con ``T² > límite`` y repetir no converge: MRCD no
+  es «de composición» y al reducir la base vuelve a dejar fuera un 25 %.
+- **Mínimo de filas:** ``min_observations = 25`` (documento del dueño, 2026-10-07), sin regla por
+  variable; por debajo, ``INSUFFICIENT``: no se crea modelo ni se lanza excepción.
 - **Q4:** Frobenius relativa con umbral parametrizable (0.10), informativo por defecto
   (``threshold_decides = False``); deciden las pruebas formales de S y de μ (pendientes) con la
   regla «cualquiera». Con ``threshold_decides = True`` el umbral también decide.
@@ -17,9 +16,8 @@ Decisiones del dueño (2026-10-07):
 - **Q9:** «límite de Fase II > límite de Fase I» es un diagnóstico del informe, no una invariante.
 """
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final, Protocol
+from typing import Final
 
 import numpy as np
 
@@ -33,29 +31,16 @@ from voracious.domain.charts.t2mrcd.comparison import (
     frobenius_relative_change,
 )
 from voracious.domain.charts.t2mrcd.model import LimitRegime, T2MRCDModel
-from voracious.domain.charts.t2mrcd.params import DEFAULT_MAX_DEPURATION_ROUNDS, _is_int
-from voracious.domain.common import (
-    BoolVector,
-    FloatMatrix,
-    FloatVector,
-    InvalidInputError,
-    RecalibrationDecision,
-    RowDisposition,
-)
-from voracious.domain.estimators.mrcd import IndexVector
+from voracious.domain.charts.t2mrcd.params import _is_int
+from voracious.domain.common import InvalidInputError, RecalibrationDecision, RowDisposition
 
 __all__ = [
     "DEFAULT_MIN_OBSERVATIONS",
     "DEFAULT_RELATIVE_CHANGE_THRESHOLD",
-    "DepurationResult",
-    "DepurationStage",
-    "DepurationStep",
     "LimitsSnapshot",
     "T2MRCDRecalibrationParams",
     "T2MRCDRecalibrationReport",
     "decide",
-    "depurate",
-    "depuration_step",
 ]
 
 DEFAULT_MIN_OBSERVATIONS: Final = 25
@@ -73,7 +58,6 @@ class T2MRCDRecalibrationParams:
     Attributes:
         seed: Semilla raíz de la recalibración, entera y no negativa (obligatoria).
         min_observations: Mínimo de filas nuevas conservadas (25, documento del dueño).
-        max_depuration_rounds: Rondas máximas de la depuración automática (5, Q5).
         relative_change_threshold: Umbral del cambio relativo de la dispersión (0.10, Q4;
             configurable, finito y ``> 0``).
         threshold_decides: Si ``True``, superar el umbral también reemplaza la base
@@ -90,7 +74,6 @@ class T2MRCDRecalibrationParams:
 
     seed: int
     min_observations: int = DEFAULT_MIN_OBSERVATIONS
-    max_depuration_rounds: int = DEFAULT_MAX_DEPURATION_ROUNDS
     relative_change_threshold: float = DEFAULT_RELATIVE_CHANGE_THRESHOLD
     threshold_decides: bool = False
     relative_change_metric: RelativeChangeMetric = frobenius_relative_change
@@ -104,9 +87,8 @@ class T2MRCDRecalibrationParams:
 
         Raises:
             InvalidInputError: Si ``seed`` no es un entero ``>= 0``, ``min_observations`` no es
-                un entero ``>= 1``, ``max_depuration_rounds`` no es un entero ``>= 0``, el umbral
-                no es finito y positivo, ``threshold_decides`` no es booleano o
-                ``n_test_resamples`` no es ``None`` ni un entero ``>= 1``.
+                un entero ``>= 1``, el umbral no es finito y positivo, ``threshold_decides`` no es
+                booleano o ``n_test_resamples`` no es ``None`` ni un entero ``>= 1``.
         """
         if not _is_int(self.seed) or self.seed < 0:
             raise InvalidInputError(
@@ -116,11 +98,6 @@ class T2MRCDRecalibrationParams:
             raise InvalidInputError(
                 "'min_observations' debe ser un entero >= 1",
                 details={"field": "recalibration.min_observations"},
-            )
-        if not _is_int(self.max_depuration_rounds) or self.max_depuration_rounds < 0:
-            raise InvalidInputError(
-                "'max_depuration_rounds' debe ser un entero >= 0",
-                details={"field": "recalibration.max_depuration_rounds"},
             )
         threshold = self.relative_change_threshold
         if not (np.isfinite(threshold) and threshold > 0.0):
@@ -157,162 +134,6 @@ class T2MRCDRecalibrationParams:
         return pending
 
 
-class DepurationStage(Protocol):
-    """Lo que la depuración necesita de una ronda: el límite de Fase I y el T²."""
-
-    @property
-    def phase1_limit(self) -> float:
-        """Límite de Fase I de la ronda."""
-        ...
-
-    def t2(self, x: FloatMatrix) -> FloatVector:
-        """T² de ``x`` con el ajuste de la ronda.
-
-        Args:
-            x: Observaciones ``m x p``.
-
-        Returns:
-            Vector de ``m`` valores T².
-        """
-        ...
-
-
-@dataclass(frozen=True, eq=False)
-class DepurationResult[StageT: DepurationStage]:
-    """Resultado de la depuración automática.
-
-    Attributes:
-        stage: Ronda final (ajustada sobre ``kept``), o ``None`` si quedaron menos de
-            ``min_rows`` filas.
-        kept: Filas conservadas (máscara sobre la entrada).
-        excluded_automatic: Filas quitadas por la depuración automática.
-        rounds: Rondas que quitaron filas.
-        converged: ``True`` si en la ronda final ninguna fila conservada supera el límite.
-    """
-
-    stage: StageT | None
-    kept: BoolVector
-    excluded_automatic: BoolVector
-    rounds: int
-    converged: bool
-
-
-@dataclass(frozen=True, eq=False)
-class DepurationStep:
-    """Resultado de evaluar una ronda de la depuración automática (``depuration_step``).
-
-    Attributes:
-        kept: Filas conservadas tras la ronda (máscara sobre la entrada; copia propia).
-        excluded_automatic_now: Filas que esta ronda quita (máscara sobre la entrada).
-        above_t2: Filas de la ronda con ``T² > límite de Fase I`` (máscara sobre ``rows``).
-        converged: ``True`` si ninguna fila de la ronda supera el límite.
-        final: ``True`` si la depuración termina en esta ronda: convergió, se agotaron las rondas
-            (la ronda queda como final, sin quitar filas) o, tras quitar filas, quedan menos de
-            ``min_rows`` (``exhausted``: no hay ronda final).
-    """
-
-    kept: BoolVector
-    excluded_automatic_now: BoolVector
-    above_t2: BoolVector
-    converged: bool
-    final: bool
-
-    @property
-    def exhausted(self) -> bool:
-        """``True`` si la depuración terminó por quedar menos de ``min_rows`` filas."""
-        return self.final and bool(self.excluded_automatic_now.any())
-
-
-def depuration_step(
-    stage: DepurationStage,
-    x_rows: FloatMatrix,
-    rows: IndexVector,
-    kept: BoolVector,
-    round_index: int,
-    *,
-    max_rounds: int,
-    min_rows: int = 1,
-) -> DepurationStep:
-    """Una ronda de la depuración automática (Q3, Q5), sin ajustar nada (función pura).
-
-    Con la ronda ``round_index`` ya ajustada sobre ``x_rows`` (las filas ``rows`` de la entrada,
-    las conservadas en ``kept``): si ninguna supera el límite de Fase I (estricto), converge; si
-    alguna lo supera y ya se hicieron ``max_rounds`` rondas de exclusión, termina sin converger y
-    sin quitar filas; si no, quita **todas** las que lo superan y termina solo si quedan menos de
-    ``min_rows`` filas.
-
-    Args:
-        stage: Ronda ajustada (límite de Fase I y T²).
-        x_rows: Filas de la ronda (``x[rows]``).
-        rows: Índices de esas filas en la entrada.
-        kept: Filas conservadas antes de la ronda (máscara sobre la entrada; no se muta).
-        round_index: Número de la ronda (desde 0) = rondas de exclusión ya hechas.
-        max_rounds: Rondas máximas de exclusión (``>= 0``).
-        min_rows: Mínimo de filas para seguir ajustando (``>= 1``).
-
-    Returns:
-        El resultado de la ronda.
-    """
-    above = stage.t2(x_rows) > stage.phase1_limit
-    kept = kept.copy()
-    now = np.zeros(kept.shape[0], dtype=np.bool_)
-    if not bool(above.any()):
-        return DepurationStep(kept, now, above, converged=True, final=True)
-    if round_index >= max_rounds:
-        return DepurationStep(kept, now, above, converged=False, final=True)
-    removed = rows[above]
-    kept[removed] = False
-    now[removed] = True
-    return DepurationStep(kept, now, above, converged=False, final=int(kept.sum()) < min_rows)
-
-
-def depurate[StageT: DepurationStage](
-    x: FloatMatrix,
-    kept: BoolVector,
-    *,
-    fit_round: Callable[[FloatMatrix, IndexVector, int], StageT],
-    max_rounds: int,
-    min_rows: int,
-) -> DepurationResult[StageT]:
-    """Depuración automática iterativa (Q3, Q5): bucle de ``depuration_step``.
-
-    En cada ronda ``r`` (desde 0) se ajusta ``fit_round(x[rows], rows, r)`` con las filas
-    conservadas y se evalúa con ``depuration_step``; se repite hasta que la ronda sea final.
-    Termina cuando ninguna fila supera el límite (``converged``), cuando ya se hicieron
-    ``max_rounds`` rondas de exclusión (la ronda final se ajusta igual y ``converged = False``) o
-    cuando quedan menos de ``min_rows`` filas (``stage = None``, sin ajustar).
-
-    Args:
-        x: Entrada ``n x p``.
-        kept: Filas de partida (tras la exclusión humana); se copia.
-        fit_round: Ajuste de una ronda: filas, sus índices en ``x`` y el número de ronda.
-        max_rounds: Rondas máximas de exclusión (``>= 0``).
-        min_rows: Mínimo de filas para seguir ajustando (``>= 1``).
-
-    Returns:
-        El resultado de la depuración.
-    """
-    kept = kept.copy()
-    automatic = np.zeros(x.shape[0], dtype=np.bool_)
-    rounds = 0
-    if int(kept.sum()) < min_rows:
-        return DepurationResult(None, kept, automatic, rounds, converged=False)
-    while True:
-        rows = np.flatnonzero(kept).astype(np.int64)
-        x_rows = x[rows]
-        stage = fit_round(x_rows, rows, rounds)
-        step = depuration_step(
-            stage, x_rows, rows, kept, rounds, max_rounds=max_rounds, min_rows=min_rows
-        )
-        kept = step.kept
-        automatic |= step.excluded_automatic_now
-        if step.exhausted:
-            return DepurationResult(None, kept, automatic, rounds + 1, converged=False)
-        if step.final:
-            return DepurationResult(stage, kept, automatic, rounds, converged=step.converged)
-        rounds += 1
-
-
 def decide(
     comparison: ComparisonResult | None,
     *,
@@ -327,7 +148,7 @@ def decide(
 
     Args:
         comparison: Comparación de bases, o ``None`` si no se hizo (forzado o insuficiente).
-        n_kept: Filas nuevas conservadas tras la depuración.
+        n_kept: Filas nuevas conservadas tras la exclusión humana.
         min_observations: Mínimo de filas nuevas.
         force_replace: Reemplazo forzado por una persona.
 
@@ -399,15 +220,12 @@ class T2MRCDRecalibrationReport:
         decision: Decisión tomada.
         forced: Reemplazo forzado por una persona.
         row_disposition: Destino de cada fila de ``vstack(base, x_new)``: las de la base,
-            ``ALREADY_IN_BASE``; las nuevas, ``KEPT`` o excluidas.
+            ``ALREADY_IN_BASE``; las nuevas, ``KEPT`` o ``EXCLUDED_ASSIGNABLE_CAUSE``.
         n_base: Filas de la base vigente.
         n_new: Filas nuevas recibidas.
         n_excluded_assignable_cause: Filas nuevas excluidas por una persona.
-        n_excluded_automatic: Filas nuevas excluidas por la depuración automática.
         n_kept_new: Filas nuevas conservadas.
         min_observations: Mínimo exigido de filas nuevas conservadas.
-        depuration_rounds: Rondas de la depuración automática de las filas nuevas.
-        depuration_converged: Convergencia de esa depuración (``None`` si no se ajustó nada).
         comparison: Comparación de bases (``None`` si se forzó o no hubo filas suficientes).
         before: Límites del modelo vigente.
         after: Límites del modelo nuevo (``None`` si ``INSUFFICIENT``).
@@ -421,11 +239,8 @@ class T2MRCDRecalibrationReport:
     n_base: int
     n_new: int
     n_excluded_assignable_cause: int
-    n_excluded_automatic: int
     n_kept_new: int
     min_observations: int
-    depuration_rounds: int
-    depuration_converged: bool | None
     comparison: ComparisonResult | None
     before: LimitsSnapshot
     after: LimitsSnapshot | None

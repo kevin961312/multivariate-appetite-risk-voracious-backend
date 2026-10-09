@@ -6,7 +6,7 @@ otra fuente, manda este archivo; si está desactualizado, se corrige aquí prime
 ## Qué es
 
 Backend SaaS para monitorear el **apetito de riesgo multivariado** de portafolios financieros con la carta
-de control robusta **T²MRCD**. Hoy es un **cascarón**: estructura, cableado y compuertas, sin el algoritmo.
+de control robusta **T²MRCD**. Hoy tiene el núcleo (`pymrcd`), la carta T²MRCD con su ciclo de vida, la API por pasos, Docker y CI; el estado vive en el proceso (Postgres y la cola distribuida llegan después).
 Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio ni los casos de uso**.
 
 ## 1. Lo que no se negocia (producto)
@@ -36,9 +36,9 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
   cuantiles por réplica (que infla el α efectivo cuando m·α < 1). B = `n_replicates` (100 por defecto, con cita),
   `alpha_limit` y `phase2_alpha_limit` = 0.005. **Límite operativo por régimen:** la v0 vigila con el de Fase I
   (provisional y fijo); las versiones recalibradas, con el de Fase II. **Se remuestrea solo `best` (alpha
-  0.75)**: con todas las filas una contaminación no detectada inflaría el límite (enmascaramiento). **Falsa
-  alarma real conocida:** frente a observaciones nuevas en control es ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase
-  II frente al 0.5 % nominal, porque `best` es el 75 % central; es una característica del diseño, no un error
+  0.75)**: con todas las filas una contaminación no detectada inflaría el límite (enmascaramiento). **Sin depuración automática (dueño, 2026-10-09):** quitar el 25 % fuera de `best` y repetir nunca converge con MRCD (200 → 36 filas en 6 rondas, 18,3 min); el único filtro de filas es la exclusión humana por causa asignable y la Fase I es una sola pasada (≈ 6 min con 200×300, B = 100, 2 vCPU). **Falsa
+  alarma real conocida (media entre semillas, varía ~1–3.8 %):** frente a observaciones nuevas en control es
+  ≈ 2.3 % en Fase I y ≈ 2.1 % en Fase II (n = 200, p = 3, sin depuración; p > n no medido) frente al 0.5 % nominal, porque `best` es el 75 % central; es una característica del diseño, no un error
   (estudio futuro: reponderado tipo MCD). El umbral Frobenius de la recalibración es parametrizable
   (`relative_change_threshold` 0.10; `threshold_decides = False`: solo informativo, deciden las pruebas formales
   de S y μ). El **ciclo de vida** (versiones inmutables
@@ -63,7 +63,7 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
 | Ejecución de los pasos | `JobQueue` | `InlineJobQueue` (un hilo-pool por carril: estimation, calibration, light, orchestration) | `CeleryJobQueue` |
-| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `DepurationRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | en memoria (seguros entre hilos, con `claim`) | Postgres (TimescaleDB) |
+| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | en memoria (seguros entre hilos, con `claim`) | Postgres (TimescaleDB) |
 | Datos de entrada | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash) | `S3DatasetStorage` |
 | Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria (altas atómicas) | Postgres (TimescaleDB) |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta |
@@ -78,7 +78,7 @@ Puertos auxiliares: `IdGenerator` y `Clock` (`UuidIdGenerator`, `SystemClock`). 
 
 API **por pasos independientes, encadenables por id** ([ADR 0009](docs/adr/0009-api-por-pasos-encadenables.md);
 rutas y catálogo de códigos en la enmienda del Paso 3 del [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)),
-asíncrona ([ADR 0003](docs/adr/0003-api-asincrona.md)): `/v1/datasets`, `/v1/charts/t2mrcd/{fits,limits,depurations,models,pipelines}`
+asíncrona ([ADR 0003](docs/adr/0003-api-asincrona.md)): `/v1/datasets`, `/v1/charts/t2mrcd/{fits,limits,exclusions,models,pipelines}`
 y, bajo `…/models/{id}`, `scores`, `observations`, `structural-events`, `recalibrations`, `comparisons` y `versions`.
 Cada `POST` de cómputo responde `202 {id, status:"queued"}`. Estados `queued | running | succeeded | failed`.
 Encadenar los pasos, la tubería y `fit_phase1`/`recalibrate` dan el mismo modelo **en bits**; no se rompe esa

@@ -37,15 +37,17 @@ class StepwiseRecalibrationOut(ResponseModel):
 
 
 class ComparisonRequest(RequestModel):
-    """Comparación de la base vigente con las filas nuevas depuradas.
+    """Comparación de la base vigente con las filas nuevas conservadas tras la exclusión humana.
 
     Attributes:
         recalibration_id: Recalibración en curso.
-        depuration_id: Depuración final de las filas nuevas.
+        fit_id: Ajuste de las filas nuevas conservadas (``μ₁``, ``S₁``).
+        limits_id: Límites de ese ajuste (operación ``new_rows``).
     """
 
     recalibration_id: str = Field(min_length=1)
-    depuration_id: str = Field(min_length=1)
+    fit_id: str = Field(min_length=1)
+    limits_id: str = Field(min_length=1)
 
 
 class VersionProposalRequest(RequestModel):
@@ -54,8 +56,8 @@ class VersionProposalRequest(RequestModel):
     Attributes:
         recalibration_id: Recalibración en curso.
         comparison_id: Comparación (obligatoria salvo reemplazo forzado, en el que se omite).
-        fit_id: Ajuste final: el del dataset de extensión (EXTEND) o el de la última ronda de
-            las filas nuevas (REPLACE).
+        fit_id: Ajuste final: el del dataset de extensión (EXTEND) o el de las filas nuevas
+            conservadas (REPLACE).
         limits_id: Límites de ese ajuste.
     """
 
@@ -71,7 +73,6 @@ class ComparisonResponse(ResponseModel):
     id: str
     model_id: str
     recalibration_id: str
-    depuration_id: str
     fit_id: str
     limits_id: str
     status: JobState
@@ -104,7 +105,6 @@ class ComparisonResponse(ResponseModel):
             id=record.comparison_id,
             model_id=record.model_id,
             recalibration_id=record.recalibration_id,
-            depuration_id=record.depuration_id,
             fit_id=record.fit_id,
             limits_id=record.limits_id,
             status=record.status.value,

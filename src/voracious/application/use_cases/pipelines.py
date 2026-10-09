@@ -1,15 +1,15 @@
 """Tubería de Fase I (``/pipelines/phase1``): orquestación pura de los pasos encadenables.
 
 No calcula nada: cada paso crea su recurso con el mismo caso de uso que la API por pasos
-(``RequestFit``, ``RequestLimits``, ``RequestDepuration``, ``RequestModel``) y, al terminar, el
+(``RequestExclusion``, ``RequestFit``, ``RequestLimits``, ``RequestModel``) y, al terminar, el
 trabajo del paso encola el de la tubería, que decide el siguiente (continuaciones). Por eso la
 tubería, la cadena manual y ``fit_phase1`` dan el mismo modelo en bits.
 
 Orden: (si hay ``assignable_cause``: exclusión humana sobre el dataset raíz, sin ajuste) →
-ajuste → límites → depuración automática → (si quitó filas: ajuste del derivado → límites →
-depuración…) → modelo con la depuración final. Si un paso falla (también si su recurso no se
-puede crear), la tubería falla con su error (``details.step`` y ``details.step_id``). Las
-decisiones pendientes se comprueban antes del primer paso.
+ajuste → límites → modelo con ese ajuste y esos límites. Sin depuración automática iterativa
+(decisión del dueño, 2026-10-09). Si un paso falla (también si su recurso no se puede crear), la
+tubería falla con su error (``details.step`` y ``details.step_id``). Las decisiones pendientes se
+comprueban antes del primer paso.
 
 El avance es atómico (``PipelineRepository.append_step`` con el número de pasos esperado): si dos
 avisos llegan a la vez, solo uno crea el paso siguiente.
@@ -18,16 +18,12 @@ avisos llegan a la vez, solo uno crea el paso siguiente.
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
-from voracious.application.errors import (
-    ApplicationError,
-    DepurationNotFinalError,
-    PipelineNotFoundError,
-)
+from voracious.application.errors import ApplicationError, PipelineNotFoundError
 from voracious.application.phase1_steps import Phase1Steps, Phase1StepsRegistry, resolve_steps
 from voracious.application.ports import (
     Clock,
     DatasetStorage,
-    DepurationRepository,
+    ExclusionRepository,
     FitRepository,
     IdGenerator,
     JobKind,
@@ -42,19 +38,18 @@ from voracious.application.records import (
     ErrorInfo,
     JobStatus,
     LifecyclePolicy,
-    NextStep,
     PipelineKind,
     PipelineRecord,
     PipelineStep,
 )
 from voracious.application.use_cases.common import INTERNAL_ERROR
 from voracious.application.use_cases.steps import (
-    RequestDepuration,
+    RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
     get_dataset,
-    get_depuration,
+    get_exclusion,
     get_fit,
     get_limits,
     human_mask,
@@ -68,9 +63,9 @@ __all__ = [
     "get_pipeline",
 ]
 
+STEP_EXCLUSION = "exclusion"
 STEP_FIT = "fit"
 STEP_LIMITS = "limits"
-STEP_DEPURATION = "depuration"
 STEP_MODEL = "model"
 
 
@@ -212,10 +207,8 @@ class _Next:
 
     kind: str
     target: str
-    """Dataset (``fit`` y exclusión humana), ajuste (``limits`` y ronda automática) o depuración
-    (``model``)."""
+    """Dataset (``exclusion`` y ``fit``) o ajuste (``limits`` y ``model``)."""
     limits_id: str | None = None
-    human: bool = False
 
 
 @dataclass(frozen=True)
@@ -227,11 +220,11 @@ class RunPhase1Pipeline:
         pipelines: Repositorio de tuberías.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
+        exclusions: Repositorio de exclusiones.
         models: Repositorio de modelos.
+        request_exclusion: Caso de uso de la exclusión humana.
         request_fit: Caso de uso del ajuste.
         request_limits: Caso de uso de los límites.
-        request_depuration: Caso de uso de la depuración.
         request_model: Caso de uso del modelo.
         ids: Identificadores (reserva el id del paso antes de crearlo).
         clock: Reloj.
@@ -241,11 +234,11 @@ class RunPhase1Pipeline:
     pipelines: PipelineRepository
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
     models: ModelRepository
+    request_exclusion: RequestExclusion
     request_fit: RequestFit
     request_limits: RequestLimits
-    request_depuration: RequestDepuration
     request_model: RequestModel
     ids: IdGenerator
     clock: Clock
@@ -299,10 +292,8 @@ class RunPhase1Pipeline:
             record: Tubería en ``running``.
         """
         if not record.steps:
-            first = (
-                _Next(STEP_DEPURATION, record.dataset_id, human=True)
-                if record.assignable_cause
-                else _Next(STEP_FIT, record.dataset_id)
+            first = _Next(
+                STEP_EXCLUSION if record.assignable_cause else STEP_FIT, record.dataset_id
             )
             self._create(steps, record, first)
             return
@@ -340,9 +331,9 @@ class RunPhase1Pipeline:
         if step.kind == STEP_LIMITS:
             limits = get_limits(self.limits, tenant, chart, rid)
             return limits.status, limits.error
-        if step.kind == STEP_DEPURATION:
-            depuration = get_depuration(self.depurations, tenant, chart, rid)
-            return depuration.status, depuration.error
+        if step.kind == STEP_EXCLUSION:
+            exclusion = get_exclusion(self.exclusions, tenant, chart, rid)
+            return exclusion.status, exclusion.error
         model = self.models.get(tenant, chart, rid)
         if model is None:
             return JobStatus.FAILED, ErrorInfo(INTERNAL_ERROR, "el modelo de la tubería no existe")
@@ -359,24 +350,20 @@ class RunPhase1Pipeline:
             El paso siguiente o ``None``.
 
         Raises:
-            DepurationNotFinalError: Si la depuración se quedó sin filas.
+            TypeError: Si la exclusión terminó sin dataset de salida (error de integridad).
         """
         tenant, chart = record.tenant_id, record.chart_id
+        if last.kind == STEP_EXCLUSION:
+            exclusion = get_exclusion(self.exclusions, tenant, chart, last.resource_id)
+            if exclusion.output_dataset_id is None:
+                msg = "la exclusión de Fase I terminó sin dataset de salida"
+                raise TypeError(msg)
+            return _Next(STEP_FIT, exclusion.output_dataset_id)
         if last.kind == STEP_FIT:
             return _Next(STEP_LIMITS, last.resource_id)
         if last.kind == STEP_LIMITS:
             limits = get_limits(self.limits, tenant, chart, last.resource_id)
-            return _Next(STEP_DEPURATION, limits.fit_id, limits_id=limits.limits_id)
-        if last.kind == STEP_DEPURATION:
-            depuration = get_depuration(self.depurations, tenant, chart, last.resource_id)
-            if depuration.next_step is NextStep.FIT and depuration.output_dataset_id is not None:
-                return _Next(STEP_FIT, depuration.output_dataset_id)
-            if depuration.next_step is NextStep.MODEL:
-                return _Next(STEP_MODEL, depuration.depuration_id)
-            raise DepurationNotFinalError(
-                "la depuración se quedó sin filas: no hay ronda final con la que ensamblar",
-                details={"depuration_id": depuration.depuration_id, "reason": "exhausted"},
-            )
+            return _Next(STEP_MODEL, limits.fit_id, limits_id=limits.limits_id)
         return None
 
     def _create(self, steps: Phase1Steps, record: PipelineRecord, nxt: _Next) -> None:
@@ -436,29 +423,21 @@ class RunPhase1Pipeline:
                 limits_id=rid,
                 pipeline_id=pid,
             )
-        elif nxt.kind == STEP_DEPURATION and nxt.human:
-            self.request_depuration.execute(
+        elif nxt.kind == STEP_EXCLUSION:
+            self.request_exclusion.execute(
                 tenant,
                 chart,
-                dataset_id=nxt.target,
-                assignable_cause=record.assignable_cause,
-                depuration_id=rid,
-                pipeline_id=pid,
-            )
-        elif nxt.kind == STEP_DEPURATION:
-            self.request_depuration.execute(
-                tenant,
-                chart,
-                fit_id=nxt.target,
-                limits_id=nxt.limits_id,
-                depuration_id=rid,
+                nxt.target,
+                record.assignable_cause,
+                exclusion_id=rid,
                 pipeline_id=pid,
             )
         else:
             self.request_model.execute(
                 tenant,
                 chart,
-                depuration_id=nxt.target,
+                fit_id=nxt.target,
+                limits_id=nxt.limits_id or "",
                 lifecycle_policy=record.lifecycle_policy,
                 model_id=rid,
                 pipeline_id=pid,

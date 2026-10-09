@@ -1,4 +1,4 @@
-"""Repositorios en memoria de los pasos de Fase I: datasets, ajustes, límites y depuraciones.
+"""Repositorios en memoria de los pasos de Fase I: datasets, exclusiones, ajustes y límites.
 
 Los registros de trabajo tienen clave (tenant, carta, id) y ``claim`` (``queued → running``
 atómico); las tuberías además ``append_step`` (comparar-y-cambiar sobre el número de pasos). Los
@@ -13,7 +13,7 @@ from typing import Protocol
 from voracious.application.ports import DuplicateKeyError, RecordNotFoundError
 from voracious.application.records import (
     DatasetRecord,
-    DepurationRecord,
+    ExclusionRecord,
     FitRecord,
     JobStatus,
     LimitsRecord,
@@ -25,7 +25,7 @@ from voracious.infrastructure.memory.store import KeyedStore
 
 __all__ = [
     "InMemoryDatasetStorage",
-    "InMemoryDepurationRepository",
+    "InMemoryExclusionRepository",
     "InMemoryFitRepository",
     "InMemoryLimitsRepository",
     "InMemoryPipelineRepository",
@@ -308,44 +308,44 @@ class InMemoryLimitsRepository:
         return self._steps.claim((tenant_id, chart_id, limits_id), started_at)
 
 
-class InMemoryDepurationRepository:
-    """``DepurationRepository`` en memoria (registros sin objetos de carta: tal cual)."""
+class InMemoryExclusionRepository:
+    """``ExclusionRepository`` en memoria (registros sin objetos de carta: tal cual)."""
 
-    def __init__(self, codec: RecordCodec[DepurationRecord] | None = None) -> None:
+    def __init__(self, codec: RecordCodec[ExclusionRecord] | None = None) -> None:
         """Construye el repositorio vacío.
 
         Args:
             codec: Codec; ``None`` guarda el registro inmutable tal cual.
         """
-        self._steps: _StepStore[DepurationRecord] = _StepStore(
-            codec if codec is not None else PassthroughCodec(DepurationRecord),
-            lambda r: r.depuration_id,
+        self._steps: _StepStore[ExclusionRecord] = _StepStore(
+            codec if codec is not None else PassthroughCodec(ExclusionRecord),
+            lambda r: r.exclusion_id,
             lambda r, t: replace(r, status=JobStatus.RUNNING, started_at=t),
         )
 
-    def add(self, record: DepurationRecord) -> None:
-        """Guarda una depuración nueva.
+    def add(self, record: ExclusionRecord) -> None:
+        """Guarda una exclusión nueva.
 
         Args:
             record: Registro.
         """
         self._steps.add(record)
 
-    def get(self, tenant_id: str, chart_id: str, depuration_id: str) -> DepurationRecord | None:
-        """Busca una depuración.
+    def get(self, tenant_id: str, chart_id: str, exclusion_id: str) -> ExclusionRecord | None:
+        """Busca una exclusión.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración.
+            exclusion_id: Exclusión.
 
         Returns:
             El registro o ``None``.
         """
-        return self._steps.get((tenant_id, chart_id, depuration_id))
+        return self._steps.get((tenant_id, chart_id, exclusion_id))
 
-    def update(self, record: DepurationRecord) -> None:
-        """Reemplaza una depuración existente.
+    def update(self, record: ExclusionRecord) -> None:
+        """Reemplaza una exclusión existente.
 
         Args:
             record: Registro nuevo.
@@ -353,20 +353,20 @@ class InMemoryDepurationRepository:
         self._steps.update(record)
 
     def claim(
-        self, tenant_id: str, chart_id: str, depuration_id: str, started_at: datetime
-    ) -> DepurationRecord | None:
-        """Pasa la depuración a ``running`` de forma atómica.
+        self, tenant_id: str, chart_id: str, exclusion_id: str, started_at: datetime
+    ) -> ExclusionRecord | None:
+        """Pasa la exclusión a ``running`` de forma atómica.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración.
+            exclusion_id: Exclusión.
             started_at: Instante de inicio.
 
         Returns:
             El registro en ``running`` o ``None``.
         """
-        return self._steps.claim((tenant_id, chart_id, depuration_id), started_at)
+        return self._steps.claim((tenant_id, chart_id, exclusion_id), started_at)
 
 
 class InMemoryPipelineRepository:

@@ -1,7 +1,8 @@
 """Endpoints de la recalibración paso a paso (T24): códigos 201/202, 404 de otro tenant, 409 y 422.
 
-``POST …/recalibrations`` (``mode = stepwise``), ``/limits`` con ``recalibration_id``,
-``/depurations`` sobre candidatas, ``…/comparisons`` (``POST``/``GET``) y ``…/versions``.
+``POST …/recalibrations`` (``mode = stepwise``), ``/exclusions`` sobre candidatas, ``/limits`` con
+``recalibration_id``, ``…/comparisons`` (``POST``/``GET``) y ``…/versions``. Sin depuración
+automática iterativa (decisión del dueño, 2026-10-09).
 """
 
 from collections.abc import Iterator
@@ -9,7 +10,7 @@ from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
@@ -39,7 +40,7 @@ def client(container: Container) -> Iterator[TestClient]:
         yield test_client
 
 
-def _error(response: httpx.Response, status: int, code: str) -> dict[str, Any]:
+def _error(response: httpx2.Response, status: int, code: str) -> dict[str, Any]:
     assert response.status_code == status, response.text
     body: dict[str, Any] = response.json()
     assert body["code"] == code, body
@@ -48,7 +49,7 @@ def _error(response: httpx.Response, status: int, code: str) -> dict[str, Any]:
 
 def _post(
     client: TestClient, path: str, body: dict[str, Any], headers: dict[str, str] = TENANT
-) -> httpx.Response:
+) -> httpx2.Response:
     return client.post(path, headers=headers, json=body)
 
 
@@ -78,9 +79,9 @@ def _limits(client: TestClient, fit_id: str, rid: str) -> str:
     return limits_id
 
 
-def _depurate(client: TestClient, body: dict[str, Any]) -> dict[str, Any]:
-    depuration_id = _ok(client, f"{CHART_BASE}/depurations", body)["id"]
-    return _done(client, f"{CHART_BASE}/depurations/{depuration_id}")
+def _exclude(client: TestClient, body: dict[str, Any]) -> dict[str, Any]:
+    exclusion_id = _ok(client, f"{CHART_BASE}/exclusions", body)["id"]
+    return _done(client, f"{CHART_BASE}/exclusions/{exclusion_id}")
 
 
 def _scored(client: TestClient, annotate: bool = True) -> tuple[str, list[str]]:
@@ -95,20 +96,6 @@ def _scored(client: TestClient, annotate: bool = True) -> tuple[str, list[str]]:
         )
         assert response.status_code == 201, response.text
     return model_id, ids
-
-
-def _rounds(
-    client: TestClient, fit_id: str, rid: str
-) -> tuple[list[tuple[str, str]], dict[str, Any]]:
-    """Rondas automáticas hasta la final: ``[(fit, limits)…]`` y la depuración final."""
-    rounds: list[tuple[str, str]] = []
-    while True:
-        limits_id = _limits(client, fit_id, rid)
-        rounds.append((fit_id, limits_id))
-        body = _depurate(client, {"fit_id": fit_id, "limits_id": limits_id})
-        if body["next_step"] == "model":
-            return rounds, body
-        fit_id = _fit(client, body["output_dataset_id"])
 
 
 def test_stepwise_forced_replace_endpoints(client: TestClient) -> None:
@@ -148,49 +135,46 @@ def test_stepwise_forced_replace_endpoints(client: TestClient) -> None:
         "INVALID_INPUT",
     )
     assert pending_human["details"]["reason"] == "human_exclusion_required"
+    exclusions = f"{CHART_BASE}/exclusions"
     client_causes = {"dataset_id": candidates, "assignable_cause": [{"row": 1}]}
-    reason = _error(_post(client, f"{CHART_BASE}/depurations", client_causes), 422, "INVALID_INPUT")
+    reason = _error(_post(client, exclusions, client_causes), 422, "INVALID_INPUT")
     assert reason["details"]["reason"] == "assignable_cause_from_annotations"
-    root_limits = {"fit_id": root_fit, "limits_id": "nada"}
-    reason = _error(_post(client, f"{CHART_BASE}/depurations", root_limits), 422, "INVALID_INPUT")
-    assert reason["details"]["reason"] == "human_exclusion_required"
-    human = _depurate(client, {"dataset_id": candidates})
-    assert (human["dataset_id"], human["fit_id"]) == (candidates, None)
+    human = _exclude(client, {"dataset_id": candidates})
+    assert (human["dataset_id"], human["insufficient"]) == (candidates, False)
     assert human["n_excluded_assignable_cause"] == 1
     assert human["assignable_cause"][0]["annotation_id"]
     fit0 = _fit(client, human["output_dataset_id"])
     again = _error(
-        _post(client, f"{CHART_BASE}/depurations", {"dataset_id": human["output_dataset_id"]}),
+        _post(client, exclusions, {"dataset_id": human["output_dataset_id"]}),
         422,
         "INVALID_INPUT",
     )
     assert again["details"]["reason"] == "human_exclusion_only_on_candidates"
-    rounds, final = _rounds(client, fit0, rid)
-    assert len(rounds) >= 2
+    limits0 = _limits(client, fit0, rid)
+    fit1 = _fit(client, human["output_dataset_id"])
+    limits1 = _limits(client, fit1, rid)
     _error(
-        _post(client, f"{CHART_BASE}/models", {"fit_id": fit0, "limits_id": rounds[0][1]}),
+        _post(client, f"{CHART_BASE}/models", {"fit_id": fit0, "limits_id": limits0}),
         422,
         "RECALIBRATION_MISMATCH",
     )
 
     comparisons = f"{BASE}/{model_id}/comparisons"
     forced = _error(
-        _post(client, comparisons, {"recalibration_id": rid, "depuration_id": final["id"]}),
+        _post(client, comparisons, {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}),
         422,
         "INVALID_INPUT",
     )
     assert forced["details"]["reason"] == "forced_replace_skips_comparison"
     versions = f"{BASE}/{model_id}/versions"
-    first = {"recalibration_id": rid, "fit_id": rounds[0][0], "limits_id": rounds[0][1]}
-    not_final = _error(_post(client, versions, first), 422, "VERSION_INPUTS_MISMATCH")
-    assert not_final["details"]["reason"] == "round_not_final"
-    last = {"recalibration_id": rid, "fit_id": rounds[-1][0], "limits_id": rounds[-1][1]}
+    last = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
     with_comparison = _error(
         _post(client, versions, {**last, "comparison_id": "x"}), 422, "VERSION_INPUTS_MISMATCH"
     )
     assert with_comparison["details"]["reason"] == "forced_replace_has_no_comparison"
-    mixed = {**last, "limits_id": rounds[0][1]}
-    _error(_post(client, versions, mixed), 422, "VERSION_INPUTS_MISMATCH")
+    mixed = {**last, "limits_id": limits1}
+    mismatch = _error(_post(client, versions, mixed), 422, "VERSION_INPUTS_MISMATCH")
+    assert mismatch["details"]["reason"] == "limits_of_another_fit"
     _error(_post(client, versions, last, headers=OTHER), 404, "RECALIBRATION_NOT_FOUND")
     _error(_post(client, versions, {**last, "fit_id": "nada"}), 404, "FIT_NOT_FOUND")
     accepted = _ok(client, versions, last)
@@ -205,7 +189,7 @@ def test_stepwise_forced_replace_endpoints(client: TestClient) -> None:
         "DATASET_NOT_FOUND",
     )
     _error(
-        _post(client, limits_url, {"fit_id": rounds[-1][0], "recalibration_id": rid}),
+        _post(client, limits_url, {"fit_id": fit0, "recalibration_id": rid}),
         409,
         "RECALIBRATION_NOT_IN_PROGRESS",
     )
@@ -225,12 +209,12 @@ def test_stepwise_comparison_endpoints(client: TestClient, container: Container)
     )
     session = container.use_cases.get_recalibration.execute("tenant-a", "t2mrcd", model_id, rid)
     assert session.candidates_dataset_id is not None
-    human = _depurate(client, {"dataset_id": session.candidates_dataset_id})
+    human = _exclude(client, {"dataset_id": session.candidates_dataset_id})
     fit0 = _fit(client, human["output_dataset_id"])
-    rounds, final = _rounds(client, fit0, rid)
+    limits0 = _limits(client, fit0, rid)
     comparisons = f"{BASE}/{model_id}/comparisons"
     versions = f"{BASE}/{model_id}/versions"
-    last = {"recalibration_id": rid, "fit_id": rounds[-1][0], "limits_id": rounds[-1][1]}
+    last = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
     required = _error(_post(client, versions, last), 422, "VERSION_INPUTS_MISMATCH")
     assert required["details"]["reason"] == "comparison_required"
 
@@ -238,7 +222,7 @@ def test_stepwise_comparison_endpoints(client: TestClient, container: Container)
     stored = repo.get("tenant-a", "t2mrcd", model_id, rid)
     assert stored is not None
     repo.update(replace(stored, params={"seed": 11, "min_observations": 10}))
-    body = {"recalibration_id": rid, "depuration_id": final["id"]}
+    body = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
     pending = _error(_post(client, comparisons, body), 422, "RECALIBRATION_DECISION_PENDING")
     assert pending["details"]["pending"] == [
         "recalibration.covariance_test",
@@ -248,19 +232,16 @@ def test_stepwise_comparison_endpoints(client: TestClient, container: Container)
     repo.update(stored)
 
     _error(_post(client, comparisons, body, headers=OTHER), 404, "RECALIBRATION_NOT_FOUND")
-    _error(
-        _post(client, comparisons, {**body, "depuration_id": "nada"}), 404, "DEPURATION_NOT_FOUND"
-    )
-    _error(
-        _post(client, comparisons, {**body, "depuration_id": human["id"]}),
-        409,
-        "DEPURATION_NOT_FINAL",
-    )
+    _error(_post(client, comparisons, {**body, "fit_id": "nada"}), 404, "FIT_NOT_FOUND")
+    _error(_post(client, comparisons, {**body, "limits_id": "nada"}), 404, "LIMITS_NOT_FOUND")
+    legacy = {"recalibration_id": rid, "depuration_id": human["id"]}
+    _error(_post(client, comparisons, legacy), 422, "INVALID_INPUT")
     comparison_id = _ok(client, comparisons, body)["id"]
     comparison = _done(client, f"{comparisons}/{comparison_id}")
     assert comparison["decision"] == "extend"
     assert comparison["result"]["covariance"]["name"] == "permutation_covariance_solo_test"
-    assert comparison["depuration_id"] == final["id"]
+    assert (comparison["fit_id"], comparison["limits_id"]) == (fit0, limits0)
+    assert "depuration_id" not in comparison
     _error(client.get(f"{comparisons}/{comparison_id}", headers=OTHER), 404, "COMPARISON_NOT_FOUND")
     _error(_post(client, versions, {**last, "comparison_id": "nada"}), 404, "COMPARISON_NOT_FOUND")
     wrong = _error(
@@ -275,10 +256,18 @@ def test_stepwise_comparison_endpoints(client: TestClient, container: Container)
         f"/v1/datasets/{comparison['extension_dataset_id']}", headers=TENANT
     ).json()
     assert lineage["source"] == "recalibration_extension"
-    _error(
-        _post(client, f"{CHART_BASE}/depurations", {"fit_id": ext_fit, "limits_id": ext_limits}),
+    on_extension = _error(
+        _post(
+            client, f"{CHART_BASE}/exclusions", {"dataset_id": comparison["extension_dataset_id"]}
+        ),
         422,
         "INVALID_INPUT",
+    )
+    assert on_extension["details"]["reason"] == "human_exclusion_only_on_candidates"
+    ext_body = {"recalibration_id": rid, "fit_id": ext_fit, "limits_id": ext_limits}
+    _error(_post(client, comparisons, ext_body), 422, "RECALIBRATION_MISMATCH")
+    _error(
+        _post(client, comparisons, {**body, "limits_id": ext_limits}), 422, "LIMITS_FIT_MISMATCH"
     )
     proposal = {
         "recalibration_id": rid,
@@ -317,8 +306,8 @@ def test_cancel_stepwise_session_frees_d6(client: TestClient) -> None:
 
     reopened = _ok(client, url, {**body, "mode": "stepwise"}, 201)
     rid2 = reopened["recalibration_id"]
-    rounds, _ = _rounds(client, _fit(client, reopened["candidates_dataset_id"]), rid2)
-    last = {"recalibration_id": rid2, "fit_id": rounds[-1][0], "limits_id": rounds[-1][1]}
+    fit2 = _fit(client, reopened["candidates_dataset_id"])
+    last = {"recalibration_id": rid2, "fit_id": fit2, "limits_id": _limits(client, fit2, rid2)}
     _ok(client, f"{BASE}/{model_id}/versions", last)
     _done(client, f"{url}/{rid2}")
     requested = _error(

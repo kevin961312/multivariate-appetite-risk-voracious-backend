@@ -6,7 +6,8 @@ vigente quedan aparte, ``already_in_base``), los parámetros de la carta heredad
 base con la semilla de la recalibración (Q8) y crea el dataset ``recalibration_candidates``.
 
 - ``stepwise``: la recalibración queda ``running`` y el cliente encadena por id ``/fits``,
-  ``/limits`` (con ``recalibration_id``), ``/depurations``, ``…/comparisons`` y ``…/versions``.
+  ``/exclusions`` (si hay anotaciones con causa asignable), ``/fits``, ``/limits`` (con
+  ``recalibration_id``), ``…/comparisons`` y ``…/versions``.
 - ``pipeline``: ``RunRecalibrationJob`` encadena **los mismos casos de uso** (orquestación pura,
   como ``RunPhase1Pipeline``), así que paso a paso, tubería y ``ControlChart.recalibrate`` dan el
   mismo modelo e informe en bits (``tests/integration/test_recalibration_chain.py``).
@@ -30,7 +31,6 @@ from voracious.application.charts import (
 )
 from voracious.application.errors import (
     ApplicationError,
-    DepurationNotFinalError,
     ProposalPendingError,
     RangeBeforeStructuralEventError,
     RecalibrationDecisionPendingError,
@@ -50,7 +50,7 @@ from voracious.application.ports import (
     Clock,
     ComparisonRepository,
     DatasetStorage,
-    DepurationRepository,
+    ExclusionRepository,
     FitRepository,
     IdGenerator,
     JobKind,
@@ -76,7 +76,6 @@ from voracious.application.records import (
     JobStatus,
     LifecyclePolicy,
     ModelVersion,
-    NextStep,
     ObservationRecord,
     PipelineKind,
     PipelineRecord,
@@ -97,10 +96,10 @@ from voracious.application.use_cases.recalibration_chain import (
     get_recalibration,
 )
 from voracious.application.use_cases.steps import (
-    RequestDepuration,
+    RequestExclusion,
     RequestFit,
     RequestLimits,
-    get_depuration,
+    get_exclusion,
     get_fit,
     get_limits,
 )
@@ -117,9 +116,9 @@ __all__ = [
 
 _IN_PROGRESS = frozenset({JobStatus.QUEUED, JobStatus.RUNNING})
 
+STEP_EXCLUSION = "exclusion"
 STEP_FIT = "fit"
 STEP_LIMITS = "limits"
-STEP_DEPURATION = "depuration"
 STEP_COMPARISON = "comparison"
 STEP_VERSION = "version"
 
@@ -421,7 +420,7 @@ class CancelRecalibration:
 
     Solo una recalibración ``stepwise`` ``running`` sin propuesta pedida; la comprobación se
     repite de forma atómica al guardar (``RecalibrationRepository.cancel``). Los recursos ya
-    creados (ajustes, límites, depuraciones, comparaciones) se conservan; los pasos posteriores
+    creados (exclusiones, ajustes, límites, comparaciones) se conservan; los pasos posteriores
     sobre la sesión responden ``RECALIBRATION_NOT_IN_PROGRESS``.
 
     Attributes:
@@ -480,23 +479,21 @@ class _Next:
 
     kind: str
     target: str
-    """Dataset (``fit`` y exclusión humana), ajuste (``limits``, ronda automática y
-    ``version``) o depuración (``comparison``)."""
+    """Dataset (``exclusion`` y ``fit``) o ajuste (``limits``, ``comparison`` y ``version``)."""
     limits_id: str | None = None
     comparison_id: str | None = None
-    human: bool = False
 
 
 @dataclass(frozen=True)
 class RunRecalibrationJob:
     """Avanza la tubería de una recalibración (modo ``pipeline``): un paso por aviso.
 
-    Orquestación pura con los mismos casos de uso que la API por pasos. Orden: ajuste de las
-    candidatas → (si hay anotaciones con causa asignable: exclusión humana → ajuste del
-    derivado) → límites (``NEW_ROWS``) → depuración → (si quitó filas: ajuste → límites →
-    depuración…) → con la ronda final: comparación (o, con reemplazo forzado, directamente la
-    versión con esa ronda) → si ``extend``: ajuste y límites del dataset de extensión
-    (``EXTENSION``) → versión. Si la depuración se agota, la recalibración ya terminó
+    Orquestación pura con los mismos casos de uso que la API por pasos. Orden: (si hay
+    anotaciones con causa asignable: exclusión humana de las candidatas) → ajuste → límites
+    (``NEW_ROWS``) → comparación (o, con reemplazo forzado, directamente la versión con ese ajuste
+    y esos límites) → si ``extend``: ajuste y límites del dataset de extensión (``EXTENSION``) →
+    versión. Sin depuración automática iterativa (decisión del dueño, 2026-10-09). Si la
+    exclusión humana deja menos de ``min_observations`` filas, la recalibración ya terminó
     ``insufficient`` y la tubería termina bien. Si un paso falla, la tubería y la recalibración
     fallan con su error.
 
@@ -507,13 +504,13 @@ class RunRecalibrationJob:
         recalibrations: Repositorio de recalibraciones.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
+        exclusions: Repositorio de exclusiones.
         comparisons: Repositorio de comparaciones.
         datasets: Almacenamiento.
         chain: Enlaces con la recalibración (exclusión humana).
+        request_exclusion: Caso de uso de la exclusión humana.
         request_fit: Caso de uso del ajuste.
         request_limits: Caso de uso de los límites.
-        request_depuration: Caso de uso de la depuración.
         request_comparison: Caso de uso de la comparación.
         request_proposal: Caso de uso de la propuesta de versión.
         ids: Identificadores (reserva el id del paso antes de crearlo).
@@ -526,13 +523,13 @@ class RunRecalibrationJob:
     recalibrations: RecalibrationRepository
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
     comparisons: ComparisonRepository
     datasets: DatasetStorage
     chain: RecalibrationChain
+    request_exclusion: RequestExclusion
     request_fit: RequestFit
     request_limits: RequestLimits
-    request_depuration: RequestDepuration
     request_comparison: RequestComparison
     request_proposal: RequestVersionProposal
     ids: IdGenerator
@@ -637,7 +634,7 @@ class RunRecalibrationJob:
         if not record.steps:
             # Exclusión humana de las candidatas (anotaciones) antes de ajustar nada.
             human = bool(self.chain.human_causes(self._session(record)))
-            first = _Next(STEP_DEPURATION if human else STEP_FIT, record.dataset_id, human=human)
+            first = _Next(STEP_EXCLUSION if human else STEP_FIT, record.dataset_id)
             self._create(steps, record, first)
             return
         last = record.steps[-1]
@@ -674,9 +671,9 @@ class RunRecalibrationJob:
         if step.kind == STEP_LIMITS:
             limits = get_limits(self.limits, tenant, chart, rid)
             return limits.status, limits.error
-        if step.kind == STEP_DEPURATION:
-            depuration = get_depuration(self.depurations, tenant, chart, rid)
-            return depuration.status, depuration.error
+        if step.kind == STEP_EXCLUSION:
+            exclusion = get_exclusion(self.exclusions, tenant, chart, rid)
+            return exclusion.status, exclusion.error
         if step.kind == STEP_COMPARISON:
             comparison = get_comparison(self.comparisons, tenant, chart, record.model_id or "", rid)
             return comparison.status, comparison.error
@@ -691,12 +688,15 @@ class RunRecalibrationJob:
             last: Último paso, ``succeeded``.
 
         Returns:
-            El paso siguiente o ``None``.
-
-        Raises:
-            DepurationNotFinalError: Si una depuración terminó sin paso siguiente ni agotarse.
+            El paso siguiente o ``None`` (versión pedida, o exclusión humana que dejó menos de
+            ``min_observations`` filas: la recalibración ya terminó ``insufficient``).
         """
         tenant, chart = record.tenant_id, record.chart_id
+        if last.kind == STEP_EXCLUSION:
+            exclusion = get_exclusion(self.exclusions, tenant, chart, last.resource_id)
+            if exclusion.output_dataset_id is None:
+                return None
+            return _Next(STEP_FIT, exclusion.output_dataset_id)
         if last.kind == STEP_FIT:
             return _Next(STEP_LIMITS, last.resource_id)
         if last.kind == STEP_LIMITS:
@@ -704,9 +704,9 @@ class RunRecalibrationJob:
             if limits.stage_kind == StageKind.EXTENSION.value:
                 compared = next(s for s in reversed(record.steps) if s.kind == STEP_COMPARISON)
                 return _Next(STEP_VERSION, limits.fit_id, limits.limits_id, compared.resource_id)
-            return _Next(STEP_DEPURATION, limits.fit_id, limits_id=limits.limits_id)
-        if last.kind == STEP_DEPURATION:
-            return self._after_depuration(record, last)
+            if self._session(record).force_replace:
+                return _Next(STEP_VERSION, limits.fit_id, limits.limits_id)
+            return _Next(STEP_COMPARISON, limits.fit_id, limits.limits_id)
         if last.kind == STEP_COMPARISON:
             comparison = get_comparison(
                 self.comparisons, tenant, chart, record.model_id or "", last.resource_id
@@ -717,40 +717,6 @@ class RunRecalibrationJob:
                 STEP_VERSION, comparison.fit_id, comparison.limits_id, comparison.comparison_id
             )
         return None
-
-    def _after_depuration(self, record: PipelineRecord, last: PipelineStep) -> _Next | None:
-        """Paso que sigue a una depuración terminada.
-
-        Args:
-            record: Tubería.
-            last: Paso de la depuración.
-
-        Returns:
-            Ajuste del derivado, comparación o versión con la ronda final, o ``None`` si se
-            agotó (la recalibración ya terminó ``insufficient``).
-
-        Raises:
-            DepurationNotFinalError: Si terminó sin paso siguiente ni agotarse.
-        """
-        depuration = get_depuration(
-            self.depurations, record.tenant_id, record.chart_id, last.resource_id
-        )
-        if depuration.exhausted:
-            return None
-        if depuration.next_step is NextStep.FIT and depuration.output_dataset_id is not None:
-            return _Next(STEP_FIT, depuration.output_dataset_id)
-        if (
-            depuration.next_step is NextStep.MODEL
-            and depuration.fit_id is not None
-            and depuration.limits_id is not None
-        ):
-            if self._session(record).force_replace:
-                return _Next(STEP_VERSION, depuration.fit_id, depuration.limits_id)
-            return _Next(STEP_COMPARISON, depuration.depuration_id)
-        raise DepurationNotFinalError(
-            "la depuración terminó sin paso siguiente",
-            details={"depuration_id": depuration.depuration_id},
-        )
 
     def _create(self, steps: Phase1Steps, record: PipelineRecord, nxt: _Next) -> None:
         """Reserva el paso (atómico) y crea su recurso con el caso de uso de la API.
@@ -817,18 +783,9 @@ class RunRecalibrationJob:
                 limits_id=rid,
                 pipeline_id=pid,
             )
-        elif nxt.kind == STEP_DEPURATION and nxt.human:
-            self.request_depuration.execute(
-                tenant, chart, dataset_id=nxt.target, depuration_id=rid, pipeline_id=pid
-            )
-        elif nxt.kind == STEP_DEPURATION:
-            self.request_depuration.execute(
-                tenant,
-                chart,
-                fit_id=nxt.target,
-                limits_id=nxt.limits_id,
-                depuration_id=rid,
-                pipeline_id=pid,
+        elif nxt.kind == STEP_EXCLUSION:
+            self.request_exclusion.execute(
+                tenant, chart, nxt.target, exclusion_id=rid, pipeline_id=pid
             )
         elif nxt.kind == STEP_COMPARISON:
             self.request_comparison.execute(
@@ -836,7 +793,8 @@ class RunRecalibrationJob:
                 chart,
                 model_id,
                 session.recalibration_id,
-                nxt.target,
+                fit_id=nxt.target,
+                limits_id=nxt.limits_id or "",
                 comparison_id=rid,
                 pipeline_id=pid,
             )

@@ -16,7 +16,7 @@ para comportarse igual.
   recalibración de su carta (``RecalibrationSteps.encode_comparison``), exacta en bits.
 - ``PassthroughCodec``: guarda el registro inmutable tal cual. Se mantiene para los registros
   sin modelo ni informe (monitoreos, observaciones, anotaciones, eventos estructurales,
-  datasets, depuraciones y tuberías, que solo
+  datasets, exclusiones y tuberías, que solo
   tienen arreglos, fechas y textos: su codec llega con el adaptador Postgres) y como valor por
   defecto de los repositorios construidos sin cableado (tests).
 """
@@ -357,7 +357,7 @@ _MODEL_RECORD_FIELDS: Final = frozenset(
         "pipeline_id",
     }
 )
-_PROVENANCE_FIELDS: Final = frozenset({"root_dataset_id", "fit_id", "limits_id", "depuration_ids"})
+_PROVENANCE_FIELDS: Final = frozenset({"root_dataset_id", "fit_id", "limits_id", "exclusion_id"})
 _POLICY_FIELDS: Final = frozenset({"revalidate_every_months", "revalidate_every_observations"})
 
 
@@ -376,7 +376,7 @@ def _encode_provenance(provenance: ModelProvenance | None) -> dict[str, object] 
         "root_dataset_id": provenance.root_dataset_id,
         "fit_id": provenance.fit_id,
         "limits_id": provenance.limits_id,
-        "depuration_ids": list(provenance.depuration_ids),
+        "exclusion_id": provenance.exclusion_id,
     }
 
 
@@ -396,10 +396,7 @@ def _decode_provenance(value: object) -> ModelProvenance | None:
         root_dataset_id=read_str(raw["root_dataset_id"], "provenance.root_dataset_id"),
         fit_id=read_str(raw["fit_id"], "provenance.fit_id"),
         limits_id=read_str(raw["limits_id"], "provenance.limits_id"),
-        depuration_ids=tuple(
-            read_str(d, f"provenance.depuration_ids[{i}]")
-            for i, d in enumerate(_items(raw["depuration_ids"], "provenance.depuration_ids"))
-        ),
+        exclusion_id=_optional_str(raw["exclusion_id"], "provenance.exclusion_id"),
     )
 
 
@@ -525,7 +522,7 @@ _VERSION_FIELDS: Final = frozenset(
     }
 )
 _REF_FIELDS: Final = frozenset({"source", "ref"})
-_EXCLUSION_FIELDS: Final = frozenset({"ref", "reason", "round", "annotation_id"})
+_EXCLUSION_FIELDS: Final = frozenset({"ref", "reason", "annotation_id"})
 
 
 def _encode_ref(ref: BaseRowRef) -> dict[str, object]:
@@ -619,7 +616,6 @@ class ModelVersionCodec:
                 {
                     "ref": _encode_ref(e.ref),
                     "reason": e.reason.value,
-                    "round": e.round,
                     "annotation_id": e.annotation_id,
                 }
                 for e in record.exclusions
@@ -662,7 +658,6 @@ class ModelVersionCodec:
                 Exclusion(
                     ref=_decode_ref(ex["ref"], f"exclusions[{i}].ref"),
                     reason=_enum(ExclusionReason, ex["reason"], f"exclusions[{i}].reason"),
-                    round=_optional_int(ex["round"], f"exclusions[{i}].round"),
                     annotation_id=_optional_str(
                         ex["annotation_id"], f"exclusions[{i}].annotation_id"
                     ),
@@ -994,7 +989,6 @@ _LIMITS_FIELDS: Final = frozenset(
         "params",
         "seed",
         "stage_kind",
-        "round",
         "spawn_key",
         "created_at",
         "recalibration_id",
@@ -1042,7 +1036,6 @@ class LimitsRecordCodec:
             "params": _data(record.params),
             "seed": record.seed,
             "stage_kind": record.stage_kind,
-            "round": record.round,
             "spawn_key": list(record.spawn_key),
             "created_at": _encode_time(record.created_at),
             "recalibration_id": record.recalibration_id,
@@ -1076,7 +1069,6 @@ class LimitsRecordCodec:
             params=_mapping_data(raw["params"], "params"),
             seed=read_int(raw["seed"], "seed"),
             stage_kind=read_str(raw["stage_kind"], "stage_kind"),
-            round=read_int(raw["round"], "round"),
             spawn_key=tuple(
                 read_int(v, f"spawn_key[{i}]")
                 for i, v in enumerate(_items(raw["spawn_key"], "spawn_key"))
@@ -1101,7 +1093,6 @@ _COMPARISON_FIELDS: Final = frozenset(
         "model_id",
         "comparison_id",
         "recalibration_id",
-        "depuration_id",
         "fit_id",
         "limits_id",
         "status",
@@ -1148,7 +1139,6 @@ class ComparisonRecordCodec:
             "model_id": record.model_id,
             "comparison_id": record.comparison_id,
             "recalibration_id": record.recalibration_id,
-            "depuration_id": record.depuration_id,
             "fit_id": record.fit_id,
             "limits_id": record.limits_id,
             "status": record.status.value,
@@ -1181,7 +1171,6 @@ class ComparisonRecordCodec:
             model_id=read_str(raw["model_id"], "model_id"),
             comparison_id=read_str(raw["comparison_id"], "comparison_id"),
             recalibration_id=read_str(raw["recalibration_id"], "recalibration_id"),
-            depuration_id=read_str(raw["depuration_id"], "depuration_id"),
             fit_id=read_str(raw["fit_id"], "fit_id"),
             limits_id=read_str(raw["limits_id"], "limits_id"),
             status=_enum(JobStatus, raw["status"], "status"),

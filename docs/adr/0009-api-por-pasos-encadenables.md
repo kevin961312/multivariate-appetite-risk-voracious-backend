@@ -77,3 +77,11 @@ una; «si todo se hace en un solo API se colapsa».
 - **Pasos con datos en el cuerpo en lugar de referencias.** Más simple para el cliente, pero impide el linaje
   (de él sale la semilla) y reenvía matrices grandes en cada llamada.
 - **Un hilo/proceso común para todo.** Un bootstrap de minutos retrasaría puntuaciones de segundos; ver carriles.
+
+## Enmienda 2026-10-09: sin depuración automática
+
+Se retira el paso de depuración automática (ADR 0008, enmienda 2026-10-09): el ejemplo «si falla la ronda 3 de una
+depuración» y el paso `/depurations` del texto original ya no existen. Queda `/exclusions` (exclusión humana) y el
+dominio ya no ofrece `depurate_step`. Los límites de Fase I exigen `params` en lugar de heredarlos
+(`LIMITS_PARAMS_MISMATCH` desaparece). Contratos en la enmienda del ADR 0005.
+

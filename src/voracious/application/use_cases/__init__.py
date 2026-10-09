@@ -1,6 +1,6 @@
 """Casos de uso del ciclo de vida de una carta, comunes a todas las cartas.
 
-Fase I por pasos encadenables (datasets, ajustes, límites, depuraciones, modelo y tubería), Fase II
+Fase I por pasos encadenables (datasets, exclusiones, ajustes, límites, modelo y tubería), Fase II
 (puntuar y registrar observaciones), versiones, anotaciones, eventos estructurales, recalibración
 (paso a paso: comparación y propuesta de versión; o tubería) y estado de la carta (ADR 0005,
 ADR 0008).
@@ -44,14 +44,14 @@ from voracious.application.use_cases.recalibration_chain import RecalibrationCha
 from voracious.application.use_cases.steps import (
     DatasetLineage,
     GetDataset,
-    GetDepuration,
+    GetExclusion,
     GetFit,
     GetLimits,
-    RequestDepuration,
+    RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
-    RunDepurationJob,
+    RunExclusionJob,
     RunFitJob,
     RunLimitsJob,
     RunModelAssemblyJob,
@@ -76,7 +76,7 @@ __all__ = [
     "GetChartStatus",
     "GetComparison",
     "GetDataset",
-    "GetDepuration",
+    "GetExclusion",
     "GetFit",
     "GetLimits",
     "GetModel",
@@ -92,7 +92,7 @@ __all__ = [
     "RegisterStructuralEvent",
     "RejectVersion",
     "RequestComparison",
-    "RequestDepuration",
+    "RequestExclusion",
     "RequestFit",
     "RequestLimits",
     "RequestModel",
@@ -100,7 +100,7 @@ __all__ = [
     "RequestRecalibration",
     "RequestVersionProposal",
     "RunComparisonJob",
-    "RunDepurationJob",
+    "RunExclusionJob",
     "RunFitJob",
     "RunLimitsJob",
     "RunModelAssemblyJob",

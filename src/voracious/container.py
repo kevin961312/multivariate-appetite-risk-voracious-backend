@@ -25,7 +25,7 @@ from voracious.application.use_cases import (
     GetChartStatus,
     GetComparison,
     GetDataset,
-    GetDepuration,
+    GetExclusion,
     GetFit,
     GetLimits,
     GetModel,
@@ -41,7 +41,7 @@ from voracious.application.use_cases import (
     RegisterStructuralEvent,
     RejectVersion,
     RequestComparison,
-    RequestDepuration,
+    RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
@@ -49,7 +49,7 @@ from voracious.application.use_cases import (
     RequestRecalibration,
     RequestVersionProposal,
     RunComparisonJob,
-    RunDepurationJob,
+    RunExclusionJob,
     RunFitJob,
     RunLimitsJob,
     RunModelAssemblyJob,
@@ -74,7 +74,7 @@ from voracious.infrastructure.memory import (
     FitRecordCodec,
     InMemoryComparisonRepository,
     InMemoryDatasetStorage,
-    InMemoryDepurationRepository,
+    InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
     InMemoryModelRepository,
@@ -123,8 +123,8 @@ class UseCases:
         get_fit: Consulta de un ajuste.
         request_limits: Límites sobre un ajuste (``/limits``).
         get_limits: Consulta de unos límites.
-        request_depuration: Depuración (``/depurations``).
-        get_depuration: Consulta de una depuración.
+        request_exclusion: Exclusión humana (``/exclusions``).
+        get_exclusion: Consulta de una exclusión.
         request_model: Ensamblado de un modelo a partir de referencias (``/models``).
         request_pipeline: Fase I completa por pasos (``/pipelines/phase1``).
         get_pipeline: Consulta de una tubería.
@@ -154,8 +154,8 @@ class UseCases:
     get_fit: GetFit
     request_limits: RequestLimits
     get_limits: GetLimits
-    request_depuration: RequestDepuration
-    get_depuration: GetDepuration
+    request_exclusion: RequestExclusion
+    get_exclusion: GetExclusion
     request_model: RequestModel
     request_pipeline: RequestPhase1Pipeline
     get_pipeline: GetPipeline
@@ -372,7 +372,7 @@ def build_container(
     # codificados como datos (M1), cada uno con su carta; el resto se guarda tal cual.
     fits = InMemoryFitRepository(FitRecordCodec(steps))
     limits = InMemoryLimitsRepository(LimitsRecordCodec(steps))
-    depurations = InMemoryDepurationRepository()
+    exclusions = InMemoryExclusionRepository()
     pipelines = InMemoryPipelineRepository()
     models = InMemoryModelRepository(ModelRecordCodec(registry))
     monitorings = InMemoryMonitoringRepository()
@@ -396,31 +396,25 @@ def build_container(
             JobLane.ORCHESTRATION: resolved.queue_workers_orchestration,
         },
     )
-    chain = RecalibrationChain(rsteps, recalibrations, versions, annotations, depurations, clock)
+    chain = RecalibrationChain(rsteps, recalibrations, versions, annotations, clock)
     request_fit = RequestFit(steps, datasets, fits, queue, ids, clock)
-    request_limits = RequestLimits(
-        steps, datasets, fits, limits, depurations, queue, ids, clock, chain
-    )
-    request_depuration = RequestDepuration(
-        steps, datasets, fits, limits, depurations, queue, ids, clock, chain
-    )
-    request_model = RequestModel(
-        steps, datasets, fits, limits, depurations, models, queue, ids, clock
-    )
+    request_limits = RequestLimits(steps, datasets, fits, limits, queue, ids, clock, chain)
+    request_exclusion = RequestExclusion(steps, datasets, exclusions, queue, ids, clock, chain)
+    request_model = RequestModel(steps, datasets, fits, limits, models, queue, ids, clock)
     request_comparison = RequestComparison(
         registry,
         rsteps,
         recalibrations,
         datasets,
         fits,
-        depurations,
+        limits,
         comparisons,
         queue,
         ids,
         clock,
     )
     request_proposal = RequestVersionProposal(
-        steps, rsteps, recalibrations, versions, datasets, fits, limits, comparisons, queue, clock
+        rsteps, recalibrations, versions, datasets, fits, limits, comparisons, queue, clock
     )
     handlers.update(
         {
@@ -428,11 +422,11 @@ def build_container(
             JobKind.LIMITS: RunLimitsJob(
                 steps, datasets, fits, limits, mapper, queue, clock
             ).execute,
-            JobKind.DEPURATION: RunDepurationJob(
-                steps, datasets, fits, limits, depurations, queue, ids, clock, chain
+            JobKind.EXCLUSION: RunExclusionJob(
+                steps, datasets, exclusions, queue, ids, clock, chain
             ).execute,
             JobKind.MODEL_ASSEMBLY: RunModelAssemblyJob(
-                steps, datasets, fits, limits, depurations, models, versions, queue, clock
+                steps, datasets, fits, limits, models, versions, queue, clock
             ).execute,
             JobKind.PIPELINE: RunPipelineJob(
                 pipelines,
@@ -441,11 +435,11 @@ def build_container(
                     pipelines,
                     fits,
                     limits,
-                    depurations,
+                    exclusions,
                     models,
+                    request_exclusion,
                     request_fit,
                     request_limits,
-                    request_depuration,
                     request_model,
                     ids,
                     clock,
@@ -457,13 +451,13 @@ def build_container(
                     recalibrations,
                     fits,
                     limits,
-                    depurations,
+                    exclusions,
                     comparisons,
                     datasets,
                     chain,
+                    request_exclusion,
                     request_fit,
                     request_limits,
-                    request_depuration,
                     request_comparison,
                     request_proposal,
                     ids,
@@ -486,7 +480,6 @@ def build_container(
                 clock,
             ).execute,
             JobKind.VERSION_PROPOSAL: RunVersionProposalJob(
-                steps,
                 rsteps,
                 models,
                 versions,
@@ -495,7 +488,7 @@ def build_container(
                 datasets,
                 fits,
                 limits,
-                depurations,
+                exclusions,
                 comparisons,
                 queue,
                 clock,
@@ -509,8 +502,8 @@ def build_container(
         get_fit=GetFit(steps, fits),
         request_limits=request_limits,
         get_limits=GetLimits(steps, limits),
-        request_depuration=request_depuration,
-        get_depuration=GetDepuration(steps, depurations),
+        request_exclusion=request_exclusion,
+        get_exclusion=GetExclusion(steps, exclusions),
         request_model=request_model,
         request_pipeline=RequestPhase1Pipeline(steps, datasets, pipelines, queue, ids, clock),
         get_pipeline=GetPipeline(steps, pipelines),

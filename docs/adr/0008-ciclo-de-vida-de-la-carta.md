@@ -29,8 +29,8 @@ backend. El front solo muestra y pide. El ciclo:
 3. **Registro.** Cada observación puntuada se guarda con fecha (`observed_at`), lote (`batch_label`), valores,
    T², límite usado y versión. Las observaciones **con señal** se pueden anotar: causa asignable (sí/no), cuál,
    acción tomada (Q12: solo se anotan las que señalan).
-4. **Recalibración a petición** (base + rango de fechas): depuración (humana: causa asignable confirmada; y
-   automática iterativa, también en v0, Q3), comparación con la base (cambio en S y en μ), decisión
+4. **Recalibración a petición** (base + rango de fechas): exclusión humana (causa asignable confirmada en las anotaciones;
+   ~~depuración automática iterativa, Q3~~, superada el 2026-10-09), comparación con la base (cambio en S y en μ), decisión
    **ampliar o reemplazar**, nuevo límite de Fase II y una **versión inmutable en estado propuesta**, con
    reporte antes/después. **Solo rige cuando se aprueba.** Hereda B, α y parámetros MRCD de la versión vigente (Q8).
 5. **Régimen.** Cada versión aprobada tiene un límite vigente fijo; cada observación se evalúa con la versión
@@ -68,10 +68,9 @@ pedido). `phase2_alpha_limit` es configurable, default 0.005.
 - **Remuestreo solo sobre `best` (0.75), decisión del dueño 2026-10-07:** con todas las filas una contaminación
   no detectada inflaría el límite (enmascaramiento). Coste conocido y medido (n = 200, p = 3, B = 50): falsa
   alarma real ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase II frente al 0.5 % nominal (≈ 0.4 % con todas las
-  filas), porque `best` es el 75 % central; la depuración automática puede quitar entre 1 y 10 filas buenas.
-  Característica del diseño; estudio futuro: reponderado tipo MCD. La Fase I final de una recalibración no
-  vuelve a depurar (`final_depuration_skipped`), para no recortar filas buenas en cada versión.
-- **Depuración:** máximo 5 vueltas (técnico); si no converge, sigue con `converged=false` en el reporte (Q5).
+  filas), porque `best` es el 75 % central (cifras re-medidas en la enmienda 2026-10-09). Característica del
+  diseño; estudio futuro: reponderado tipo MCD.
+- ~~**Depuración:** máximo 5 vueltas (Q5)~~: superada el 2026-10-09; no hay depuración automática.
 - **«Límite Fase II > Fase I»** es un diagnóstico, no un invariante (Q9).
 - **Calidad de la tubería:** con estimador clásico y un muestreador de muestras independientes (normal, solo en
   `tests/`, nunca en `src/`) los límites simulados coinciden con Beta (Fase I) y F (Fase II), n > p. Valida la
@@ -94,10 +93,9 @@ pedido). `phase2_alpha_limit` es configurable, default 0.005.
 
 ## Consecuencias
 
-- **Coste:** la v0 hace hasta `(1 + max_depuration_rounds)·B` ajustes MRCD (cada ronda de depuración calibra); una
-  recalibración, hasta `(1 + rondas)·B` para depurar las filas nuevas más `B` en EXTEND (en REPLACE se reutiliza
-  la última calibración). Con B = 100 y 5 rondas son cientos de ajustes (la estimación del dueño era ≈ 300, 20–70
-  min en 8 núcleos con `pymrcd` actual, para el caso sin rondas extra). Siempre trabajo asíncrono (`202`).
+- **Coste:** la v0 hace `B` ajustes MRCD; una recalibración, `B` para las filas nuevas más `B` en EXTEND (en
+  REPLACE se reutiliza la calibración de las filas nuevas). Medido en el servidor: ver la enmienda 2026-10-09
+  (la estimación del dueño era ≈ 300 ajustes, 20–70 min en 8 núcleos). Siempre trabajo asíncrono (`202`).
   **M5** (optimizar `pymrcd`) es más urgente por este coste; antes de producción.
 - **Puertos nuevos previstos** (Paso 2b.2): `ModelVersionRepository` (append-only con CAS de estado),
   `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository`.
@@ -128,9 +126,9 @@ que decidió la implementación de `application/` y corrige un nombre.
   ya puntuada (Q6, `EFFECTIVE_FROM_NOT_AFTER_SCORED`) **y** al `effective_from` de la versión vigente; si no,
   dos versiones se solaparían en el tiempo.
 - **Candidatas de una recalibración.** Una observación excluida automáticamente en una recalibración **sigue
-  siendo candidata** en las posteriores (la depuración se repite con otra base y otro límite); solo las filas de
-  la base vigente se marcan `already_in_base` para no pasarlas dos veces como nuevas. `Exclusion.round` es
-  `None`: T²MRCD informa el total de rondas, no la ronda por fila.
+  siendo candidata** en las posteriores (no queda excluida de forma permanente); solo las filas de
+  la base vigente se marcan `already_in_base` para no pasarlas dos veces como nuevas. La exclusión por fila solo
+  puede ser humana (`Exclusion.round` desaparece con la depuración, enmienda 2026-10-09).
 - **Mínimo de observaciones.** La validación síncrona cuenta candidatas **antes** de quitar las de causa
   asignable (es una puerta barata previa a encolar) y el dominio **recomprueba** tras depurar
   (`RECALIBRATION_INSUFFICIENT_OBSERVATIONS`). No es doble criterio: son dos momentos del mismo mínimo.
@@ -156,3 +154,21 @@ que decidió la implementación de `application/` y corrige un nombre.
 - **Deuda declarada hacia el Paso 3:** atomicidad de «una propuesta / una recalibración por carta» (`PROPOSAL_PENDING`,
   `RECALIBRATION_IN_PROGRESS` se comprueban leyendo y luego escribiendo) y de `queued → running`; persistencia
   del objeto modelo (`T2MRCDModel.params` aún lleva estrategias como objetos: solo los **registros** guardan datos).
+
+## Enmienda 2026-10-09: sin depuración automática
+
+Supera **Q3** (depuración humana + automática) y **Q5** (máximo 5 vueltas). Decisión del dueño: no hay
+depuración automática; el único filtro de filas es la exclusión humana por causa asignable. **Por qué:** repetir
+«quitar lo que supera el límite» no converge con MRCD (no es «de composición»: cada vuelta vuelve a dejar fuera un
+25 % del nuevo total y el límite se calcula siempre sobre el 75 % sobrante); medido en el servidor, 200 × 300,
+B = 100, 2 vCPU: 200 → 150 → 113 → 85 → 64 → 48 → 36 filas en 6 rondas, 18,3 min, sin converger.
+
+- **Fase I:** exclusión humana opcional al inicio (solo sobre el dataset subido) → ajuste → límites → modelo, una
+  sola pasada.
+- **Recalibración:** candidatas → exclusión humana desde anotaciones con causa asignable → ajuste → límites
+  (NEW_ROWS) → comparación (o versión directa si reemplazo forzado) → si EXTEND, ajuste y límites de la
+  extensión → versión. Si no se alcanza `min_observations`, `insufficient`.
+- **Coste:** `B` ajustes por calibración. Una calibración con 200 × 300, B = 100, 2 procesos × 1 hilo: 5,5 min;
+  Fase I ≈ 6 min (estimado de la ronda 0 medida); memoria pico 245 MB; con la cascada antigua, 18,3 min.
+- **Campos eliminados:** `max_depuration_rounds`, `depuration_rounds`, `depuration_converged`,
+  `final_depuration_skipped`. Modelo, informe y metadatos de dataset pasan al formato 2; el 1 se rechaza.

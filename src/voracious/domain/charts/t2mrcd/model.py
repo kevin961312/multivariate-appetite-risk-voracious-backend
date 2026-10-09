@@ -27,26 +27,17 @@ class T2MRCDModel:
 
     Attributes:
         params: Parámetros con los que se ajustó. En una versión recalibrada son los heredados
-            del modelo vigente (incluido ``max_depuration_rounds``) con la semilla de la
-            recalibración; ver ``final_depuration_skipped``.
+            del modelo vigente con la semilla de la recalibración.
         mrcd: Ajuste MRCD de la base (las filas conservadas de la entrada).
         n_features: Número de variables ``p``.
-        base_mask: Filas de la entrada que forman la base (conservadas tras la exclusión humana y
-            la depuración automática).
+        base_mask: Filas de la entrada que forman la base (todas salvo las de la exclusión
+            humana; no hay depuración automática).
         row_disposition: Destino de cada fila de la entrada.
         clean_mask: Filas limpias de la entrada (las que se remuestrean; subconjunto de la base).
         limits: Límites bootstrap de Fase I y de Fase II.
         limit_regime: Qué límite vigila la Fase II de esta versión.
         historical_t2: T² de cada fila de la entrada con el ajuste final.
         historical_outlier: ``historical_t2 > limits.phase1_limit`` (estricto).
-        depuration_rounds: Rondas de depuración automática que quitaron filas (0 si no se
-            depuró).
-        depuration_converged: ``True`` si en el ajuste final ninguna fila de la base supera el
-            límite de Fase I; ``False`` si se agotaron las rondas; ``None`` si no se intentó
-            depurar (``final_depuration_skipped``).
-        final_depuration_skipped: ``True`` en las versiones recalibradas: la Fase I final no
-            vuelve a depurar la nueva base (la base vigente ya estaba depurada y las filas
-            nuevas se depuraron antes de comparar); ``False`` en la versión inicial.
         pymrcd_version: Versión de ``pymrcd`` del ajuste.
         seed: Semilla raíz del bootstrap.
         statistic_reference: Cita de la estadística T² con la que se ajustó.
@@ -62,9 +53,6 @@ class T2MRCDModel:
     limit_regime: LimitRegime
     historical_t2: FloatVector
     historical_outlier: BoolVector
-    depuration_rounds: int
-    depuration_converged: bool | None
-    final_depuration_skipped: bool
     pymrcd_version: str
     seed: int
     statistic_reference: str

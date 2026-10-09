@@ -13,7 +13,7 @@ from typing import Protocol
 from voracious.application.records import (
     ComparisonRecord,
     DatasetRecord,
-    DepurationRecord,
+    ExclusionRecord,
     FitRecord,
     LimitsRecord,
     ModelRecord,
@@ -33,8 +33,8 @@ __all__ = [
     "Clock",
     "ComparisonRepository",
     "DatasetStorage",
-    "DepurationRepository",
     "DuplicateKeyError",
+    "ExclusionRepository",
     "FitRepository",
     "IdGenerator",
     "JobKind",
@@ -205,11 +205,11 @@ class LimitsRepository(Protocol):
         ...
 
 
-class DepurationRepository(Protocol):
-    """Depuraciones (``/depurations``)."""
+class ExclusionRepository(Protocol):
+    """Exclusiones humanas (``/exclusions``)."""
 
-    def add(self, record: DepurationRecord) -> None:
-        """Guarda una depuración nueva.
+    def add(self, record: ExclusionRecord) -> None:
+        """Guarda una exclusión nueva.
 
         Args:
             record: Registro.
@@ -219,21 +219,21 @@ class DepurationRepository(Protocol):
         """
         ...
 
-    def get(self, tenant_id: str, chart_id: str, depuration_id: str) -> DepurationRecord | None:
-        """Busca una depuración.
+    def get(self, tenant_id: str, chart_id: str, exclusion_id: str) -> ExclusionRecord | None:
+        """Busca una exclusión.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración.
+            exclusion_id: Exclusión.
 
         Returns:
             El registro, o ``None`` si no existe para esa clave.
         """
         ...
 
-    def update(self, record: DepurationRecord) -> None:
-        """Reemplaza una depuración existente.
+    def update(self, record: ExclusionRecord) -> None:
+        """Reemplaza una exclusión existente.
 
         Args:
             record: Registro nuevo.
@@ -244,14 +244,14 @@ class DepurationRepository(Protocol):
         ...
 
     def claim(
-        self, tenant_id: str, chart_id: str, depuration_id: str, started_at: datetime
-    ) -> DepurationRecord | None:
-        """Pasa la depuración de ``queued`` a ``running`` de forma atómica.
+        self, tenant_id: str, chart_id: str, exclusion_id: str, started_at: datetime
+    ) -> ExclusionRecord | None:
+        """Pasa la exclusión de ``queued`` a ``running`` de forma atómica.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración.
+            exclusion_id: Exclusión.
             started_at: Instante de inicio (UTC).
 
         Returns:
@@ -975,8 +975,8 @@ class JobKind(StrEnum):
     LIMITS = "limits"
     """Calibración de límites bootstrap sobre un ajuste."""
 
-    DEPURATION = "depuration"
-    """Depuración automática iterativa."""
+    EXCLUSION = "exclusion"
+    """Exclusión humana de las filas con causa asignable (sin ajuste)."""
 
     MODEL_ASSEMBLY = "model_assembly"
     """Ensamblado de un modelo a partir de referencias (el recurso es el modelo)."""
@@ -1005,10 +1005,10 @@ class JobLane(StrEnum):
     """Ajustes del estimador."""
 
     CALIBRATION = "calibration"
-    """Calibraciones con réplicas, depuraciones y comparaciones (lo más costoso)."""
+    """Calibraciones con réplicas y comparaciones (lo más costoso)."""
 
     LIGHT = "light"
-    """Trabajos cortos: puntuar, ensamblar, proponer versión."""
+    """Trabajos cortos: excluir filas, puntuar, ensamblar, proponer versión."""
 
     ORCHESTRATION = "orchestration"
     """Tuberías que encadenan otros pasos."""
@@ -1017,8 +1017,8 @@ class JobLane(StrEnum):
 _LANES: dict[JobKind, JobLane] = {
     JobKind.MRCD_FIT: JobLane.ESTIMATION,
     JobKind.LIMITS: JobLane.CALIBRATION,
-    JobKind.DEPURATION: JobLane.CALIBRATION,
     JobKind.COMPARISON: JobLane.CALIBRATION,
+    JobKind.EXCLUSION: JobLane.LIGHT,
     JobKind.MODEL_ASSEMBLY: JobLane.LIGHT,
     JobKind.SCORE: JobLane.LIGHT,
     JobKind.VERSION_PROPOSAL: JobLane.LIGHT,
@@ -1051,7 +1051,7 @@ class JobRequest:
         tenant_id: Tenant.
         scope: Espacio del recurso: la carta (``t2mrcd``…) a la que pertenece.
         resource_id: Recurso que el trabajo actualiza (el ajuste en ``mrcd_fit``, los límites en
-            ``limits``, la depuración en ``depuration``, el modelo en ``model_assembly``, la
+            ``limits``, la exclusión en ``exclusion``, el modelo en ``model_assembly``, la
             puntuación en ``score``, la tubería en ``pipeline``, la comparación en
             ``comparison`` y la recalibración en ``version_proposal``).
         model_id: Modelo del que cuelga el recurso: obligatorio en ``score``,

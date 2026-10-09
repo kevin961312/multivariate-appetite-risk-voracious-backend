@@ -37,7 +37,7 @@ class RecalibrationCase:
 
 
 def contaminated(seed: int = 100) -> FloatArray:
-    """60 x 3 normal con 10 filas desplazadas: la depuración quita filas en dos rondas."""
+    """60 x 3 normal con 10 filas desplazadas (sin depuración automática siguen en la base)."""
     rng = np.random.default_rng(seed)
     x = rng.normal(size=(60, 3))
     x[:6] += rng.normal(scale=1.0, size=(6, 3)) + 4.0
@@ -46,7 +46,7 @@ def contaminated(seed: int = 100) -> FloatArray:
 
 
 def phase1_cases() -> dict[str, Phase1Case]:
-    """Casos de Fase I: n > p, p > n, contaminado, exclusión humana y rondas agotadas."""
+    """Casos de Fase I: n > p, p > n, contaminado y exclusión humana."""
     human = np.zeros(60, dtype=np.bool_)
     human[[0, 1, 2, 30]] = True
     return {
@@ -54,7 +54,6 @@ def phase1_cases() -> dict[str, Phase1Case]:
         "p_gt_n": Phase1Case(np.random.default_rng(5).normal(size=(15, 20)), fast_params()),
         "contaminated": Phase1Case(contaminated(), fast_params()),
         "human_exclusion": Phase1Case(contaminated(), fast_params(seed=8), human),
-        "max_rounds": Phase1Case(contaminated(), fast_params(max_depuration_rounds=1)),
     }
 
 
@@ -63,29 +62,31 @@ def active_case() -> Phase1Case:
     return Phase1Case(np.random.default_rng(20).normal(size=(80, 3)), fast_params())
 
 
-def _insufficient_after_depuration() -> FloatArray:
-    """30 x 3 con 7 filas muy desplazadas: empieza con 30 >= 25 filas, la depuración quita las 7 y
-    quedan 23 < ``min_observations`` dentro del bucle (``INSUFFICIENT`` tras una ronda)."""
+def _short_after_exclusion() -> tuple[FloatArray, npt.NDArray[np.bool_]]:
+    """30 x 3 con 7 filas con causa asignable: empieza con 30 >= 25 filas y la exclusión humana
+    deja 23 < ``min_observations`` (``INSUFFICIENT`` sin ajustar nada)."""
     x = np.random.default_rng(22).normal(size=(30, 3))
-    x[:7] += 9.0
-    return x
+    human = np.zeros(30, dtype=np.bool_)
+    human[:7] = True
+    return x, human
 
 
 def recalibration_cases() -> dict[str, RecalibrationCase]:
-    """Casos de recalibración: EXTEND, REPLACE, INSUFFICIENT (de entrada y dentro del bucle de
-    depuración) y reemplazo forzado."""
+    """Casos de recalibración: EXTEND, REPLACE, INSUFFICIENT (de entrada y tras la exclusión
+    humana) y reemplazo forzado."""
     rng = np.random.default_rng(21)
     in_control = rng.normal(size=(60, 3))
     in_control[4] += 6.0
     shifted = rng.normal(size=(60, 3)) + 3.0
     human = np.zeros(60, dtype=np.bool_)
     human[[1, 2]] = True
+    short, short_human = _short_after_exclusion()
     return {
         "extend": RecalibrationCase(in_control, solo_test_recalibration(), assignable_cause=human),
         "replace": RecalibrationCase(shifted, solo_test_recalibration(seed=12)),
         "insufficient": RecalibrationCase(rng.normal(size=(10, 3)), solo_test_recalibration()),
-        "insufficient_in_loop": RecalibrationCase(
-            _insufficient_after_depuration(), solo_test_recalibration(seed=14)
+        "insufficient_after_exclusion": RecalibrationCase(
+            short, solo_test_recalibration(seed=14), assignable_cause=short_human
         ),
         "forced": RecalibrationCase(
             in_control, T2MRCDRecalibrationParams(seed=13), force_replace=True

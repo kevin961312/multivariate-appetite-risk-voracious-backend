@@ -71,12 +71,11 @@ _BOOTSTRAP_FIELDS: Final = frozenset(
     }
 )
 _MRCD_FIELDS: Final = frozenset({"alpha", "h", "maxcsteps", "rho", "target", "maxcond"})
-_PARAMS_FIELDS: Final = frozenset({"bootstrap", "mrcd", "max_depuration_rounds"})
+_PARAMS_FIELDS: Final = frozenset({"bootstrap", "mrcd"})
 _RECALIBRATION_FIELDS: Final = frozenset(
     {
         "seed",
         "min_observations",
-        "max_depuration_rounds",
         "relative_change_threshold",
         "threshold_decides",
         "relative_change_metric",
@@ -400,7 +399,6 @@ def encode_params(
             ),
         },
         "mrcd": _encode_mrcd(params.mrcd),
-        "max_depuration_rounds": params.max_depuration_rounds,
     }
 
 
@@ -480,9 +478,6 @@ def decode_params(
     return T2MRCDParams(
         bootstrap=bootstrap,
         mrcd=_decode_mrcd(raw["mrcd"]) if "mrcd" in raw else default.mrcd,
-        max_depuration_rounds=_int(raw["max_depuration_rounds"], "max_depuration_rounds")
-        if "max_depuration_rounds" in raw
-        else default.max_depuration_rounds,
     )
 
 
@@ -504,7 +499,6 @@ def encode_recalibration_params(
     return {
         "seed": params.seed,
         "min_observations": params.min_observations,
-        "max_depuration_rounds": params.max_depuration_rounds,
         "relative_change_threshold": params.relative_change_threshold,
         "threshold_decides": params.threshold_decides,
         "relative_change_metric": _name_of(
@@ -555,11 +549,6 @@ def decode_recalibration_params(
         min_observations=_int(raw["min_observations"], "recalibration.min_observations")
         if "min_observations" in raw
         else default.min_observations,
-        max_depuration_rounds=_int(
-            raw["max_depuration_rounds"], "recalibration.max_depuration_rounds"
-        )
-        if "max_depuration_rounds" in raw
-        else default.max_depuration_rounds,
         relative_change_threshold=_float(
             raw["relative_change_threshold"], "recalibration.relative_change_threshold"
         )

@@ -1,12 +1,12 @@
-"""Una ronda de Fase I de T²MRCD: ajuste MRCD, filas limpias y límites bootstrap.
+"""Ajuste y calibración de T²MRCD: ajuste MRCD, filas limpias y límites bootstrap.
 
-La usan la Fase I (``fit_phase1``, en cada ronda de la depuración automática) y la recalibración
-(depuración de las filas nuevas y Fase I final). Estimador: MRCD, siempre (ADR 0002); muestreador:
-``BootstrapOOBSampler``, siempre. Ninguno se expone en ``T2MRCDParams``.
+Lo usan la Fase I (``fit_phase1``) y la recalibración (filas nuevas y Fase I final). Estimador:
+MRCD, siempre (ADR 0002); muestreador: ``BootstrapOOBSampler``, siempre. Ninguno se expone en
+``T2MRCDParams``.
 
-Una ronda son dos pasos separables (vuelta 3.2 del Paso 3): ``fit_base`` (ajuste MRCD de las filas)
-y ``calibrate_stage`` (criterio de fila limpia y límites bootstrap); ``fit_stage`` es su
-composición. Así un orquestador puede ejecutarlos por separado sin cambiar ningún bit.
+Son dos pasos separables (vuelta 3.2 del Paso 3): ``fit_base`` (ajuste MRCD de las filas) y
+``calibrate_stage`` (criterio de fila limpia y límites bootstrap); ``fit_stage`` es su composición.
+Así un orquestador puede ejecutarlos por separado sin cambiar ningún bit.
 """
 
 from dataclasses import dataclass
@@ -18,12 +18,10 @@ from voracious.domain.charts.t2mrcd.bootstrap import BootstrapLimits, calibrate_
 from voracious.domain.charts.t2mrcd.params import LimitAggregation, T2MRCDParams
 from voracious.domain.charts.t2mrcd.phase2_limit import bootstrap_oob_sampler
 from voracious.domain.charts.t2mrcd.seeds import SpawnKey
-from voracious.domain.charts.t2mrcd.statistic import t2
 from voracious.domain.common import (
     BoolVector,
     EstimationError,
     FloatMatrix,
-    FloatVector,
     InvalidInputError,
     TaskMapper,
 )
@@ -53,7 +51,7 @@ MAX_REPORTED_ROWS: Final = 20
 
 @dataclass(frozen=True, eq=False)
 class Phase1Stage:
-    """Resultado de una ronda de Fase I sobre las filas ``rows`` de la entrada.
+    """Ajuste y calibración sobre las filas ``rows`` de la entrada.
 
     Attributes:
         fit: Ajuste MRCD de esas filas.
@@ -64,22 +62,6 @@ class Phase1Stage:
     fit: MRCDFit
     clean: BoolVector
     limits: BootstrapLimits
-
-    @property
-    def phase1_limit(self) -> float:
-        """Límite de Fase I de la ronda (el que usa la depuración automática)."""
-        return self.limits.phase1_limit
-
-    def t2(self, x: FloatMatrix) -> FloatVector:
-        """T² de ``x`` con el ajuste de la ronda.
-
-        Args:
-            x: Observaciones ``m x p``.
-
-        Returns:
-            Vector de ``m`` valores T².
-        """
-        return t2(self.fit, x)
 
 
 @dataclass(frozen=True)
@@ -98,10 +80,10 @@ class Aggregations:
 def fit_base(
     x: FloatMatrix, rows: IndexVector, params: T2MRCDParams, *, n_threads: int | None = None
 ) -> MRCDFit:
-    """Ajusta MRCD sobre las filas de una ronda y exige que todas sean utilizables.
+    """Ajusta MRCD sobre unas filas y exige que todas sean utilizables.
 
     Args:
-        x: Filas de la ronda ``n_k x p`` (finitas).
+        x: Filas ``n_k x p`` (finitas).
         rows: Índices de esas filas en la entrada original (solo para los mensajes).
         params: Parámetros de la carta.
         n_threads: Hilos de ``pymrcd`` (rendimiento; no cambia ningún bit, ver ``fit_mrcd``).
@@ -159,10 +141,10 @@ def calibrate_stage(
     mapper: TaskMapper,
     n_threads: int | None = None,
 ) -> Phase1Stage:
-    """Aplica el criterio de fila limpia al ajuste de la ronda y calibra los límites.
+    """Aplica el criterio de fila limpia al ajuste y calibra los límites.
 
     Args:
-        x: Filas de la ronda ``n_k x p``, las mismas con las que se ajustó ``fit``.
+        x: Filas ``n_k x p``, las mismas con las que se ajustó ``fit``.
         fit: Ajuste MRCD de esas filas (``fit_base``).
         params: Parámetros de la carta.
         aggregations: Agregaciones de Fase I y de Fase II resueltas.
@@ -172,7 +154,7 @@ def calibrate_stage(
         n_threads: Hilos de ``pymrcd`` en cada réplica (rendimiento; no cambia ningún bit).
 
     Returns:
-        La ronda.
+        El ajuste con sus filas limpias y sus límites.
 
     Raises:
         EstimationError: ``T2MRCD_CLEAN_CRITERION_INVALID``, ``T2MRCD_NO_CLEAN_OBSERVATIONS`` o un
@@ -218,10 +200,10 @@ def fit_stage(
     mapper: TaskMapper,
     n_threads: int | None = None,
 ) -> Phase1Stage:
-    """Ronda completa: ``fit_base`` seguido de ``calibrate_stage`` (composición, sin más lógica).
+    """``fit_base`` seguido de ``calibrate_stage`` (composición, sin más lógica).
 
     Args:
-        x: Filas de la ronda ``n_k x p`` (finitas).
+        x: Filas ``n_k x p`` (finitas).
         rows: Índices de esas filas en la entrada original (solo para los mensajes).
         params: Parámetros de la carta.
         aggregation: Agregación de Fase I (ya resuelta, no ``None``).
@@ -232,7 +214,7 @@ def fit_stage(
         n_threads: Hilos de ``pymrcd`` (rendimiento; no cambia ningún bit).
 
     Returns:
-        La ronda.
+        El ajuste con sus filas limpias y sus límites.
 
     Raises:
         InvalidInputError: Filas finitas cuya suma desborda (``rrcov`` las descartaría).

@@ -39,7 +39,7 @@ def test_container_wires_use_cases_and_handlers() -> None:
         assert set(container.handlers) == {
             JobKind.MRCD_FIT,
             JobKind.LIMITS,
-            JobKind.DEPURATION,
+            JobKind.EXCLUSION,
             JobKind.MODEL_ASSEMBLY,
             JobKind.PIPELINE,
             JobKind.SCORE,

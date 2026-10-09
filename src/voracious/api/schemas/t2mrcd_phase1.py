@@ -1,6 +1,6 @@
 """Schemas HTTP de los pasos de la Fase I de T²MRCD (vuelta 3.3).
 
-``/fits``, ``/limits``, ``/depurations``, ``/models`` (solo referencias) y
+``/exclusions``, ``/fits``, ``/limits``, ``/models`` (solo referencias) y
 ``/pipelines/phase1``. Como en ``t2mrcd.py``, lo que el cliente omite no se rellena aquí: lo
 decide la carta con sus defaults citados (``alpha`` de MRCD 0.75, P2).
 """
@@ -22,7 +22,7 @@ from voracious.api.schemas.t2mrcd import (
 )
 from voracious.application.records import (
     AssignableCause,
-    DepurationRecord,
+    ExclusionRecord,
     FitRecord,
     LimitsRecord,
     PipelineRecord,
@@ -31,9 +31,9 @@ from voracious.domain.common import RowDisposition
 
 __all__ = [
     "AssignableCauseIn",
-    "DepurationInclude",
-    "DepurationRequest",
-    "DepurationResponse",
+    "ExclusionInclude",
+    "ExclusionRequest",
+    "ExclusionResponse",
     "FitInclude",
     "FitRequest",
     "FitResponse",
@@ -51,8 +51,8 @@ FitInclude = Literal["covariance"]
 LimitsInclude = Literal["clean_rows"]
 """Partes grandes opcionales de ``GET /limits/{id}``."""
 
-DepurationInclude = Literal["row_disposition"]
-"""Partes grandes opcionales de ``GET /depurations/{id}``."""
+ExclusionInclude = Literal["row_disposition"]
+"""Partes grandes opcionales de ``GET /exclusions/{id}``."""
 
 
 # --- peticiones -----------------------------------------------------------------------------------
@@ -75,9 +75,7 @@ class LimitsRequest(RequestModel):
 
     Attributes:
         fit_id: Ajuste ``succeeded``; sus parámetros de MRCD deben ser los que usará la carta.
-        params: Parámetros de la carta (Fase I). Obligatorios si el dataset del ajuste no viene
-            de una ronda automática; si viene, se heredan de los límites que lo produjeron y, si
-            se mandan, deben ser iguales (``LIMITS_PARAMS_MISMATCH``).
+        params: Parámetros de la carta (Fase I; obligatorios sin ``recalibration_id``).
         recalibration_id: Recalibración del dataset del ajuste: los parámetros se heredan de la
             versión base (Q8) con la semilla de la recalibración.
     """
@@ -122,59 +120,35 @@ class AssignableCauseIn(RequestModel):
         return AssignableCause(row=self.row, cause=self.cause)
 
 
-class DepurationRequest(RequestModel):
-    """Depuración: ``{dataset_id, assignable_cause}`` o ``{fit_id, limits_id}``.
+class ExclusionRequest(RequestModel):
+    """Exclusión humana: ``{dataset_id, assignable_cause}``.
 
-    La exclusión humana referencia el dataset (sin ajuste) y solo se admite al principio; en las
-    candidatas de una recalibración se pide con ``{dataset_id}`` solo (sale de las anotaciones).
-    La ronda automática referencia el ajuste y sus límites. La forma la valida el caso de uso
+    Referencia el dataset (sin ajuste) y en la Fase I solo se admite sobre el dataset subido. En
+    las candidatas de una recalibración se pide con ``{dataset_id}`` solo (las filas salen de las
+    anotaciones con causa asignable confirmada). La forma la valida el caso de uso
     (``details.reason``).
 
     Attributes:
-        dataset_id: Dataset (exclusión humana).
-        fit_id: Ajuste ``succeeded`` (ronda automática).
-        limits_id: Límites del mismo ajuste (ronda automática).
-        assignable_cause: Filas del dataset con causa asignable (exclusión humana).
+        dataset_id: Dataset.
+        assignable_cause: Filas del dataset con causa asignable.
     """
 
-    dataset_id: str | None = Field(default=None, min_length=1)
-    fit_id: str | None = Field(default=None, min_length=1)
-    limits_id: str | None = Field(default=None, min_length=1)
+    dataset_id: str = Field(min_length=1)
     assignable_cause: list[AssignableCauseIn] = Field(default_factory=list)
 
 
 class ModelFromRefsRequest(RequestModel):
-    """Modelo a partir de referencias: ``{depuration_id}`` o ``{fit_id, limits_id}``.
+    """Modelo a partir de referencias: ``{fit_id, limits_id}``.
 
     Attributes:
-        depuration_id: Depuración final.
-        fit_id: Ajuste final (sin depuración automática posterior).
+        fit_id: Ajuste (del dataset subido o de su exclusión humana).
         limits_id: Límites de ese ajuste.
         lifecycle_policy: Política de revalidación.
     """
 
-    depuration_id: str | None = Field(default=None, min_length=1)
-    fit_id: str | None = Field(default=None, min_length=1)
-    limits_id: str | None = Field(default=None, min_length=1)
+    fit_id: str = Field(min_length=1)
+    limits_id: str = Field(min_length=1)
     lifecycle_policy: LifecyclePolicyIn | None = None
-
-    @model_validator(mode="after")
-    def _one_form(self) -> Self:
-        """Exige exactamente una de las dos formas.
-
-        Returns:
-            El modelo validado.
-
-        Raises:
-            ValueError: Si no es exactamente una forma.
-        """
-        by_depuration = self.depuration_id is not None
-        by_refs = self.fit_id is not None and self.limits_id is not None
-        partial = (self.fit_id is None) != (self.limits_id is None)
-        if by_depuration == by_refs or partial:
-            msg = "se pide con {depuration_id} o con {fit_id, limits_id}"
-            raise ValueError(msg)
-        return self
 
 
 class Phase1PipelineRequest(RequestModel):
@@ -244,7 +218,6 @@ class LimitsResponse(ResponseModel):
     params: dict[str, object]
     seed: int
     stage_kind: str
-    round: int
     spawn_key: list[int]
     recalibration_id: str | None
     created_at: datetime
@@ -273,7 +246,6 @@ class LimitsResponse(ResponseModel):
             params=dict(record.params),
             seed=record.seed,
             stage_kind=record.stage_kind,
-            round=record.round,
             spawn_key=list(record.spawn_key),
             recalibration_id=record.recalibration_id,
             created_at=record.created_at,
@@ -295,36 +267,29 @@ class AssignableCauseOut(ResponseModel):
     annotation_id: str | None
 
 
-class DepurationResponse(ResponseModel):
-    """Estado de una depuración y, si terminó bien, su resultado."""
+class ExclusionResponse(ResponseModel):
+    """Estado de una exclusión humana y, si terminó bien, su resultado."""
 
     id: str
     status: JobState
     dataset_id: str
-    fit_id: str | None
-    limits_id: str | None
-    round: int
     assignable_cause: list[AssignableCauseOut]
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
-    converged: bool | None
-    final: bool | None
-    exhausted: bool | None
+    insufficient: bool | None
     output_dataset_id: str | None
-    next_step: str | None
     n_kept: int | None
     n_excluded_assignable_cause: int | None
-    n_excluded_automatic: int | None
     row_disposition: list[str] | None = None
     error: ErrorBody | None = None
 
     @classmethod
-    def of(cls, record: DepurationRecord, include: Collection[str]) -> "DepurationResponse":
+    def of(cls, record: ExclusionRecord, include: Collection[str]) -> "ExclusionResponse":
         """Convierte el registro.
 
         Args:
-            record: Depuración.
+            record: Exclusión.
             include: Partes opcionales.
 
         Returns:
@@ -336,12 +301,9 @@ class DepurationResponse(ResponseModel):
             return None if result is None else sum(1 for d in result if d is kind)
 
         return cls(
-            id=record.depuration_id,
+            id=record.exclusion_id,
             status=record.status.value,
             dataset_id=record.dataset_id,
-            fit_id=record.fit_id,
-            limits_id=record.limits_id,
-            round=record.round,
             assignable_cause=[
                 AssignableCauseOut(row=a.row, cause=a.cause, annotation_id=a.annotation_id)
                 for a in record.assignable_cause
@@ -349,14 +311,10 @@ class DepurationResponse(ResponseModel):
             created_at=record.created_at,
             started_at=record.started_at,
             finished_at=record.finished_at,
-            converged=record.converged,
-            final=record.final,
-            exhausted=record.exhausted,
+            insufficient=record.insufficient,
             output_dataset_id=record.output_dataset_id,
-            next_step=None if record.next_step is None else record.next_step.value,
             n_kept=count(RowDisposition.KEPT),
             n_excluded_assignable_cause=count(RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE),
-            n_excluded_automatic=count(RowDisposition.EXCLUDED_AUTOMATIC),
             row_disposition=None
             if result is None or "row_disposition" not in include
             else [d.value for d in result],

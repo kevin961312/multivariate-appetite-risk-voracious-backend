@@ -3,7 +3,6 @@ import pytest
 
 from voracious.domain.charts.t2mrcd import (
     DEFAULT_ALPHA_LIMIT,
-    DEFAULT_MAX_DEPURATION_ROUNDS,
     DEFAULT_N_REPLICATES,
     DEFAULT_PHASE2_ALPHA_LIMIT,
     T2MRCD_MRCD_ALPHA,
@@ -30,7 +29,6 @@ def test_production_defaults_and_nothing_pending() -> None:
         "bootstrap.phase2_aggregation"
     ]
     params = T2MRCDParams(bootstrap=boot)
-    assert params.max_depuration_rounds == DEFAULT_MAX_DEPURATION_ROUNDS == 5  # Q5
     assert params.mrcd.alpha == T2MRCD_MRCD_ALPHA == 0.75  # dueño 2026-10-07 (P2)
     assert params.mrcd == MRCDParams(alpha=0.75)
     # El adaptador conserva el default de rrcov; solo cambia el de la carta.
@@ -72,8 +70,7 @@ def test_numpy_integers_are_accepted() -> None:
     assert boot.seed == 3
 
 
-@pytest.mark.parametrize("rounds", [-1, 1.0, True, "2"])
-def test_invalid_max_depuration_rounds(rounds: object) -> None:
-    with pytest.raises(InvalidInputError) as info:
-        T2MRCDParams(bootstrap=T2MRCDBootstrap(seed=1), max_depuration_rounds=rounds)
-    assert info.value.details["field"] == "max_depuration_rounds"
+def test_there_is_no_automatic_depuration_parameter() -> None:
+    """Decisión del dueño (2026-10-09): sin depuración automática iterativa ni su parámetro."""
+    with pytest.raises(TypeError):
+        T2MRCDParams(**{"bootstrap": T2MRCDBootstrap(seed=1), "max_depuration_rounds": 1})

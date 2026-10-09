@@ -8,7 +8,7 @@ import numpy.typing as npt
 from support.memory import (
     InMemoryComparisonRepository,
     InMemoryDatasetStorage,
-    InMemoryDepurationRepository,
+    InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
     InMemoryModelRepository,
@@ -41,7 +41,7 @@ from voracious.application.use_cases import (
     GetChartStatus,
     GetComparison,
     GetDataset,
-    GetDepuration,
+    GetExclusion,
     GetFit,
     GetLimits,
     GetModel,
@@ -56,7 +56,7 @@ from voracious.application.use_cases import (
     RegisterStructuralEvent,
     RejectVersion,
     RequestComparison,
-    RequestDepuration,
+    RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
@@ -64,7 +64,7 @@ from voracious.application.use_cases import (
     RequestRecalibration,
     RequestVersionProposal,
     RunComparisonJob,
-    RunDepurationJob,
+    RunExclusionJob,
     RunFitJob,
     RunLimitsJob,
     RunModelAssemblyJob,
@@ -106,7 +106,7 @@ class App:
     datasets: InMemoryDatasetStorage = field(default_factory=InMemoryDatasetStorage)
     fits: InMemoryFitRepository = field(default_factory=InMemoryFitRepository)
     limits: InMemoryLimitsRepository = field(default_factory=InMemoryLimitsRepository)
-    depurations: InMemoryDepurationRepository = field(default_factory=InMemoryDepurationRepository)
+    exclusions: InMemoryExclusionRepository = field(default_factory=InMemoryExclusionRepository)
     pipelines: InMemoryPipelineRepository = field(default_factory=InMemoryPipelineRepository)
     comparisons: InMemoryComparisonRepository = field(default_factory=InMemoryComparisonRepository)
 
@@ -136,7 +136,6 @@ class App:
             self.recalibrations,
             self.versions,
             self.annotations,
-            self.depurations,
             self.clock,
         )
 
@@ -163,7 +162,6 @@ class App:
             self.datasets,
             self.fits,
             self.limits,
-            self.depurations,
             self.queue,
             self.ids,
             self.clock,
@@ -184,29 +182,25 @@ class App:
             self.clock,
         )
 
-    def request_depuration(self) -> RequestDepuration:
-        return RequestDepuration(
+    def request_exclusion(self) -> RequestExclusion:
+        return RequestExclusion(
             self.steps,
             self.datasets,
-            self.fits,
-            self.limits,
-            self.depurations,
+            self.exclusions,
             self.queue,
             self.ids,
             self.clock,
             self.chain,
         )
 
-    def get_depuration(self) -> GetDepuration:
-        return GetDepuration(self.steps, self.depurations)
+    def get_exclusion(self) -> GetExclusion:
+        return GetExclusion(self.steps, self.exclusions)
 
-    def run_depuration(self) -> RunDepurationJob:
-        return RunDepurationJob(
+    def run_exclusion(self) -> RunExclusionJob:
+        return RunExclusionJob(
             self.steps,
             self.datasets,
-            self.fits,
-            self.limits,
-            self.depurations,
+            self.exclusions,
             self.queue,
             self.ids,
             self.clock,
@@ -219,7 +213,6 @@ class App:
             self.datasets,
             self.fits,
             self.limits,
-            self.depurations,
             self.models,
             self.queue,
             self.ids,
@@ -232,7 +225,6 @@ class App:
             self.datasets,
             self.fits,
             self.limits,
-            self.depurations,
             self.models,
             self.versions,
             self.queue,
@@ -256,11 +248,11 @@ class App:
             self.pipelines,
             self.fits,
             self.limits,
-            self.depurations,
+            self.exclusions,
             self.models,
+            self.request_exclusion(),
             self.request_fit(),
             self.request_limits(),
-            self.request_depuration(),
             self.request_model(),
             self.ids,
             self.clock,
@@ -362,13 +354,13 @@ class App:
             self.recalibrations,
             self.fits,
             self.limits,
-            self.depurations,
+            self.exclusions,
             self.comparisons,
             self.datasets,
             self.chain,
+            self.request_exclusion(),
             self.request_fit(),
             self.request_limits(),
-            self.request_depuration(),
             self.request_comparison(),
             self.request_version_proposal(),
             self.ids,
@@ -382,7 +374,7 @@ class App:
             self.recalibrations,
             self.datasets,
             self.fits,
-            self.depurations,
+            self.limits,
             self.comparisons,
             self.queue,
             self.ids,
@@ -408,7 +400,6 @@ class App:
 
     def request_version_proposal(self) -> RequestVersionProposal:
         return RequestVersionProposal(
-            self.steps,
             self.rsteps,
             self.recalibrations,
             self.versions,
@@ -422,7 +413,6 @@ class App:
 
     def run_version_proposal(self) -> RunVersionProposalJob:
         return RunVersionProposalJob(
-            self.steps,
             self.rsteps,
             self.models,
             self.versions,
@@ -431,7 +421,7 @@ class App:
             self.datasets,
             self.fits,
             self.limits,
-            self.depurations,
+            self.exclusions,
             self.comparisons,
             self.queue,
             self.clock,
@@ -464,7 +454,7 @@ class App:
         runners = {
             JobKind.MRCD_FIT: self.run_fit,
             JobKind.LIMITS: self.run_limits,
-            JobKind.DEPURATION: self.run_depuration,
+            JobKind.EXCLUSION: self.run_exclusion,
             JobKind.MODEL_ASSEMBLY: self.run_assembly,
             JobKind.PIPELINE: self.run_pipeline,
             JobKind.SCORE: self.run_monitoring,

@@ -146,12 +146,10 @@ class T2MRCDParamsIn(RequestModel):
     Attributes:
         bootstrap: Bootstrap de los límites.
         mrcd: Parámetros de MRCD.
-        max_depuration_rounds: Rondas máximas de depuración automática.
     """
 
     bootstrap: BootstrapIn
     mrcd: MRCDIn | None = None
-    max_depuration_rounds: int | None = Field(default=None, ge=0)
 
     def to_domain(self) -> T2MRCDParams:
         """Construye los parámetros de dominio con solo los campos enviados.
@@ -164,8 +162,6 @@ class T2MRCDParamsIn(RequestModel):
         )
         if self.mrcd is not None:
             params = replace(params, mrcd=self.mrcd.to_domain())
-        if self.max_depuration_rounds is not None:
-            params = replace(params, max_depuration_rounds=self.max_depuration_rounds)
         return params
 
 
@@ -275,14 +271,12 @@ class RecalibrationParamsIn(RequestModel):
     Attributes:
         seed: Semilla raíz (obligatoria).
         min_observations: Mínimo de filas nuevas conservadas.
-        max_depuration_rounds: Rondas máximas de depuración.
         relative_change_threshold: Umbral del cambio relativo.
         threshold_decides: Si el umbral decide.
     """
 
     seed: int = Field(ge=0)
     min_observations: int | None = Field(default=None, ge=1)
-    max_depuration_rounds: int | None = Field(default=None, ge=0)
     relative_change_threshold: FiniteFloat | None = Field(default=None, gt=0)
     threshold_decides: bool | None = None
 
@@ -444,9 +438,6 @@ class T2MRCDModelOut(ResponseModel):
     operative_limit: float
     limits: LimitsOut
     mrcd: MRCDFitOut
-    depuration_rounds: int
-    depuration_converged: bool | None
-    final_depuration_skipped: bool
     pymrcd_version: str
     seed: int
     statistic_reference: str
@@ -478,9 +469,6 @@ class T2MRCDModelOut(ResponseModel):
             operative_limit=model.operative_limit,
             limits=LimitsOut.of(model.limits),
             mrcd=MRCDFitOut.of(model.mrcd, covariance="covariance" in include),
-            depuration_rounds=model.depuration_rounds,
-            depuration_converged=model.depuration_converged,
-            final_depuration_skipped=model.final_depuration_skipped,
             pymrcd_version=model.pymrcd_version,
             seed=model.seed,
             statistic_reference=model.statistic_reference,
@@ -495,7 +483,7 @@ class ProvenanceOut(ResponseModel):
     root_dataset_id: str
     fit_id: str
     limits_id: str
-    depuration_ids: list[str]
+    exclusion_id: str | None
 
 
 class LifecyclePolicyOut(ResponseModel):
@@ -554,7 +542,7 @@ class ModelResponse(ResponseModel):
                 root_dataset_id=record.provenance.root_dataset_id,
                 fit_id=record.provenance.fit_id,
                 limits_id=record.provenance.limits_id,
-                depuration_ids=list(record.provenance.depuration_ids),
+                exclusion_id=record.provenance.exclusion_id,
             ),
             result=None if record.model is None else T2MRCDModelOut.of(record.model, include),
             error=error_body(record.error),
@@ -811,11 +799,8 @@ class RecalibrationReportOut(ResponseModel):
     n_base: int
     n_new: int
     n_excluded_assignable_cause: int
-    n_excluded_automatic: int
     n_kept_new: int
     min_observations: int
-    depuration_rounds: int
-    depuration_converged: bool | None
     comparison: ComparisonOut | None
     before: LimitsSnapshotOut
     after: LimitsSnapshotOut | None
@@ -845,11 +830,8 @@ class RecalibrationReportOut(ResponseModel):
             n_base=report.n_base,
             n_new=report.n_new,
             n_excluded_assignable_cause=report.n_excluded_assignable_cause,
-            n_excluded_automatic=report.n_excluded_automatic,
             n_kept_new=report.n_kept_new,
             min_observations=report.min_observations,
-            depuration_rounds=report.depuration_rounds,
-            depuration_converged=report.depuration_converged,
             comparison=None if report.comparison is None else ComparisonOut.of(report.comparison),
             before=LimitsSnapshotOut.of(report.before),
             after=None if report.after is None else LimitsSnapshotOut.of(report.after),
@@ -873,7 +855,6 @@ class ExclusionOut(ResponseModel):
     source: str
     ref: str
     reason: str
-    round: int | None
     annotation_id: str | None
 
 
@@ -972,7 +953,6 @@ class VersionDetail(VersionSummary):
                         source=str(e.ref.source),
                         ref=e.ref.ref,
                         reason=str(e.reason),
-                        round=e.round,
                         annotation_id=e.annotation_id,
                     )
                     for e in version.exclusions

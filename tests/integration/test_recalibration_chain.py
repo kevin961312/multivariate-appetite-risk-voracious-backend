@@ -2,20 +2,24 @@
 
 Tres caminos sobre el mismo modelo y las mismas observaciones:
 
-- **paso a paso** por HTTP: ``/fits`` → (exclusión humana) → ``/limits`` con
-  ``recalibration_id`` → ``/depurations`` … → ``…/comparisons`` → (``extend``: ajuste y límites
-  del dataset de extensión) → ``…/versions``;
+- **paso a paso** por HTTP: (exclusión humana, ``/exclusions``) → ``/fits`` → ``/limits`` con
+  ``recalibration_id`` → ``…/comparisons`` con ``{fit_id, limits_id}`` → (``extend``: ajuste y
+  límites del dataset de extensión) → ``…/versions``;
 - **tubería** (``mode = pipeline``), que encadena los mismos casos de uso;
 - ``T2MRCDChart.recalibrate`` directo, con la base y el modelo de la versión 0.
 
-Se comparan en bits (``support.bits``) el modelo, el informe, ``base_hash``, ``base_refs`` y
-``exclusions`` en tres casos: EXTEND (pruebas formales «SOLO TEST» de ``tests/support``,
-registradas solo aquí, con exclusión humana por anotaciones), REPLACE forzado e INSUFFICIENT. Se
-comprueban los huecos de semilla de cada calibración: ``(1, r)`` las rondas de las filas nuevas y
-``(0, 0)`` la base ampliada.
+Se comparan en bits (``support.bits``) el modelo, el informe, ``base_hash``, ``base_refs``,
+``exclusions`` y la decisión en cuatro casos: EXTEND (pruebas formales «SOLO TEST» de
+``tests/support``, registradas solo aquí, con exclusión humana por anotaciones), REPLACE no
+forzado (las mismas pruebas, con la media de las filas nuevas desplazada para que decidan
+``replace``), REPLACE forzado e INSUFFICIENT (la exclusión humana deja menos de
+``min_observations``). Sin depuración automática iterativa (decisión del dueño, 2026-10-09). Se
+comprueban los huecos de semilla de cada calibración: ``(1, 0)`` las filas nuevas (que REPLACE
+reutiliza) y ``(0, 0)`` la base ampliada.
 
 Las pruebas formales no se pueden mandar por HTTP (en producción están pendientes, P3), así que
-en EXTEND la recalibración se **abre** con el caso de uso y todo lo demás va por HTTP.
+en EXTEND y en REPLACE no forzado la recalibración se **abre** con el caso de uso y todo lo demás
+va por HTTP.
 """
 
 from collections.abc import Iterator
@@ -44,7 +48,7 @@ from voracious.application.records import (
 from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import (
-    SLOT_NEW_ROWS_DEPURATION,
+    SLOT_NEW_ROWS,
     SLOT_PHASE1,
     T2MRCDChart,
     T2MRCDRecalibrationParams,
@@ -86,9 +90,11 @@ class Scenario:
     annotation_ids: dict[int, str]
 
 
-def _scenario(client: TestClient, seed: int, annotate: tuple[int, ...] = ()) -> Scenario:
+def _scenario(
+    client: TestClient, seed: int, annotate: tuple[int, ...] = (), shift: float = 0.0
+) -> Scenario:
     model_id = train(client, seed=3)
-    x = small_data(N, 4, seed=seed)
+    x = small_data(N, 4, seed=seed) + shift
     x[list(SHIFTED)] += 8.0
     rows = [
         {"observed_at": (T0 + timedelta(hours=i)).isoformat(), "values": row}
@@ -127,20 +133,20 @@ def _fit(client: TestClient, dataset_id: str) -> str:
     return fit_id
 
 
-def _limits(client: TestClient, fit_id: str, rid: str, kind: str, round_: int) -> str:
+def _limits(client: TestClient, fit_id: str, rid: str, kind: str) -> str:
     body = {"fit_id": fit_id, "recalibration_id": rid}
     limits_id = str(_post(client, f"{CHART_BASE}/limits", body)["id"])
     limits = _done(client, f"{CHART_BASE}/limits/{limits_id}")
-    slot = SLOT_NEW_ROWS_DEPURATION if kind == "new_rows" else SLOT_PHASE1
-    assert (limits["stage_kind"], limits["round"]) == (kind, round_)
-    assert limits["spawn_key"] == [slot, round_]
+    slot = SLOT_NEW_ROWS if kind == "new_rows" else SLOT_PHASE1
+    assert limits["stage_kind"] == kind
+    assert limits["spawn_key"] == [slot, 0]
     assert limits["recalibration_id"] == rid
     return limits_id
 
 
-def _depurate(client: TestClient, body: dict[str, Any]) -> dict[str, Any]:
-    depuration_id = _post(client, f"{CHART_BASE}/depurations", body)["id"]
-    return _done(client, f"{CHART_BASE}/depurations/{depuration_id}")
+def _exclude(client: TestClient, body: dict[str, Any]) -> dict[str, Any]:
+    exclusion_id = _post(client, f"{CHART_BASE}/exclusions", body)["id"]
+    return _done(client, f"{CHART_BASE}/exclusions/{exclusion_id}")
 
 
 def _stepwise(
@@ -150,36 +156,27 @@ def _stepwise(
     url = f"{BASE}/{model_id}/recalibrations/{rid}"
     if human:
         # Exclusión humana sobre el dataset de candidatas, sin ajustarlo antes.
-        body = _depurate(client, {"dataset_id": candidates})
+        body = _exclude(client, {"dataset_id": candidates})
         assert body["n_excluded_assignable_cause"] > 0
         assert all(a["annotation_id"] for a in body["assignable_cause"])
-        if body["exhausted"]:
+        if body["insufficient"]:
+            assert body["output_dataset_id"] is None
             return _done(client, url)
         candidates = body["output_dataset_id"]
     fit_id = _fit(client, candidates)
-    rounds = 0
-    while True:
-        limits_id = _limits(client, fit_id, rid, "new_rows", rounds)
-        body = _depurate(client, {"fit_id": fit_id, "limits_id": limits_id})
-        if body["exhausted"]:
-            return _done(client, url)
-        if body["next_step"] == "model":
-            final = body
-            break
-        rounds += 1
-        fit_id = _fit(client, body["output_dataset_id"])
+    limits_id = _limits(client, fit_id, rid, "new_rows")
     version: dict[str, Any] = {"recalibration_id": rid, "fit_id": fit_id, "limits_id": limits_id}
     if not forced:
         comparison_id = _post(
             client,
             f"{BASE}/{model_id}/comparisons",
-            {"recalibration_id": rid, "depuration_id": final["id"]},
+            {"recalibration_id": rid, "fit_id": fit_id, "limits_id": limits_id},
         )["id"]
         comparison = _done(client, f"{BASE}/{model_id}/comparisons/{comparison_id}")
         version["comparison_id"] = comparison_id
         if comparison["decision"] == "extend":
             ext_fit = _fit(client, comparison["extension_dataset_id"])
-            ext_limits = _limits(client, ext_fit, rid, "extension", 0)
+            ext_limits = _limits(client, ext_fit, rid, "extension")
             version.update(fit_id=ext_fit, limits_id=ext_limits)
     accepted = _post(client, f"{BASE}/{model_id}/versions", version)
     assert accepted["id"] == rid
@@ -228,17 +225,11 @@ def _expected_base(
         refs = v0.base_refs + kept_refs
     else:
         data, refs = scenario.x[kept], kept_refs
-    reasons = {
-        RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE: ExclusionReason.ASSIGNABLE_CAUSE,
-        RowDisposition.EXCLUDED_AUTOMATIC: ExclusionReason.AUTOMATIC,
-    }
     exclusions = tuple(
         Exclusion(
             ref=BaseRowRef(BaseRowSource.OBSERVATION, scenario.observation_ids[i]),
-            reason=reasons[d],
-            annotation_id=scenario.annotation_ids.get(i)
-            if d is RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE
-            else None,
+            reason=ExclusionReason.ASSIGNABLE_CAUSE,
+            annotation_id=scenario.annotation_ids.get(i),
         )
         for i, d in enumerate(new)
         if d is not RowDisposition.KEPT
@@ -272,15 +263,15 @@ def _check(
     return version
 
 
-def _pipeline_slots(client: TestClient, pipeline_id: str) -> list[tuple[str, int, list[int]]]:
-    """Linaje y hueco de semilla de cada calibración que creó la tubería, en orden."""
+def _pipeline_slots(client: TestClient, pipeline_id: str) -> list[tuple[str, list[int]]]:
+    """Operación y hueco de semilla de cada calibración que creó la tubería, en orden."""
     body = _done(client, f"{CHART_BASE}/pipelines/{pipeline_id}")
     assert body["kind"] == "recalibration"
     out = []
     for step in body["steps"]:
         if step["kind"] == "limits":
             limits = _done(client, f"{CHART_BASE}/limits/{step['id']}")
-            out.append((limits["stage_kind"], limits["round"], limits["spawn_key"]))
+            out.append((limits["stage_kind"], limits["spawn_key"]))
     return out
 
 
@@ -298,8 +289,8 @@ def test_extend_with_human_exclusion_matches_recalibrate_in_bits(
     outcome = _reference(container, scenario, params, annotate=annotate, forced=False)
     assert outcome.decision is RecalibrationDecision.EXTEND
     assert outcome.report.n_excluded_assignable_cause == 1
-    assert outcome.report.n_excluded_automatic > 0
-    assert outcome.report.depuration_rounds >= 1
+    # Sin depuración automática: las filas desplazadas sin causa asignable se conservan.
+    assert outcome.report.n_kept_new == N - 1
 
     open_ = container.use_cases.request_recalibration
     rid = open_.execute(
@@ -334,11 +325,74 @@ def test_extend_with_human_exclusion_matches_recalibrate_in_bits(
     assert piped["mode"] == "pipeline"
     pipeline = _check(container, scenario, piped, outcome)
     _same_version(stepwise, pipeline)
-    rounds = outcome.report.depuration_rounds
     assert _pipeline_slots(client, piped["pipeline_id"]) == [
-        *(("new_rows", r, [SLOT_NEW_ROWS_DEPURATION, r]) for r in range(rounds + 1)),
-        ("extension", 0, [SLOT_PHASE1, 0]),
+        ("new_rows", [SLOT_NEW_ROWS, 0]),
+        ("extension", [SLOT_PHASE1, 0]),
     ]
+    steps = client.get(f"{CHART_BASE}/pipelines/{piped['pipeline_id']}", headers=TENANT)
+    kinds = [s["kind"] for s in steps.json()["steps"]]
+    assert kinds == ["exclusion", "fit", "limits", "comparison", "fit", "limits", "version"]
+
+
+def test_unforced_replace_with_human_exclusion_matches_recalibrate_in_bits(
+    client: TestClient, container: Container
+) -> None:
+    annotate = (3,)
+    # Media de las filas nuevas desplazada en todas las variables: las pruebas deciden REPLACE.
+    scenario = _scenario(client, seed=53, annotate=annotate, shift=3.0)
+    params = solo_test_recalibration(seed=13, min_observations=10)
+    outcome = _reference(container, scenario, params, annotate=annotate, forced=False)
+    assert outcome.decision is RecalibrationDecision.REPLACE
+    assert outcome.report.n_excluded_assignable_cause == 1
+    assert outcome.report.n_kept_new == N - 1
+
+    open_ = container.use_cases.request_recalibration
+    rid = open_.execute(
+        TENANT_ID,
+        CHART_ID,
+        scenario.model_id,
+        range_from=T0,
+        range_to=END,
+        params=params,
+        mode=RecalibrationMode.STEPWISE,
+    )
+    session = container.use_cases.get_recalibration.execute(
+        TENANT_ID, CHART_ID, scenario.model_id, rid
+    )
+    assert session.status.value == "running"
+    assert session.candidates_dataset_id is not None
+    recal = _stepwise(
+        client, scenario.model_id, rid, session.candidates_dataset_id, human=True, forced=False
+    )
+    assert recal["outcome"] == "replace"
+    assert recal["proposal"]["comparison_id"] is not None
+    comparison = _done(
+        client, f"{BASE}/{scenario.model_id}/comparisons/{recal['proposal']['comparison_id']}"
+    )
+    assert comparison["decision"] == "replace"
+    assert comparison["extension_dataset_id"] is None
+    stepwise = _check(container, scenario, recal, outcome)
+    assert stepwise.decision is RecalibrationDecision.REPLACE
+    human = [e for e in stepwise.exclusions if e.reason is ExclusionReason.ASSIGNABLE_CAUSE]
+    assert [e.ref.ref for e in human] == [scenario.observation_ids[3]]
+    assert all(e.annotation_id for e in human)
+    assert stepwise.justification == "change_detected"
+    _reject(client, scenario.model_id, stepwise.number)
+
+    pid = open_.execute(
+        TENANT_ID, CHART_ID, scenario.model_id, range_from=T0, range_to=END, params=params
+    )
+    piped = _done(client, f"{BASE}/{scenario.model_id}/recalibrations/{pid}")
+    assert piped["mode"] == "pipeline"
+    assert piped["outcome"] == "replace"
+    pipeline = _check(container, scenario, piped, outcome)
+    _same_version(stepwise, pipeline)
+    assert pipeline.justification == "change_detected"
+    # REPLACE reutiliza el ajuste y los límites de las filas nuevas: un solo hueco, (1, 0).
+    assert _pipeline_slots(client, piped["pipeline_id"]) == [("new_rows", [SLOT_NEW_ROWS, 0])]
+    steps = client.get(f"{CHART_BASE}/pipelines/{piped['pipeline_id']}", headers=TENANT)
+    kinds = [s["kind"] for s in steps.json()["steps"]]
+    assert kinds == ["exclusion", "fit", "limits", "comparison", "version"]
 
 
 def test_forced_replace_matches_recalibrate_in_bits(
@@ -380,28 +434,16 @@ def test_forced_replace_matches_recalibrate_in_bits(
     _same_version(stepwise, pipeline)
     steps = client.get(f"{CHART_BASE}/pipelines/{piped['pipeline_id']}", headers=TENANT)
     kinds = [s["kind"] for s in steps.json()["steps"]]
-    assert kinds[-1] == "version"
-    assert "comparison" not in kinds
-    rounds = outcome.report.depuration_rounds
-    assert _pipeline_slots(client, piped["pipeline_id"]) == [
-        ("new_rows", r, [SLOT_NEW_ROWS_DEPURATION, r]) for r in range(rounds + 1)
-    ]
+    assert kinds == ["fit", "limits", "version"]
+    assert _pipeline_slots(client, piped["pipeline_id"]) == [("new_rows", [SLOT_NEW_ROWS, 0])]
 
 
-@pytest.mark.parametrize(
-    ("annotate", "min_observations", "rounds"),
-    [((), N - 1, 1), ((3,), N, 0)],
-    ids=["automatic", "human"],
-)
-def test_insufficient_matches_recalibrate_in_bits(
-    client: TestClient,
-    container: Container,
-    annotate: tuple[int, ...],
-    min_observations: int,
-    rounds: int,
+def test_insufficient_after_human_exclusion_matches_recalibrate_in_bits(
+    client: TestClient, container: Container
 ) -> None:
+    annotate = (3,)
     scenario = _scenario(client, seed=52, annotate=annotate)
-    raw = {"seed": 9, "min_observations": min_observations}
+    raw = {"seed": 9, "min_observations": N}
     body = {
         "range_from": T0.isoformat(),
         "range_to": END.isoformat(),
@@ -411,7 +453,7 @@ def test_insufficient_matches_recalibrate_in_bits(
     params = T2MRCDChart().decode_recalibration_params(raw)
     outcome = _reference(container, scenario, params, annotate=annotate, forced=True)
     assert outcome.decision is RecalibrationDecision.INSUFFICIENT
-    assert outcome.report.depuration_rounds == rounds
+    assert outcome.report.n_kept_new == N - 1
 
     results = []
     opened = _post(
@@ -423,7 +465,7 @@ def test_insufficient_matches_recalibrate_in_bits(
             scenario.model_id,
             opened["recalibration_id"],
             opened["candidates_dataset_id"],
-            human=bool(annotate),
+            human=True,
             forced=True,
         )
     )

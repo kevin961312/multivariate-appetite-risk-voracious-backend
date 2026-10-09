@@ -29,14 +29,9 @@ def fast_bootstrap(seed: int = 7, n_replicates: int = 5) -> T2MRCDBootstrap:
     return T2MRCDBootstrap(n_replicates=n_replicates, seed=seed)
 
 
-def fast_params(
-    seed: int = 7, n_replicates: int = 5, max_depuration_rounds: int | None = None
-) -> T2MRCDParams:
+def fast_params(seed: int = 7, n_replicates: int = 5) -> T2MRCDParams:
     """Parámetros de T²MRCD con los defaults de producción y B reducido por velocidad."""
-    boot = fast_bootstrap(seed, n_replicates)
-    if max_depuration_rounds is None:
-        return T2MRCDParams(bootstrap=boot)
-    return T2MRCDParams(bootstrap=boot, max_depuration_rounds=max_depuration_rounds)
+    return T2MRCDParams(bootstrap=fast_bootstrap(seed, n_replicates))
 
 
 def solo_test_recalibration(seed: int = 11, **overrides: object) -> T2MRCDRecalibrationParams:

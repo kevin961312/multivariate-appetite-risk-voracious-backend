@@ -16,8 +16,8 @@ from voracious.application.ports import DuplicateKeyError, RecordNotFoundError
 from voracious.application.records import (
     DatasetRecord,
     DatasetSource,
-    DepurationRecord,
     ErrorInfo,
+    ExclusionRecord,
     FitRecord,
     JobStatus,
     LifecyclePolicy,
@@ -29,12 +29,12 @@ from voracious.application.records import (
     PipelineStep,
 )
 from voracious.domain.charts.t2mrcd import T2MRCDChart
-from voracious.domain.common import SerialTaskMapper, StageKind, StageLineage
+from voracious.domain.common import SerialTaskMapper, StageKind
 from voracious.infrastructure.charts import T2MRCDPhase1Steps
 from voracious.infrastructure.memory import (
     FitRecordCodec,
     InMemoryDatasetStorage,
-    InMemoryDepurationRepository,
+    InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
     InMemoryModelRepository,
@@ -59,11 +59,11 @@ def _fit(tenant: str = "t", rid: str = "f") -> FitRecord:
 
 
 def _limits(tenant: str = "t", rid: str = "l") -> LimitsRecord:
-    return LimitsRecord(tenant, "c", rid, "f", JobStatus.QUEUED, {}, 1, "phase1", 0, (0, 0), T)
+    return LimitsRecord(tenant, "c", rid, "f", JobStatus.QUEUED, {}, 1, "phase1", (0, 0), T)
 
 
-def _depuration(tenant: str = "t", rid: str = "x") -> DepurationRecord:
-    return DepurationRecord(tenant, "c", rid, "f", JobStatus.QUEUED, (), 0, T)
+def _exclusion(tenant: str = "t", rid: str = "x") -> ExclusionRecord:
+    return ExclusionRecord(tenant, "c", rid, "d", JobStatus.QUEUED, (), T)
 
 
 def _pipeline(tenant: str = "t", rid: str = "p") -> PipelineRecord:
@@ -75,7 +75,7 @@ def _pipeline(tenant: str = "t", rid: str = "p") -> PipelineRecord:
 JOB_REPOS = [
     (InMemoryFitRepository, _fit),
     (InMemoryLimitsRepository, _limits),
-    (InMemoryDepurationRepository, _depuration),
+    (InMemoryExclusionRepository, _exclusion),
     (InMemoryPipelineRepository, _pipeline),
 ]
 
@@ -87,7 +87,7 @@ def test_job_repositories_contract(repo_type: type, make: object) -> None:
     rid = {
         FitRecord: "f",
         LimitsRecord: "l",
-        DepurationRecord: "x",
+        ExclusionRecord: "x",
         PipelineRecord: "p",
     }[type(record)]
     repo.add(record)
@@ -137,11 +137,10 @@ def test_local_dataset_storage_round_trip_in_bits(tmp_path: Path) -> None:
     root = _dataset()
     derived = _dataset(
         rid="d2",
-        source=DatasetSource.DEPURATION_OUTPUT,
+        source=DatasetSource.EXCLUSION_OUTPUT,
         parent_id="d",
         rows=np.array([0, 2, 4], dtype=np.int64),
-        lineage_round=1,
-        origin_ref="dep-1",
+        origin_ref="exc-1",
     )
     for record in (root, derived):
         storage.add(record)
@@ -167,6 +166,11 @@ def test_local_dataset_storage_rejects_tampering_and_bad_records(tmp_path: Path)
     meta.write_text(json.dumps(doc))
     with pytest.raises(DatasetIntegrityError, match="huella"):
         storage.get("t", "d")
+    legacy = {**doc, "format_version": 1, "lineage_round": 0}
+    meta.write_text(json.dumps(legacy))
+    with pytest.raises(DatasetIntegrityError, match="formato desconocido"):
+        storage.get("t", "d")
+    meta.write_text(json.dumps(doc))
     np.save(tmp_path / "t" / "d.npy", np.zeros(3), allow_pickle=False)
     with pytest.raises(DatasetIntegrityError, match="float64"):
         storage.get("t", "d")
@@ -183,7 +187,7 @@ def fitted() -> tuple[object, object, np.ndarray]:
     params = adapter.encode_params(fast_params())
     fit = adapter.fit(x, adapter.fit_params_of(params))
     calibration = adapter.calibrate(
-        x, fit, params, lineage=StageLineage(StageKind.PHASE1), mapper=SerialTaskMapper()
+        x, fit, params, kind=StageKind.PHASE1, mapper=SerialTaskMapper()
     )
     return fit, calibration.limits, calibration.clean
 
@@ -235,7 +239,7 @@ def test_model_record_codec_keeps_provenance() -> None:
         {},
         small_data(4, 2),
         T,
-        provenance=ModelProvenance("d", "f", "l", ("x1", "x2")),
+        provenance=ModelProvenance("d", "f", "l", "x1"),
         pipeline_id="p",
     )
     repo = InMemoryModelRepository(ModelRecordCodec({"t2mrcd": T2MRCDChart()}))

@@ -21,6 +21,7 @@ def test_every_kind_has_a_lane() -> None:
     assert lane_of(JobKind.MRCD_FIT) is JobLane.ESTIMATION
     assert lane_of(JobKind.LIMITS) is JobLane.CALIBRATION
     assert lane_of(JobKind.SCORE) is JobLane.LIGHT
+    assert lane_of(JobKind.EXCLUSION) is JobLane.LIGHT
     assert lane_of(JobKind.PIPELINE) is JobLane.ORCHESTRATION
 
 

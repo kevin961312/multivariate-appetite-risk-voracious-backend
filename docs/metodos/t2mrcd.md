@@ -9,11 +9,12 @@ cita no hay default ([CLAUDE.md](../../CLAUDE.md), regla dura 3).
 Estado: el dominio (Paso 2) existe y **con los defaults decididos la Fase I se ejecuta completa** (P2, P3, P4,
 P5 y P6 cerradas el 2026-10-07). El mecanismo `failed / T2MRCD_DECISION_PENDING` se conserva: si alguien pasa
 explícitamente un campo decisivo como `None`, la Fase I se detiene antes de ajustar nada. La API HTTP es del Paso 3.
-**Paso 2b.1 (dominio, commit `c44f86d`):** dos límites (Fase I y Fase II por OOB), agregación pool, depuración
-automática, comparación y recalibración como funciones del dominio. **Paso 2b.2 (aplicación, implementada el
+**Paso 2b.1 (dominio, commit `c44f86d`):** dos límites (Fase I y Fase II por OOB), agregación pool,
+comparación y recalibración como funciones del dominio. **Paso 2b.2 (aplicación, implementada el
 2026-10-07):** versiones persistidas, registro de observaciones, anotaciones, eventos y
 aprobación, con los parámetros guardados como datos (ver «Parámetros como datos (M1)»). Rutas HTTP y adaptadores
-reales: Paso 3.
+reales: Paso 3 (hecho). **Sin depuración automática (decisión del dueño, 2026-10-09):** ver «Sin depuración
+automática».
 
 - **Estimador declarado:** MRCD, siempre. Sin *fallbacks* ni «modos rápidos» (ADR 0004, punto 5): si MRCD
   falla, la Fase I termina en `failed / MRCD_FIT_FAILED`.
@@ -74,14 +75,15 @@ fases se calibran por bootstrap sobre las filas limpias. El porqué completo y l
 están en el [ADR 0007](../adr/0007-limites-t2mrcd-por-bootstrap.md).
 
 - **Semillas:** huecos fijos de `seeds.py` (`SeedSequence(seed, spawn_key=…)`), **no** `spawn(B)`. Cada uso
-  aleatorio tiene su hueco: `(0, r)` calibración de la ronda `r` de la Fase I (y, con `r = 0`, la Fase I final de
-  EXTEND); `(1, r)` calibración de la ronda `r` de la depuración de las filas nuevas al recalibrar; `(2,)` prueba
-  de S; `(3,)` prueba de μ. Dentro de una calibración con clave `k`: `k+(0,i)` es la réplica `i` y `k+(1,0)`,
-  `k+(1,1)` los diagnósticos del error Monte Carlo. Por qué: con `spawn(B)` cambiar B, las rondas o los
-  remuestreos de una prueba desplazaría las semillas de los demás usos; con huecos fijos no. En REPLACE el
-  modelo **reutiliza** la calibración de la última ronda de depuración de las filas nuevas (misma base, mismo
-  orden, mismos parámetros y semilla), así que sus límites conservan el hueco `(1, r)` en lugar de repetir las B
-  réplicas. El resultado no depende del número de procesos.
+  aleatorio tiene su hueco: `(0, 0)` calibración de la Fase I (y de la Fase I final de EXTEND); `(1, 0)`
+  calibración de las filas nuevas al recalibrar; `(2,)` prueba de S; `(3,)` prueba de μ. Dentro de una
+  calibración con clave `k`: `k+(0,i)` es la réplica `i` y `k+(1,0)`, `k+(1,1)` los diagnósticos del error Monte
+  Carlo. Por qué: con `spawn(B)` cambiar B o los remuestreos de una prueba desplazaría las semillas de los demás
+  usos; con huecos fijos no. El segundo componente de los dos primeros huecos (`STAGE_INDEX = 0`) era el número
+  de ronda de la depuración; se **conserva en 0** para que los bits sigan siendo los mismos tras quitarla. En
+  REPLACE el modelo **reutiliza** la calibración de las filas nuevas (misma base, mismo orden, mismos parámetros
+  y semilla), así que sus límites conservan el hueco `(1, 0)` en lugar de repetir las B réplicas. El resultado no
+  depende del número de procesos.
 - **Réplica fallida = Fase I fallida** (`BOOTSTRAP_REPLICATE_FAILED`): no se descartan réplicas.
 - **Reparto:** por `TaskMapper` (dominio) con el contexto enviado una vez; el adaptador con procesos es del Paso 3.
 - **Dos límites, mismas réplicas (2b).** Cada réplica remuestrea **con reemplazo `h` filas** (las limpias) y
@@ -109,9 +111,12 @@ con todas las filas, una contaminación no detectada entraría en el remuestreo 
 (enmascaramiento); `best` es la mejor estimación de la parte limpia. **Consecuencia conocida, medida por el
 validador** (n = 200, p = 3, normal limpia, B = 50): la falsa alarma real frente a observaciones nuevas en
 control es ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase II frente al 0.5 % nominal (con todas las filas, ≈ 0.4 %),
-porque `best` es el 75 % central y las nuevas incluyen las colas. Del mismo modo, la depuración automática con ese
-límite puede quitar entre 1 y 10 filas buenas. Es una **característica del diseño**, no un error. **Estudio
-futuro posible:** reponderado tipo MCD (añadir a `best` las observaciones con distancia robusta no extrema).
+porque `best` es el 75 % central y las nuevas incluyen las colas. **Re-medida sin depuración por el validador
+(2026-10-09; 12 réplicas, n = 200, p = 3, B = 50, 20 000 observaciones nuevas):** Fase I media 2.29 % (rango
+0.96–3.77 %) y Fase II 2.10 % (0.91–2.82 %); son medias entre semillas y una sola semilla puede dar ~1–3.8 %. La
+depuración apenas las movía. **No medido:** el caso p > n. Es una **característica del diseño**, no un error.
+El dueño confirmó (2026-10-09) mantener el cuantil por **pool**, el grupo de Fase I = **toda la muestra
+sorteada** (opción i) y **no** hacer estudio de simulación del sesgo. **Estudio futuro posible:** reponderado tipo MCD (añadir a `best` las observaciones con distancia robusta no extrema).
 
 **Ejemplo (n = 100, p = 250).** `h = ceiling(0.75·100) = 75`: MRCD (alpha 0.75) deja 75 filas limpias. Cada una
 de las B = 100 réplicas remuestrea 75 filas con reemplazo y ajusta MRCD (con p > n, rho por número de condición,
@@ -147,20 +152,20 @@ Orden de `fit_phase1` (dominio 2b.1), y por qué:
    silencio las filas no finitas (`CovMrcd.R:19-20`); la carta necesita un T² por cada observación histórica y
    por eso las **rechaza** en lugar de descartarlas.
 2. **Comprobar pendientes** (solo si un campo se pasó como `None`; `T2MRCD_DECISION_PENDING`) **antes** de gastar minutos de cómputo.
-3. **Exclusión humana:** las filas con causa asignable confirmada (`assignable_cause`) se quitan primero; una
-   persona sabe lo que un umbral no.
-4. **Depuración automática** (hasta `max_depuration_rounds`, 5): en cada ronda, ajuste MRCD, filas limpias,
-   límites bootstrap, y se quitan las filas con `T² > límite de Fase I`; se repite hasta converger. Si se agotan
-   las rondas, `depuration_converged = False`.
-5. **Ajustar MRCD** a la base final (`MRCD_FIT_FAILED` si `pymrcd` falla). Si alguna fila finita queda fuera del
-   ajuste porque su suma por fila desborda (`rrcov` también la descarta, `CovMrcd.R:19-20`), se rechaza con
+3. **Exclusión humana opcional:** las filas con causa asignable confirmada (`assignable_cause`) se quitan
+   primero, solo sobre el dataset subido; una persona sabe lo que un umbral no. **No hay depuración
+   automática:** una sola pasada (ver «Sin depuración automática»).
+4. **Ajustar MRCD** a la base (todas las filas salvo las excluidas por una persona; `MRCD_FIT_FAILED` si `pymrcd` falla). Si
+   alguna fila finita queda fuera del ajuste porque su suma por fila desborda (`rrcov` también la descarta, `CovMrcd.R:19-20`), se rechaza con
    `INVALID_INPUT` y `details.rows` (máx. 20), por la misma razón que en el punto 1.
-6. **Aplicar el criterio de fila limpia** (P2: subconjunto `best` de MRCD con alpha 0.75). Debe devolver una máscara booleana de longitud n
+5. **Aplicar el criterio de fila limpia** (P2: subconjunto `best` de MRCD con alpha 0.75). Debe devolver una máscara booleana de longitud n
    (`T2MRCD_CLEAN_CRITERION_INVALID`) con al menos una fila `True` (`T2MRCD_NO_CLEAN_OBSERVATIONS`).
-7. **Calibrar los límites** por bootstrap (`BOOTSTRAP_REPLICATE_FAILED`, `BOOTSTRAP_LIMIT_NOT_FINITE`).
-8. **Puntuar el histórico** y marcar las atípicas.
+6. **Calibrar los límites** por bootstrap (`BOOTSTRAP_REPLICATE_FAILED`, `BOOTSTRAP_LIMIT_NOT_FINITE`).
+7. **Puntuar el histórico** y marcar las atípicas.
 
-Coste: hasta `(1 + max_depuration_rounds)·B` ajustes MRCD en la Fase I de la v0 (cada ronda calibra).
+Coste: `B` ajustes MRCD en la Fase I (una sola calibración). **Medido en el servidor** (200 × 300, B = 100,
+2 procesos × 1 hilo, 2 vCPU): una calibración 5,5 min; Fase I completa ≈ 6 min (estimado a partir de la
+calibración medida); memoria pico 245 MB. La cascada antigua tardó 18,3 min sin converger.
 
 `n_replicates` y `seed` solo admiten **enteros** (`bool` y `float` se rechazan, `n_replicates >= 1`,
 `seed >= 0`): una cuenta de réplicas o una semilla ambiguas (`True`, `100.0`) no deben interpretarse en
@@ -172,18 +177,27 @@ silencio porque cambiarían el resultado sin dejar rastro. `alpha_limit`, si se 
 | --- | --- |
 | `params`, `n_features` | Parámetros y `p` con los que se ajustó |
 | `mrcd` | Ajuste MRCD del histórico completo (ver [`mrcd.md`](mrcd.md)) |
-| `base_mask` | Filas de la entrada que forman la base (tras exclusión humana y depuración automática) |
-| `row_disposition` | Destino de cada fila de la entrada (`RowDisposition`: conservada, causa asignable, automática, ya en la base) |
+| `base_mask` | Filas de la entrada que forman la base (todas las filas salvo las de la exclusión humana) |
+| `row_disposition` | Destino de cada fila de la entrada (`RowDisposition`: conservada, causa asignable, ya en la base) |
 | `clean_mask` | Filas limpias de la entrada (las remuestreadas; subconjunto de la base) |
 | `limits` | `phase1_limit` y `phase2_limit` y su procedencia: `n_clean`, `seed`, `n_replicates` (B), `alpha_limit`, `phase2_alpha_limit`, error Monte Carlo |
 | `limit_regime` | `LimitRegime`: `PHASE1_PROVISIONAL` (v0) o `PHASE2` (recalibradas). `operative_limit` = `phase1_limit` o `phase2_limit` según el régimen |
 | `historical_t2` | T² de cada fila de la entrada con el ajuste final |
 | `historical_outlier` | `historical_t2 > phase1_limit` (**estricto**) |
-| `depuration_rounds` | Rondas de depuración automática que quitaron filas |
-| `depuration_converged` | `True`/`False` en la v0; **`None` en las recalibradas** (no se intentó depurar) |
-| `final_depuration_skipped` | `True` en las recalibradas: la Fase I final **no vuelve a depurar** la nueva base. Motivo: la base vigente ya estaba depurada y las filas nuevas se depuraron antes de comparar; depurar otra vez con el límite de `best` (ver arriba) recortaría filas buenas en cada versión |
 | `pymrcd_version` | Versión de `pymrcd` del ajuste, para auditar reproducibilidad |
 | `seed`, `statistic_reference` | Semilla raíz y cita de la estadística (P6) con las que se ajustó |
+
+## Sin depuración automática (decisión del dueño, 2026-10-09)
+
+No hay depuración automática iterativa. El 25 % que queda fuera de `best` no es «malo» por estar fuera: no se
+elimina, solo no entra en la estimación ni en el bootstrap. **Por qué se quitó:** quitar ese 25 % y repetir nunca
+converge, porque MRCD no es «de composición»: en cada vuelta deja fuera otro 25 % del nuevo total y el límite se
+calcula siempre sobre el 75 % sobrante. Medido en el servidor (200 × 300, B = 100, 2 vCPU): 200 → 150 → 113 →
+85 → 64 → 48 → 36 filas en 6 rondas, 18,3 min, sin converger. El único filtro de filas es la **exclusión humana**
+por causa asignable. Flujos: **Fase I** = exclusión humana opcional al inicio → ajuste → límites → modelo, una
+sola pasada; **recalibración** = candidatas → exclusión humana desde anotaciones → ajuste → límites (NEW_ROWS) →
+comparación (o versión directa si reemplazo forzado) → si EXTEND, ajuste y límites de la extensión → versión.
+Sin `min_observations`, `insufficient`. La depuración quedó solo como historia en los ADR 0007 y 0008.
 
 ## Fase II (puntuación y señales)
 
@@ -202,13 +216,15 @@ inmutable, en estado propuesta**, que solo rige al aprobarse (ADR 0008). Pasos:
 
 1. **Selección:** base (versión) + rango de fechas. Mínimo de observaciones `min_observations` = 25. Si el rango
    incluye datos anteriores a un evento estructural, se rechaza (`RANGE_BEFORE_STRUCTURAL_EVENT`).
-2. **Depuración:** humana (observaciones con causa asignable confirmada) y automática iterativa (también en v0),
-   máximo `max_depuration_rounds` = 5; si no converge, continúa con `converged=false` en el reporte.
-3. **Comparación con la base:** cambio en S con Frobenius relativa ‖S₁−S₀‖_F/‖S₀‖_F (umbral parametrizable, 0.10) y
+2. **Exclusión humana:** solo las observaciones con causa asignable confirmada en las anotaciones; no hay
+   depuración automática. Se ajusta y se calibra (hueco `(1, 0)`) sobre las filas que quedan; si no se alcanza
+   `min_observations`, el resultado es `insufficient`.
+3. **Comparación con la base** (o versión directa si el reemplazo es forzado): cambio en S con Frobenius relativa ‖S₁−S₀‖_F/‖S₀‖_F (umbral parametrizable, 0.10) y
    cambio en μ. **Reemplazar** si cualquiera de las pruebas formales de S o μ (`any_formal_test_change`) detecta
    cambio, o además si el umbral lo supera **y** `threshold_decides = True`; si no, **ampliar**. Ver «Umbral
    Frobenius parametrizable».
-4. **Nuevo límite de Fase II** por OOB con pool, heredando B, α y MRCD de la versión vigente (Q8).
+4. **Nuevo límite de Fase II** por OOB con pool, heredando B, α y MRCD de la versión vigente (Q8). Si la
+   decisión es EXTEND, se ajusta y se calibra además la base ampliada (hueco `(0, 0)`).
 5. **Propuesta** con reporte antes/después. `effective_from` posterior a la última observación puntuada (Q6).
 
 Constante técnica `BASE_CONSISTENCY_RTOL = 1e-9` (`chart.py`): al recalibrar se comprueba que la base recibida
@@ -228,7 +244,6 @@ observaciones) genera aviso.
 | `relative_change_threshold` | 0.10 sobre Frobenius relativa, configurable | Documento de diseño del dueño; **sin cita** (decisión abierta) |
 | `threshold_decides` | `False`: el umbral es informativo | Decisión del dueño 2026-10-07 (motivo abajo) |
 | revalidación | 6 meses o N observaciones, configurable | Documento de diseño del dueño; **sin cita** |
-| `max_depuration_rounds` | 5 | Técnico (Q5), acota el bucle; no es estadístico |
 | métrica de cambio en S | ‖S₁−S₀‖_F/‖S₀‖_F | Decisión del dueño (Q4); sin cita |
 
 ### Umbral Frobenius parametrizable (decisión del dueño, 2026-10-07)
@@ -281,29 +296,36 @@ añaden estadística nueva y no tienen fuente en `rrcov` (son decisiones de dise
 **Semilla por linaje.** El cliente nunca elige el hueco de semilla de una calibración; se deduce de la cadena de
 datasets (`stage_lineage` en la aplicación, `stage_spawn_key` en la carta, mapa de huecos en `seeds.py`):
 
-- *Operación* = origen del dataset **raíz**: subida del cliente → `PHASE1` → hueco `(0, r)`; candidatas de una
-  recalibración → `NEW_ROWS` → `(1, r)`; base ampliada de una recalibración → `EXTENSION` → `(0, 0)`.
-- *Ronda `r`* = `lineage_round` del último dataset de la cadena. La raíz vale 0 y **solo sube en 1 cuando una
-  ronda de depuración automática quitó filas** (la exclusión humana no cuenta como ronda). Es la misma ronda que
-  numera `fit_phase1`: si una ronda no quita nada, la depuración converge y no hay ronda siguiente.
+- *Operación* = origen del dataset **raíz**: subida del cliente → `PHASE1` → hueco `(0, 0)`; candidatas de una
+  recalibración → `NEW_ROWS` → `(1, 0)`; base ampliada de una recalibración → `EXTENSION` → `(0, 0)`. REPLACE
+  reutiliza la calibración de las filas nuevas, `(1, 0)`.
 
-Por qué así: en `fit_phase1` la ronda `r` calibra con el hueco `(0, r)` aunque la ejecución sea de una pieza; el
-linaje reconstruye ese número desde los datos, de modo que el resultado no depende de cómo se encadenó ni de qué
-proceso lo corrió. El resto de huecos (`(2,)`, `(3,)` para las pruebas de S y μ) no cambian.
+Por qué así: el linaje reconstruye el hueco desde los datos, de modo que el resultado no depende de cómo se
+encadenó ni de qué proceso lo corrió. El 0 del segundo componente (`STAGE_INDEX`) era la ronda de la depuración
+y se conserva para mantener los bits. Los huecos `(2,)` y `(3,)` (pruebas de S y μ) no cambian.
 
-**Exclusión humana solo al inicio.** La exclusión por causa asignable (`assignable_cause`) se admite únicamente
-sobre el dataset **raíz** (`422 INVALID_INPUT`, `details.reason = human_exclusion_only_at_start`). Por qué: en
-`fit_phase1` la exclusión humana es el paso 3, anterior a todas las rondas, y no consume ronda de semilla; una
-exclusión humana a mitad de cadena no tendría equivalente en `fit_phase1` y rompería la igualdad en bits. Se aplica
-sobre el dataset sin ajuste adicional. En una recalibración, la exclusión humana de las candidatas se toma de las
-anotaciones de las señales (P4) y debe hacerse antes de cualquier ajuste (`human_exclusion_required`).
+**Exclusión humana solo al inicio.** `POST/GET /v1/charts/t2mrcd/exclusions`. En Fase I recibe
+`{dataset_id, assignable_cause}` y solo se admite sobre el dataset **subido** (`422 INVALID_INPUT`,
+`details.reason = human_exclusion_only_at_start`). Por qué: en `fit_phase1` la exclusión humana es un paso
+inicial y una exclusión a mitad de cadena no tendría equivalente allí, lo que rompería la igualdad en bits. En
+una recalibración recibe `{dataset_id}` y las filas salen de las anotaciones de las señales con causa asignable
+(P4); debe hacerse antes de cualquier ajuste (`human_exclusion_required`). `/limits` en Fase I exige `params`
+(`422 params_required`), no devuelve ronda y `POST /models` recibe solo `{fit_id, limits_id}`;
+`/comparisons` recibe `{recalibration_id, fit_id, limits_id}` (`RECALIBRATION_MISMATCH`,
+`LIMITS_FIT_MISMATCH`).
 
 **Herencia de parámetros.** Los parámetros se fijan en el primer ajuste y los hereda toda la cadena: el ajuste exige
 los parámetros de ajuste (`T2MRCD_FIT_PARAMS_MISMATCH`), los límites de un dataset derivado toman los de su
-cadena y se rechazan si difieren (`LIMITS_PARAMS_MISMATCH`), y en una recalibración los parámetros son los
-heredados de la sesión (Q8, [ADR 0008](../adr/0008-ciclo-de-vida-de-la-carta.md)) en **todas** las rondas. Por qué:
-`fit_phase1` usa un único `T2MRCDParams`; admitir cambios entre rondas produciría un modelo que `fit_phase1`
-no puede reproducir. Los campos decisivos pendientes (`None`) se comprueban de forma síncrona, antes de encolar.
+cadena y en una recalibración los parámetros son los heredados de la sesión (Q8,
+[ADR 0008](../adr/0008-ciclo-de-vida-de-la-carta.md)). Por qué: `fit_phase1` usa un único `T2MRCDParams`;
+admitir parámetros distintos entre pasos produciría un modelo que `fit_phase1` no puede reproducir. Con
+`/limits` exigiendo `params` en Fase I desaparece `LIMITS_PARAMS_MISMATCH`. `max_depuration_rounds` ya no
+existe: enviarlo da `422` por campo extra. Los campos decisivos pendientes (`None`) se comprueban de forma síncrona, antes de encolar.
+
+**Formatos.** Modelo, informe y metadatos de dataset pasan al formato 2; el formato 1 se rechaza
+(`unknown_format_version`) y no hay migración. Pasos de las tuberías: `exclusion, fit, limits, model,
+comparison, version`; `JobKind.EXCLUSION` va en el carril light; `provenance.exclusion_id` sustituye al
+de la depuración.
 
 **Equivalencia comprobada.** Cadena HTTP = tubería = `fit_phase1` en Fase I; y la recalibración por pasos o por
 tubería = `recalibrate` en EXTEND, REPLACE forzado e INSUFFICIENT (pruebas de integración de cadena). Con

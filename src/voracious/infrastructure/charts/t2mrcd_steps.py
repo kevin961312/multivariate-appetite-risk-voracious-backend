@@ -1,8 +1,7 @@
 """Adaptador ``Phase1Steps`` de T²MRCD: traduce datos codificados a las piezas públicas de la carta.
 
-Sin lógica estadística: decodifica parámetros con el codec de la carta (M1), reconstruye la ronda
-(``Phase1Stage``) a partir del ajuste y la calibración guardados y llama a ``fit_estimator``,
-``calibrate``, ``depurate_step`` y ``assemble_model``. Los pasos encadenados así dan el mismo
+Sin lógica estadística: decodifica parámetros con el codec de la carta (M1) y llama a
+``fit_estimator``, ``calibrate`` y ``assemble_model``. Los pasos encadenados así dan el mismo
 modelo, en bits, que ``fit_phase1`` (``tests/integration/test_phase1_chain.py``).
 """
 
@@ -11,12 +10,11 @@ from typing import TYPE_CHECKING, Final
 
 import numpy as np
 
-from voracious.application.phase1_steps import Calibration, DepurationOutcome, Phase1Steps
+from voracious.application.phase1_steps import Calibration, Phase1Steps
 from voracious.domain.charts.t2mrcd import (
     T2MRCD_DECISION_PENDING,
     BootstrapLimits,
     LimitRegime,
-    Phase1Stage,
     T2MRCDChart,
     T2MRCDParams,
     decode_limits,
@@ -29,7 +27,7 @@ from voracious.domain.common import (
     DomainError,
     FloatMatrix,
     MethodDecisionPendingError,
-    StageLineage,
+    StageKind,
     TaskMapper,
 )
 from voracious.domain.estimators.mrcd import (
@@ -229,16 +227,16 @@ class T2MRCDPhase1Steps:
         """
         return self._params(params).bootstrap.seed
 
-    def stage_spawn_key(self, lineage: StageLineage) -> tuple[int, ...]:
-        """Hueco de semilla de la ronda (``T2MRCDChart.stage_spawn_key``).
+    def stage_spawn_key(self, kind: StageKind) -> tuple[int, ...]:
+        """Hueco de semilla de la calibración (``T2MRCDChart.stage_spawn_key``).
 
         Args:
-            lineage: Linaje.
+            kind: Operación.
 
         Returns:
             La clave.
         """
-        return self.chart.stage_spawn_key(lineage)
+        return self.chart.stage_spawn_key(kind)
 
     def fit(self, x: FloatMatrix, fit_params: Mapping[str, object]) -> MRCDFit:
         """Ajuste MRCD del dataset (``fit_estimator``).
@@ -258,82 +256,23 @@ class T2MRCDPhase1Steps:
         fit: object,
         params: Mapping[str, object],
         *,
-        lineage: StageLineage,
+        kind: StageKind,
         mapper: TaskMapper,
     ) -> Calibration:
-        """Filas limpias y límites bootstrap de la ronda (``calibrate``).
+        """Filas limpias y límites bootstrap del ajuste (``calibrate``).
 
         Args:
             x: Dataset del ajuste.
             fit: Ajuste.
             params: Parámetros codificados.
-            lineage: Linaje.
+            kind: Operación.
             mapper: Reparto de las réplicas.
 
         Returns:
             La calibración.
         """
-        stage = self.chart.calibrate(
-            x, _fit(fit), self._params(params), lineage=lineage, mapper=mapper
-        )
+        stage = self.chart.calibrate(x, _fit(fit), self._params(params), kind=kind, mapper=mapper)
         return Calibration(limits=stage.limits, clean=stage.clean)
-
-    def depurate(
-        self,
-        x: FloatMatrix,
-        fit: object,
-        calibration: Calibration,
-        params: Mapping[str, object],
-        *,
-        round_index: int,
-        evaluate_only: bool = False,
-        max_rounds: int | None = None,
-        min_rows: int = 1,
-    ) -> DepurationOutcome:
-        """Una ronda de la depuración automática sobre todas las filas del dataset.
-
-        Con ``evaluate_only`` las rondas máximas son las ya hechas: la ronda es final y no quita
-        filas (como ``fit_phase1`` al agotar las rondas).
-
-        Args:
-            x: Dataset del ajuste.
-            fit: Ajuste.
-            calibration: Calibración.
-            params: Parámetros codificados (``max_depuration_rounds``).
-            round_index: Ronda.
-            evaluate_only: No quitar filas.
-            max_rounds: Rondas máximas; ``None`` usa ``max_depuration_rounds`` de ``params``.
-            min_rows: Mínimo de filas para seguir (``min_observations`` al recalibrar).
-
-        Returns:
-            El resultado.
-        """
-        n = x.shape[0]
-        stage = Phase1Stage(
-            fit=_fit(fit), clean=calibration.clean, limits=_limits(calibration.limits)
-        )
-        if evaluate_only:
-            rounds = round_index
-        elif max_rounds is not None:
-            rounds = max_rounds
-        else:
-            rounds = self._params(params).max_depuration_rounds
-        step = self.chart.depurate_step(
-            stage,
-            x,
-            _rows(n),
-            np.ones(n, dtype=np.bool_),
-            round_index,
-            max_rounds=rounds,
-            min_rows=min_rows,
-        )
-        return DepurationOutcome(
-            kept=step.kept,
-            excluded_automatic=step.excluded_automatic_now,
-            converged=step.converged,
-            final=step.final,
-            exhausted=step.exhausted,
-        )
 
     def assemble_initial_model(
         self,
@@ -342,24 +281,16 @@ class T2MRCDPhase1Steps:
         fit: object,
         calibration: Calibration,
         *,
-        kept: BoolVector,
         excluded: BoolVector,
-        automatic: BoolVector,
-        rounds: int,
-        converged: bool,
     ) -> object:
         """Modelo de Fase I con régimen ``PHASE1_PROVISIONAL`` (``assemble_model``).
 
         Args:
             root: Dataset raíz.
             params: Parámetros codificados.
-            fit: Ajuste final.
-            calibration: Calibración final.
-            kept: Filas de la base.
+            fit: Ajuste de ``root[~excluded]``.
+            calibration: Calibración de ese ajuste.
             excluded: Excluidas por una persona.
-            automatic: Excluidas por la depuración automática.
-            rounds: Rondas que quitaron filas.
-            converged: Convergencia.
 
         Returns:
             El ``T2MRCDModel``.
@@ -370,11 +301,7 @@ class T2MRCDPhase1Steps:
             _fit(fit),
             calibration.clean,
             _limits(calibration.limits),
-            kept=kept,
             excluded=excluded,
-            automatic=automatic,
-            rounds=rounds,
-            converged=converged,
             regime=LimitRegime.PHASE1_PROVISIONAL,
         )
 

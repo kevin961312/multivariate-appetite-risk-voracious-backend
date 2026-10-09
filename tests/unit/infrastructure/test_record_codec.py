@@ -105,7 +105,7 @@ def test_model_version_round_trip(fitted: tuple) -> None:
         "sha256:abc",
         (BaseRowRef(BaseRowSource.TRAINING, "0"), BaseRowRef(BaseRowSource.OBSERVATION, "o1")),
         (
-            Exclusion(BaseRowRef(BaseRowSource.OBSERVATION, "o2"), ExclusionReason.AUTOMATIC),
+            Exclusion(BaseRowRef(BaseRowSource.OBSERVATION, "o2"), ExclusionReason.ALREADY_IN_BASE),
             Exclusion(
                 BaseRowRef(BaseRowSource.OBSERVATION, "o3"),
                 ExclusionReason.ASSIGNABLE_CAUSE,

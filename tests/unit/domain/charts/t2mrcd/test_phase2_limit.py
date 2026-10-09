@@ -103,8 +103,6 @@ def test_mc_error_tracks_the_spread_between_seeds() -> None:
 def test_phase2_exceeds_phase1_with_p_greater_than_n() -> None:
     # (g) diagnóstico Q9 con MRCD y p > n (semilla fija): no es una invariante, solo se informa.
     x = np.random.default_rng(4).standard_normal((30, 40))
-    model = T2MRCDChart().fit_phase1(
-        x, fast_params(seed=3, max_depuration_rounds=0), mapper=SerialTaskMapper()
-    )
+    model = T2MRCDChart().fit_phase1(x, fast_params(seed=3), mapper=SerialTaskMapper())
     assert model.limits.phase2_limit > model.limits.phase1_limit
     assert model.limits.phase2_exceeds_phase1

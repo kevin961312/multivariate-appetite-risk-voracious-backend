@@ -17,7 +17,7 @@ OPENAPI_TAGS = [
     },
     {
         "name": "t2mrcd-phase1",
-        "description": "Pasos encadenables de la Fase I de T²MRCD: ajuste, límites y depuración.",
+        "description": "Pasos encadenables de la Fase I de T²MRCD: exclusión, ajuste y límites.",
     },
     {
         "name": "t2mrcd-pipelines",

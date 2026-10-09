@@ -2,9 +2,10 @@
 
 ``RequestComparison`` valida de forma síncrona y encola (carril ``calibration``);
 ``RunComparisonJob`` llama a la carta (``compare``: pruebas formales de S y μ y cambio relativo
-informativo) con la base de la versión base y las filas nuevas de la ronda final de su depuración,
-y decide ``extend`` o ``replace``. Con ``extend`` crea el dataset ``recalibration_extension``
-(base vigente + nuevas conservadas, en ese orden), raíz del linaje ``EXTENSION``.
+informativo) con la base de la versión base y las filas nuevas conservadas tras la exclusión
+humana (el dataset del ajuste ``NEW_ROWS``), y decide ``extend`` o ``replace``. Con ``extend`` crea
+el dataset ``recalibration_extension`` (base vigente + nuevas conservadas, en ese orden), raíz de
+la operación ``EXTENSION``.
 
 **P3 (decisión del dueño):** mientras las pruebas formales no tengan cita, pedir una comparación
 responde ``RECALIBRATION_DECISION_PENDING`` (422). Con reemplazo forzado (o un evento estructural
@@ -19,7 +20,6 @@ from voracious.application.charts import ChartRegistry, resolve_chart
 from voracious.application.errors import (
     ApplicationError,
     ComparisonNotFoundError,
-    DepurationNotFinalError,
     RecalibrationDecisionPendingError,
     RecalibrationMismatchError,
 )
@@ -28,12 +28,12 @@ from voracious.application.ports import (
     Clock,
     ComparisonRepository,
     DatasetStorage,
-    DepurationRepository,
     FitRepository,
     IdGenerator,
     JobKind,
     JobQueue,
     JobRequest,
+    LimitsRepository,
     ModelVersionRepository,
     RecalibrationRepository,
 )
@@ -52,11 +52,12 @@ from voracious.application.records import (
 from voracious.application.use_cases.common import INTERNAL_ERROR, get_version
 from voracious.application.use_cases.recalibration_chain import get_recalibration, open_session
 from voracious.application.use_cases.steps import (
+    check_same_fit,
     dataset_chain,
     get_dataset,
-    get_depuration,
     notify_pipeline,
     ready_fit,
+    ready_limits,
 )
 from voracious.domain.common import (
     DomainError,
@@ -110,7 +111,7 @@ class RequestComparison:
         recalibrations: Repositorio de recalibraciones.
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
-        depurations: Repositorio de depuraciones.
+        limits: Repositorio de límites.
         comparisons: Repositorio de comparaciones.
         queue: Cola.
         ids: Identificadores.
@@ -122,7 +123,7 @@ class RequestComparison:
     recalibrations: RecalibrationRepository
     datasets: DatasetStorage
     fits: FitRepository
-    depurations: DepurationRepository
+    limits: LimitsRepository
     comparisons: ComparisonRepository
     queue: JobQueue
     ids: IdGenerator
@@ -134,22 +135,25 @@ class RequestComparison:
         chart_id: str,
         model_id: str,
         recalibration_id: str,
-        depuration_id: str,
         *,
+        fit_id: str,
+        limits_id: str,
         comparison_id: str | None = None,
         pipeline_id: str | None = None,
     ) -> str:
         """Encola la comparación.
 
         Orden: recalibración en curso; sin reemplazo forzado; sin decisiones pendientes (P3);
-        depuración final (no agotada) de las filas nuevas de esa recalibración.
+        ajuste y límites ``succeeded`` de las filas nuevas de esa recalibración (operación
+        ``new_rows``).
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
             model_id: Modelo.
             recalibration_id: Recalibración.
-            depuration_id: Depuración final de las filas nuevas.
+            fit_id: Ajuste de las filas nuevas conservadas (``μ₁``, ``S₁``).
+            limits_id: Límites de ese ajuste.
             comparison_id: Identificador ya reservado (tubería).
             pipeline_id: Tubería que la pide.
 
@@ -162,10 +166,12 @@ class RequestComparison:
             RecalibrationNotInProgressError: Si ya no admite pasos.
             InvalidInputError: Si la recalibración es un reemplazo forzado.
             RecalibrationDecisionPendingError: Si las pruebas formales siguen pendientes.
-            DepurationNotFoundError: Si la depuración no existe.
-            DepurationNotFinalError: Si no es la final de su cadena.
-            RecalibrationMismatchError: Si la depuración no es de las filas nuevas de esa
-                recalibración.
+            FitNotFoundError: Si el ajuste no existe.
+            FitNotReadyError: Si no está ``succeeded``.
+            LimitsNotFoundError: Si los límites no existen.
+            LimitsNotReadyError: Si no están ``succeeded``.
+            LimitsFitMismatchError: Si los límites son de otro ajuste.
+            RecalibrationMismatchError: Si no son de las filas nuevas de esa recalibración.
         """
         chart = resolve_chart(self.charts, chart_id)
         resolve_recalibration_steps(self.recalibration_steps, chart_id)
@@ -188,34 +194,24 @@ class RequestComparison:
                 "la comparación tiene decisiones estadísticas pendientes",
                 details={"pending": list(pending)},
             )
-        depuration = get_depuration(self.depurations, tenant_id, chart_id, depuration_id)
-        if (
-            depuration.status is not JobStatus.SUCCEEDED
-            or not depuration.final
-            or depuration.exhausted
-            or depuration.fit_id is None
-            or depuration.limits_id is None
-        ):
-            raise DepurationNotFinalError(
-                f"la depuración '{depuration_id}' no es la final de su cadena",
-                details={
-                    "depuration_id": depuration_id,
-                    "status": str(depuration.status),
-                    "final": depuration.final,
-                    "exhausted": depuration.exhausted,
-                },
-            )
-        fit = ready_fit(self.fits, tenant_id, chart_id, depuration.fit_id)
+        fit = ready_fit(self.fits, tenant_id, chart_id, fit_id)
+        limits = ready_limits(self.limits, tenant_id, chart_id, limits_id)
+        check_same_fit(limits, fit_id)
         root = dataset_chain(self.datasets, get_dataset(self.datasets, tenant_id, fit.dataset_id))[
             0
         ]
         if (
             root.source is not DatasetSource.RECALIBRATION_CANDIDATES
             or root.origin_ref != recalibration_id
+            or limits.recalibration_id != recalibration_id
         ):
             raise RecalibrationMismatchError(
-                "la depuración no es de las filas nuevas de esa recalibración",
-                details={"depuration_id": depuration_id, "recalibration_id": recalibration_id},
+                "el ajuste no es de las filas nuevas de esa recalibración",
+                details={
+                    "fit_id": fit_id,
+                    "limits_id": limits_id,
+                    "recalibration_id": recalibration_id,
+                },
             )
         record = ComparisonRecord(
             tenant_id=tenant_id,
@@ -223,9 +219,8 @@ class RequestComparison:
             model_id=model_id,
             comparison_id=comparison_id if comparison_id is not None else self.ids.new_id(),
             recalibration_id=recalibration_id,
-            depuration_id=depuration_id,
-            fit_id=depuration.fit_id,
-            limits_id=depuration.limits_id,
+            fit_id=fit_id,
+            limits_id=limits_id,
             status=JobStatus.QUEUED,
             created_at=self.clock.now(),
             pipeline_id=pipeline_id,
@@ -364,7 +359,7 @@ class RunComparisonJob:
         Args:
             record: Comparación.
             base: Base de la versión base.
-            new_kept: Filas nuevas de la ronda final.
+            new_kept: Filas nuevas conservadas.
 
         Returns:
             El id del dataset.

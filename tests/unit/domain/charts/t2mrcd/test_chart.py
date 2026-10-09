@@ -32,10 +32,8 @@ from voracious.domain.estimators.mrcd import PYMRCD_VERSION, MRCDEstimator, MRCD
 
 @pytest.fixture(scope="module")
 def model() -> T2MRCDModel:
-    # Sin depuración automática: el ajuste final es el del histórico completo.
-    return T2MRCDChart().fit_phase1(
-        small_data(), fast_params(max_depuration_rounds=0), mapper=SerialTaskMapper()
-    )
+    # Sin depuración automática (decisión del dueño, 2026-10-09): el ajuste es el del histórico.
+    return T2MRCDChart().fit_phase1(small_data(), fast_params(), mapper=SerialTaskMapper())
 
 
 def _spy_fit_mrcd(monkeypatch: pytest.MonkeyPatch) -> list[object]:
@@ -93,7 +91,7 @@ def test_statistic_reference_default() -> None:
 def test_clean_rows_are_ceiling_of_mrcd_alpha_times_n() -> None:
     # n = 41 no es múltiplo de 4: h = ceil(0.75 * 41) = 31 (no 30 ni 0.75 filas).
     x = small_data(41, 4)
-    params = fast_params(n_replicates=2, max_depuration_rounds=0)
+    params = fast_params(n_replicates=2)
     model = T2MRCDChart().fit_phase1(x, params, mapper=SerialTaskMapper())
     assert model.mrcd.h == 31
     assert int(model.clean_mask.sum()) == model.limits.n_clean == 31
@@ -160,7 +158,6 @@ def test_phase1_model(model: T2MRCDModel) -> None:
     assert model.base_mask.all()
     assert model.n_base == 40
     assert model.row_disposition == (RowDisposition.KEPT,) * 40
-    assert model.depuration_rounds == 0
     assert model.pymrcd_version == PYMRCD_VERSION
     assert model.statistic_reference == STATISTIC_REFERENCE
 
@@ -217,7 +214,7 @@ def test_clean_mask_is_used_for_bootstrap() -> None:
     boot = dataclasses.replace(fast_bootstrap(), clean_criterion=first_half)
     model = T2MRCDChart().fit_phase1(
         small_data(),
-        T2MRCDParams(bootstrap=boot, max_depuration_rounds=0),
+        T2MRCDParams(bootstrap=boot),
         mapper=SerialTaskMapper(),
     )
     assert model.limits.n_clean == 20
@@ -276,9 +273,7 @@ def test_human_exclusion_is_applied_before_fitting() -> None:
     x[5] += 50.0  # fila con causa asignable confirmada
     excluded = np.zeros(40, dtype=np.bool_)
     excluded[5] = True
-    model = T2MRCDChart().fit_phase1(
-        x, fast_params(max_depuration_rounds=0), mapper=SerialTaskMapper(), excluded=excluded
-    )
+    model = T2MRCDChart().fit_phase1(x, fast_params(), mapper=SerialTaskMapper(), excluded=excluded)
     fit = fit_mrcd(np.delete(x, 5, axis=0), MRCDParams(alpha=T2MRCD_MRCD_ALPHA))
     assert np.array_equal(model.mrcd.cov, fit.cov)
     assert not model.base_mask[5]
@@ -313,33 +308,15 @@ def test_all_rows_excluded_is_an_error() -> None:
     assert info.value.code == T2MRCD_NO_CLEAN_OBSERVATIONS
 
 
-def test_automatic_depuration_removes_rows_above_phase1_limit() -> None:
-    # Q3: ajuste + límite de Fase I, quitar T² > límite y repetir; la base final no tiene filas
-    # por encima del límite si converge.
+def test_rows_above_the_phase1_limit_stay_in_the_base() -> None:
+    # Sin depuración automática iterativa (decisión del dueño, 2026-10-09): las filas con
+    # T² > límite de Fase I no se quitan; un solo ajuste MRCD sobre todo el histórico.
     x = small_data(60, 3, seed=5)
     x[:3] += 6.0
     model = T2MRCDChart().fit_phase1(x, fast_params(), mapper=SerialTaskMapper())
-    auto = [
-        i for i, d in enumerate(model.row_disposition) if d is RowDisposition.EXCLUDED_AUTOMATIC
-    ]
-    assert {0, 1, 2} <= set(auto)
-    assert model.depuration_rounds >= 1
-    assert model.limits.spawn_key == (SLOT_PHASE1, model.depuration_rounds)
-    assert not model.base_mask[auto].any()
-    assert model.depuration_converged
-    assert not (model.historical_t2[model.base_mask] > model.limits.phase1_limit).any()
-    fit = fit_mrcd(x[model.base_mask], MRCDParams(alpha=T2MRCD_MRCD_ALPHA))
-    assert np.array_equal(model.mrcd.cov, fit.cov)
-
-
-def test_depuration_without_rounds_does_not_converge_but_continues() -> None:
-    # Q5: si se agotan las rondas se sigue con converged = False (no es un error).
-    x = small_data(60, 3, seed=5)
-    x[:3] += 6.0
-    model = T2MRCDChart().fit_phase1(
-        x, fast_params(max_depuration_rounds=0), mapper=SerialTaskMapper()
-    )
-    assert model.depuration_rounds == 0
-    assert not model.depuration_converged
     assert model.base_mask.all()
+    assert model.row_disposition == (RowDisposition.KEPT,) * 60
     assert model.historical_outlier[:3].all()
+    assert model.limits.spawn_key == (SLOT_PHASE1, 0)
+    fit = fit_mrcd(x, MRCDParams(alpha=T2MRCD_MRCD_ALPHA))
+    assert np.array_equal(model.mrcd.cov, fit.cov)

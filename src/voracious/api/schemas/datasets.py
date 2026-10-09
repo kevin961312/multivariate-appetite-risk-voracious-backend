@@ -60,7 +60,6 @@ class LineageEntryOut(ResponseModel):
     dataset_id: str
     source: str
     n: int
-    lineage_round: int
     origin_ref: str | None
 
 
@@ -74,7 +73,6 @@ class DatasetResponse(ResponseModel):
     source: str
     created_at: datetime
     parent_id: str | None
-    lineage_round: int
     origin_ref: str | None
     lineage: list[LineageEntryOut]
     data: list[list[float]] | None = None
@@ -101,14 +99,12 @@ class DatasetResponse(ResponseModel):
             source=record.source.value,
             created_at=record.created_at,
             parent_id=record.parent_id,
-            lineage_round=record.lineage_round,
             origin_ref=record.origin_ref,
             lineage=[
                 LineageEntryOut(
                     dataset_id=d.dataset_id,
                     source=d.source.value,
                     n=int(d.data.shape[0]),
-                    lineage_round=d.lineage_round,
                     origin_ref=d.origin_ref,
                 )
                 for d in view.chain

@@ -11,16 +11,19 @@ Límite operativo (Q2): la versión inicial vigila con ``phase1_limit`` de forma
 (``LimitRegime.PHASE1_PROVISIONAL``); las versiones recalibradas, con ``phase2_limit``
 (``LimitRegime.PHASE2``).
 
+Sin depuración automática iterativa (decisión del dueño, 2026-10-09): la Fase I es exclusión
+humana opcional, un ajuste MRCD, una calibración y el modelo; la recalibración, exclusión humana
+de las filas nuevas y una recalibración como Fase I, en una sola pasada.
+
 Piezas públicas (vuelta 3.2 del Paso 3): ``fit_phase1`` y ``recalibrate`` **componen** los pasos
 ``validate_phase1_input``, ``fit_base``, ``calibrate`` (con la semilla de ``stage_spawn_key``),
-``depurate_step``, ``compare`` y ``assemble_model``; un orquestador puede ejecutarlos por
-separado y obtiene los mismos bits. ``mrcd_threads`` solo cambia el rendimiento de ``pymrcd``.
+``compare`` y ``assemble_model``; un orquestador puede ejecutarlos por separado y obtiene los
+mismos bits. ``mrcd_threads`` solo cambia el rendimiento de ``pymrcd``.
 """
 
 import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from functools import partial
 from typing import TYPE_CHECKING, Final
 
 import numpy as np
@@ -55,17 +58,15 @@ from voracious.domain.charts.t2mrcd.registry import (
     encode_recalibration_params,
 )
 from voracious.domain.charts.t2mrcd.revalidation import (
-    DepurationStep,
     LimitsSnapshot,
     T2MRCDRecalibrationParams,
     T2MRCDRecalibrationReport,
     decide,
-    depurate,
-    depuration_step,
 )
 from voracious.domain.charts.t2mrcd.seeds import (
-    SLOT_NEW_ROWS_DEPURATION,
+    SLOT_NEW_ROWS,
     SLOT_PHASE1,
+    STAGE_INDEX,
     SpawnKey,
 )
 from voracious.domain.charts.t2mrcd.statistic import t2
@@ -80,7 +81,6 @@ from voracious.domain.common import (
     RecalibrationOutcome,
     RowDisposition,
     StageKind,
-    StageLineage,
     TaskMapper,
     as_matrix,
 )
@@ -178,32 +178,36 @@ def _validated_mask(mask: npt.ArrayLike | None, n: int, *, name: str) -> BoolVec
     return arr.copy()
 
 
-def _dispositions(
-    excluded: BoolVector, automatic: BoolVector
-) -> tuple[tuple[RowDisposition, ...], int, int]:
-    """Destino de cada fila a partir de las exclusiones humana y automática.
+def _dispositions(excluded: BoolVector) -> tuple[RowDisposition, ...]:
+    """Destino de cada fila a partir de la exclusión humana.
 
     Args:
         excluded: Excluidas por una persona.
-        automatic: Excluidas por la depuración automática.
 
     Returns:
-        Los destinos y los recuentos de excluidas por persona y automáticamente.
+        Los destinos.
     """
-    out = tuple(
-        RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE
-        if human
-        else RowDisposition.EXCLUDED_AUTOMATIC
-        if auto
-        else RowDisposition.KEPT
-        for human, auto in zip(excluded.tolist(), automatic.tolist(), strict=True)
+    return tuple(
+        RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE if human else RowDisposition.KEPT
+        for human in excluded.tolist()
     )
-    return out, int(excluded.sum()), int(automatic.sum())
+
+
+def _kept_rows(excluded: BoolVector) -> IndexVector:
+    """Índices de las filas no excluidas, en orden.
+
+    Args:
+        excluded: Excluidas por una persona.
+
+    Returns:
+        Los índices.
+    """
+    return np.flatnonzero(~excluded).astype(np.int64)
 
 
 _STAGE_SLOTS: Final[Mapping[StageKind, int]] = {
     StageKind.PHASE1: SLOT_PHASE1,
-    StageKind.NEW_ROWS: SLOT_NEW_ROWS_DEPURATION,
+    StageKind.NEW_ROWS: SLOT_NEW_ROWS,
     StageKind.EXTENSION: SLOT_PHASE1,
 }
 """Hueco de semilla de cada operación (``seeds.py``); la extensión usa ``(SLOT_PHASE1, 0)``."""
@@ -431,24 +435,34 @@ class T2MRCDChart:
         """
         _validated(x, name="x")
 
-    def stage_spawn_key(self, lineage: StageLineage) -> SpawnKey:
-        """Hueco de semilla de la calibración de una ronda (``seeds.py``).
+    def stage_spawn_key(self, kind: StageKind) -> SpawnKey:
+        """Hueco de semilla de la calibración de una operación (``seeds.py``).
 
-        ``PHASE1`` → ``(0, r)``; ``NEW_ROWS`` → ``(1, r)``; ``EXTENSION`` → ``(0, 0)``.
+        ``PHASE1`` → ``(0, 0)``; ``NEW_ROWS`` → ``(1, 0)``; ``EXTENSION`` → ``(0, 0)``.
 
         Args:
-            lineage: Operación y número de ronda.
+            kind: Operación (se admite su valor como texto, p. ej. ``"phase1"``).
 
         Returns:
             La clave bajo la semilla raíz.
+
+        Raises:
+            InvalidInputError: Si ``kind`` no es una operación conocida.
         """
-        return (_STAGE_SLOTS[lineage.kind], lineage.round)
+        try:
+            stage = StageKind(kind)
+        except ValueError as exc:
+            raise InvalidInputError(
+                f"'kind' no es una operación conocida: {kind!r}",
+                details={"field": "stage_kind"},
+            ) from exc
+        return (_STAGE_SLOTS[stage], STAGE_INDEX)
 
     def fit_base(self, x_rows: FloatMatrix, rows: IndexVector, params: T2MRCDParams) -> MRCDFit:
-        """Ajuste MRCD de las filas de una ronda (``phase1.fit_base``).
+        """Ajuste MRCD de unas filas (``phase1.fit_base``).
 
         Args:
-            x_rows: Filas de la ronda ``n_k x p`` (finitas).
+            x_rows: Filas ``n_k x p`` (finitas).
             rows: Índices de esas filas en la entrada (para los mensajes).
             params: Parámetros de la carta.
 
@@ -486,23 +500,23 @@ class T2MRCDChart:
         fit: MRCDFit,
         params: T2MRCDParams,
         *,
-        lineage: StageLineage,
+        kind: StageKind,
         mapper: TaskMapper,
     ) -> Phase1Stage:
-        """Filas limpias y límites bootstrap de una ronda ya ajustada (``calibrate_stage``).
+        """Filas limpias y límites bootstrap de un ajuste (``calibrate_stage``).
 
-        La semilla es la raíz ``params.bootstrap.seed`` con el hueco ``stage_spawn_key(lineage)``.
+        La semilla es la raíz ``params.bootstrap.seed`` con el hueco ``stage_spawn_key(kind)``.
 
         Args:
-            x_rows: Filas de la ronda, las mismas con las que se ajustó ``fit``.
-            fit: Ajuste de la ronda (``fit_base``).
+            x_rows: Filas, las mismas con las que se ajustó ``fit``.
+            fit: Ajuste de esas filas (``fit_base``).
             params: Parámetros de la carta (en una recalibración, los heredados con la semilla
                 de la recalibración).
-            lineage: Operación y número de ronda.
+            kind: Operación a la que pertenece la calibración.
             mapper: Reparto de las réplicas.
 
         Returns:
-            La ronda.
+            El ajuste con sus filas limpias y sus límites.
 
         Raises:
             MethodDecisionPendingError: ``T2MRCD_DECISION_PENDING``.
@@ -515,67 +529,35 @@ class T2MRCDChart:
             params,
             aggregations=self._aggregations(params),
             seed=params.bootstrap.seed,
-            spawn_key=self.stage_spawn_key(lineage),
+            spawn_key=self.stage_spawn_key(kind),
             mapper=mapper,
             n_threads=self.mrcd_threads,
         )
 
-    def depurate_step(
-        self,
-        stage: Phase1Stage,
-        x_rows: FloatMatrix,
-        rows: IndexVector,
-        kept: BoolVector,
-        round_index: int,
-        *,
-        max_rounds: int,
-        min_rows: int = 1,
-    ) -> DepurationStep:
-        """Evalúa una ronda de la depuración automática (``revalidation.depuration_step``).
-
-        Args:
-            stage: Ronda calibrada.
-            x_rows: Filas de la ronda.
-            rows: Sus índices en la entrada.
-            kept: Filas conservadas antes de la ronda (máscara sobre la entrada).
-            round_index: Número de ronda.
-            max_rounds: Rondas máximas de exclusión.
-            min_rows: Mínimo de filas para seguir.
-
-        Returns:
-            El resultado de la ronda.
-        """
-        return depuration_step(
-            stage, x_rows, rows, kept, round_index, max_rounds=max_rounds, min_rows=min_rows
-        )
-
     def _stage(
         self,
-        x_rows: FloatMatrix,
+        x: FloatMatrix,
         rows: IndexVector,
-        round_index: int,
         *,
         params: T2MRCDParams,
         kind: StageKind,
         mapper: TaskMapper,
     ) -> Phase1Stage:
-        """Ronda completa: ``fit_base`` y ``calibrate`` con el linaje ``(kind, round_index)``.
+        """``fit_base`` seguido de ``calibrate`` sobre las filas ``rows`` de ``x``.
 
         Args:
-            x_rows: Filas de la ronda.
-            rows: Sus índices en la entrada.
-            round_index: Número de ronda.
+            x: Entrada.
+            rows: Filas que se ajustan (índices en ``x``, para los mensajes).
             params: Parámetros de la carta.
             kind: Operación.
             mapper: Reparto de las réplicas.
 
         Returns:
-            La ronda.
+            El ajuste con sus filas limpias y sus límites.
         """
+        x_rows = x[rows]
         fit = self.fit_base(x_rows, rows, params)
-        return self.calibrate(
-            x_rows, fit, params, lineage=StageLineage(kind, round_index), mapper=mapper
-        )
+        return self.calibrate(x_rows, fit, params, kind=kind, mapper=mapper)
 
     def assemble_model(
         self,
@@ -585,51 +567,39 @@ class T2MRCDChart:
         clean: BoolVector,
         limits: BootstrapLimits,
         *,
-        kept: BoolVector,
         excluded: BoolVector,
-        automatic: BoolVector,
-        rounds: int,
-        converged: bool | None,
         regime: LimitRegime,
     ) -> T2MRCDModel:
-        """Construye el modelo a partir de la ronda final (ajustada sobre ``arr[kept]``).
+        """Construye el modelo a partir del ajuste de ``arr[~excluded]``.
 
         Args:
             arr: Entrada ``n x p``.
             params: Parámetros que se guardan en el modelo.
-            fit: Ajuste de la ronda final, sobre las filas ``kept`` en su orden.
-            clean: Filas limpias de la ronda final (máscara sobre las filas ``kept``).
-            limits: Límites de la ronda final.
-            kept: Filas de la base.
-            excluded: Filas excluidas por una persona.
-            automatic: Filas excluidas por la depuración automática.
-            rounds: Rondas de depuración que quitaron filas.
-            converged: Convergencia de la depuración, o ``None`` si no se intentó depurar
-                (versión recalibrada).
+            fit: Ajuste de las filas no excluidas, en su orden.
+            clean: Filas limpias del ajuste (máscara sobre las filas no excluidas).
+            limits: Límites del ajuste.
+            excluded: Filas excluidas por una persona (el resto forma la base).
             regime: Régimen del límite de la versión.
 
         Returns:
             El modelo.
         """
+        kept = ~excluded
         rows = np.flatnonzero(kept)
         clean_mask = np.zeros(arr.shape[0], dtype=np.bool_)
         clean_mask[rows[clean]] = True
         historical_t2 = t2(fit, arr)
-        disposition, _, _ = _dispositions(excluded, automatic)
         return T2MRCDModel(
             params=params,
             mrcd=fit,
             n_features=int(arr.shape[1]),
-            base_mask=kept.copy(),
-            row_disposition=disposition,
+            base_mask=kept,
+            row_disposition=_dispositions(excluded),
             clean_mask=clean_mask,
             limits=limits,
             limit_regime=regime,
             historical_t2=historical_t2,
             historical_outlier=historical_t2 > limits.phase1_limit,
-            depuration_rounds=rounds,
-            depuration_converged=converged,
-            final_depuration_skipped=converged is None,
             pymrcd_version=PYMRCD_VERSION,
             seed=params.bootstrap.seed,
             statistic_reference=self.statistic_reference,
@@ -644,7 +614,7 @@ class T2MRCDChart:
         params: T2MRCDRecalibrationParams,
         mapper: TaskMapper,
     ) -> ComparisonResult:
-        """Compara la base vigente con las filas nuevas depuradas (``compare_bases``).
+        """Compara la base vigente con las filas nuevas conservadas (``compare_bases``).
 
         Reajusta con MRCD y los parámetros del modelo vigente (Q8) y la semilla de la
         recalibración (huecos de las pruebas, ``seeds.py``).
@@ -652,8 +622,8 @@ class T2MRCDChart:
         Args:
             active_model: Modelo vigente (``μ₀``, ``S₀``).
             base: Base del modelo vigente.
-            new_kept: Filas nuevas conservadas tras la depuración.
-            fit1: Ajuste final de la depuración de las filas nuevas (``μ₁``, ``S₁``).
+            new_kept: Filas nuevas conservadas tras la exclusión humana.
+            fit1: Ajuste de esas filas (``μ₁``, ``S₁``).
             params: Parámetros de la recalibración.
             mapper: Reparto de los remuestreos.
 
@@ -703,12 +673,13 @@ class T2MRCDChart:
         mapper: TaskMapper,
         excluded: BoolVector | None = None,
     ) -> T2MRCDModel:
-        """Fase I: valida, comprueba pendientes, depura y calibra los dos límites.
+        """Fase I: valida, comprueba pendientes, excluye, ajusta y calibra los dos límites.
 
         Orden: validar la entrada y la máscara; comprobar pendientes (antes de ajustar); excluir
-        las filas con causa asignable; depuración automática (cada ronda: ``fit_base`` y
-        ``calibrate`` con el linaje ``PHASE1``, y ``depurate_step``); ``assemble_model`` con la
-        ronda final, que puntúa todo el histórico. Régimen: ``PHASE1_PROVISIONAL``.
+        las filas con causa asignable; **un** ``fit_base`` y **un** ``calibrate`` (operación
+        ``PHASE1``) sobre las demás; ``assemble_model``, que puntúa todo el histórico. Sin
+        depuración automática iterativa (decisión del dueño, 2026-10-09): las filas fuera de
+        ``best`` siguen en la base. Régimen: ``PHASE1_PROVISIONAL``.
 
         Args:
             x: Histórico ``n x p``, finito.
@@ -723,36 +694,26 @@ class T2MRCDChart:
             InvalidInputError: Entrada vacía, no finita, cuya suma por fila desborda o máscara
                 inválida.
             MethodDecisionPendingError: ``T2MRCD_DECISION_PENDING`` (antes de ajustar).
-            EstimationError: ``MRCD_FIT_FAILED``, ``BOOTSTRAP_REPLICATE_FAILED``,
+            EstimationError: ``T2MRCD_NO_CLEAN_OBSERVATIONS`` (la exclusión quitó todas las
+                filas), ``MRCD_FIT_FAILED``, ``BOOTSTRAP_REPLICATE_FAILED``,
                 ``BOOTSTRAP_OOB_EMPTY`` u otro fallo.
         """
         self.validate_phase1_input(x)
         arr = as_matrix(x, name="x")
         mask = _validated_mask(excluded, arr.shape[0], name="excluded")
         self._aggregations(params)
-        result = depurate(
-            arr,
-            ~mask,
-            fit_round=partial(self._stage, params=params, kind=StageKind.PHASE1, mapper=mapper),
-            max_rounds=params.max_depuration_rounds,
-            min_rows=1,
+        if bool(mask.all()):
+            raise EstimationError(T2MRCD_NO_CLEAN_OBSERVATIONS, "la exclusión humana no dejó filas")
+        stage = self._stage(
+            arr, _kept_rows(mask), params=params, kind=StageKind.PHASE1, mapper=mapper
         )
-        stage = result.stage
-        if stage is None:
-            raise EstimationError(
-                T2MRCD_NO_CLEAN_OBSERVATIONS, "la exclusión y la depuración no dejaron filas"
-            )
         return self.assemble_model(
             arr,
             params,
             stage.fit,
             stage.clean,
             stage.limits,
-            kept=result.kept,
             excluded=mask,
-            automatic=result.excluded_automatic,
-            rounds=result.rounds,
-            converged=result.converged,
             regime=LimitRegime.PHASE1_PROVISIONAL,
         )
 
@@ -835,21 +796,19 @@ class T2MRCDChart:
 
         Pasos: (1) validar; (2) pendientes antes de ajustar, salvo ``force_replace``;
         (3) exclusión humana; (4) ``INSUFFICIENT`` si quedan menos de ``min_observations``;
-        (5) depuración automática de las filas nuevas (heredando B, niveles, agregaciones y MRCD
-        del modelo vigente, Q8; linaje ``NEW_ROWS``); (6) ``μ₁``, ``S₁`` = ajuste final de la
-        depuración; (7) ``compare`` con la base vigente, salvo ``force_replace`` (deciden las
-        pruebas formales; el cambio relativo es informativo salvo ``threshold_decides``);
-        (8) ``EXTEND`` = ``vstack(base, nuevas)`` o ``REPLACE`` = solo las nuevas; (9) Fase I
-        final sobre la nueva base, sin volver a depurarla (``final_depuration_skipped``), con
-        régimen ``PHASE2`` (``assemble_model``), e informe. El modelo guarda los parámetros
-        heredados tal cual (incluido ``max_depuration_rounds``) con la semilla de la
-        recalibración.
+        (5) **un** ajuste y **una** calibración de las filas nuevas conservadas (heredando B,
+        niveles, agregaciones y MRCD del modelo vigente, Q8; operación ``NEW_ROWS``): ``μ₁``,
+        ``S₁``; (6) ``compare`` con la base vigente, salvo ``force_replace`` (deciden las pruebas
+        formales; el cambio relativo es informativo salvo ``threshold_decides``); (7) ``EXTEND``
+        = ``vstack(base, nuevas)`` o ``REPLACE`` = solo las nuevas; (8) Fase I final sobre la
+        nueva base con régimen ``PHASE2`` (``assemble_model``), e informe. Sin depuración
+        automática iterativa (decisión del dueño, 2026-10-09). El modelo guarda los parámetros
+        heredados tal cual con la semilla de la recalibración.
 
-        En ``REPLACE`` la nueva base es exactamente la de la ronda final de la depuración de las
-        filas nuevas (mismas filas, mismo orden, mismos parámetros y semilla raíz), así que se
-        reutiliza su ajuste y su calibración (hueco ``(SLOT_NEW_ROWS_DEPURATION, r)``) en lugar
-        de repetir las B réplicas. En ``EXTEND`` se calibra con el linaje ``EXTENSION`` (hueco
-        ``(SLOT_PHASE1, 0)``).
+        En ``REPLACE`` la nueva base es exactamente la de las filas nuevas conservadas (mismas
+        filas, mismo orden, mismos parámetros y semilla raíz), así que se reutiliza su ajuste y su
+        calibración (hueco ``(SLOT_NEW_ROWS, 0)``) en lugar de repetir las B réplicas. En
+        ``EXTEND`` se calibra con la operación ``EXTENSION`` (hueco ``(SLOT_PHASE1, 0)``).
 
         Args:
             active_model: Modelo vigente.
@@ -883,75 +842,54 @@ class T2MRCDChart:
             bootstrap=dataclasses.replace(active_model.params.bootstrap, seed=params.seed),
         )
         self._aggregations(inherited)
-        result = depurate(
-            new,
-            ~human,
-            fit_round=partial(
-                self._stage, params=inherited, kind=StageKind.NEW_ROWS, mapper=mapper
-            ),
-            max_rounds=params.max_depuration_rounds,
-            min_rows=params.min_observations,
-        )
-        disposition, n_human, n_auto = _dispositions(human, result.excluded_automatic)
-        n_kept = int(result.kept.sum())
-        stage = result.stage
+        rows = _kept_rows(human)
+        kept_new = new[rows]
+        n_kept = int(rows.shape[0])
+        stage = None
+        if n_kept >= params.min_observations:
+            stage = self._stage(new, rows, params=inherited, kind=StageKind.NEW_ROWS, mapper=mapper)
         comparison = None
         if stage is not None and not force_replace:
-            comparison = self.compare(
-                active_model, base_arr, new[result.kept], stage.fit, params, mapper
-            )
-        decision = (
-            RecalibrationDecision.INSUFFICIENT
-            if stage is None
-            else decide(
-                comparison,
-                n_kept=n_kept,
-                min_observations=params.min_observations,
-                force_replace=force_replace,
-            )
+            comparison = self.compare(active_model, base_arr, kept_new, stage.fit, params, mapper)
+        decision = decide(
+            comparison,
+            n_kept=n_kept,
+            min_observations=params.min_observations,
+            force_replace=force_replace,
         )
         model = None
         if stage is not None and decision is not RecalibrationDecision.INSUFFICIENT:
-            kept_new = new[result.kept]
             if decision is RecalibrationDecision.EXTEND:
                 x_final = np.vstack([base_arr, kept_new])
                 final_stage = self._stage(
                     x_final,
                     np.arange(x_final.shape[0], dtype=np.int64),
-                    0,
                     params=inherited,
                     kind=StageKind.EXTENSION,
                     mapper=mapper,
                 )
             else:
-                # REPLACE: la ronda final de la depuración ya se ajustó y calibró sobre kept_new.
+                # REPLACE: las filas nuevas conservadas ya se ajustaron y calibraron.
                 x_final, final_stage = kept_new, stage
-            n_final = x_final.shape[0]
             model = self.assemble_model(
                 x_final,
                 inherited,
                 final_stage.fit,
                 final_stage.clean,
                 final_stage.limits,
-                kept=np.ones(n_final, dtype=np.bool_),
-                excluded=np.zeros(n_final, dtype=np.bool_),
-                automatic=np.zeros(n_final, dtype=np.bool_),
-                rounds=0,
-                converged=None,
+                excluded=np.zeros(x_final.shape[0], dtype=np.bool_),
                 regime=LimitRegime.PHASE2,
             )
         report = T2MRCDRecalibrationReport(
             decision=decision,
             forced=force_replace,
-            row_disposition=(RowDisposition.ALREADY_IN_BASE,) * base_arr.shape[0] + disposition,
+            row_disposition=(RowDisposition.ALREADY_IN_BASE,) * base_arr.shape[0]
+            + _dispositions(human),
             n_base=int(base_arr.shape[0]),
             n_new=int(new.shape[0]),
-            n_excluded_assignable_cause=n_human,
-            n_excluded_automatic=n_auto,
+            n_excluded_assignable_cause=int(human.sum()),
             n_kept_new=n_kept,
             min_observations=params.min_observations,
-            depuration_rounds=result.rounds,
-            depuration_converged=None if stage is None else result.converged,
             comparison=comparison,
             before=LimitsSnapshot.of(active_model),
             after=None if model is None else LimitsSnapshot.of(model),

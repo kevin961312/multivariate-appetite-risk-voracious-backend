@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
 
-import httpx
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 
@@ -45,7 +45,7 @@ def scored(client: TestClient) -> dict[str, Any]:
     return {"model_id": model_id, "observation_ids": result["result"]["observation_ids"]}
 
 
-def _error(response: httpx.Response, status: int, code: str) -> dict[str, Any]:
+def _error(response: httpx2.Response, status: int, code: str) -> dict[str, Any]:
     assert response.status_code == status, response.text
     body: dict[str, Any] = response.json()
     assert body["code"] == code
@@ -94,7 +94,7 @@ def test_model_post_only_accepts_references(client: TestClient) -> None:
 
 def test_model_params_and_policy_are_passed(client: TestClient) -> None:
     body = {
-        "params": {**FAST_PARAMS, "mrcd": {"maxcsteps": 100}, "max_depuration_rounds": 1},
+        "params": {**FAST_PARAMS, "mrcd": {"maxcsteps": 100}},
         "lifecycle_policy": {"revalidate_every_months": None, "revalidate_every_observations": 5},
     }
     model_id = train(client, seed=9, body=body)
@@ -105,7 +105,10 @@ def test_model_params_and_policy_are_passed(client: TestClient) -> None:
         "revalidate_every_observations": 5,
     }
     assert model["params"]["mrcd"]["maxcsteps"] == 100
-    assert model["params"]["max_depuration_rounds"] == 1
+    assert "max_depuration_rounds" not in model["params"]
+    assert set(model["result"]).isdisjoint(
+        {"depuration_rounds", "depuration_converged", "final_depuration_skipped"}
+    )
     assert model["result"]["mrcd"]["alpha"] == pytest.approx(0.75, abs=0.05)
     assert model["provenance"]["root_dataset_id"]
 
@@ -274,7 +277,7 @@ def test_versions_and_status(client: TestClient, scored: dict[str, Any]) -> None
 # --- recalibraciones y eventos --------------------------------------------------------
 
 
-def _recalibrate(client: TestClient, model_id: str, **extra: object) -> httpx.Response:
+def _recalibrate(client: TestClient, model_id: str, **extra: object) -> httpx2.Response:
     body: dict[str, Any] = {
         "range_from": T0.isoformat(),
         "range_to": END,
@@ -408,7 +411,7 @@ def test_concurrent_recalibration_posts_one_202_one_409(client: TestClient) -> N
     model_id = train(client, seed=41)
     score(client, model_id, observations(30))
     barrier = threading.Barrier(2)
-    responses: list[httpx.Response] = []
+    responses: list[httpx2.Response] = []
 
     def post() -> None:
         barrier.wait()

@@ -28,7 +28,6 @@ from voracious.application.lifecycle import ChartStatus, base_content_hash
 from voracious.application.ports import VersionStatusChange
 from voracious.application.records import (
     BaseRowSource,
-    ExclusionReason,
     JobStatus,
     ModelVersion,
     VersionStatus,
@@ -87,8 +86,9 @@ def test_training_creates_active_version_zero_with_base_hash() -> None:
     np.testing.assert_array_equal(v0.base_data, record.training_data[record.model.base_mask])
     assert v0.base_hash == base_content_hash(v0.base_data)
     assert all(r.source is BaseRowSource.TRAINING for r in v0.base_refs)
-    assert len(v0.base_refs) + len(v0.exclusions) == record.training_data.shape[0]
-    assert all(e.reason is ExclusionReason.AUTOMATIC for e in v0.exclusions)
+    # Sin depuración automática ni exclusión humana, la base es todo el histórico.
+    assert len(v0.base_refs) == record.training_data.shape[0]
+    assert v0.exclusions == ()
     assert isinstance(record.params, dict)  # M1: parámetros persistidos como datos
     status = app.status().execute(TENANT, CHART, model_id)
     assert status.status is ChartStatus.STARTUP

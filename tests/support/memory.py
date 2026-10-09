@@ -14,7 +14,7 @@ from voracious.application.records import ModelRecord, MonitoringRecord
 from voracious.infrastructure.memory import (
     InMemoryComparisonRepository,
     InMemoryDatasetStorage,
-    InMemoryDepurationRepository,
+    InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
     InMemoryObservationRepository,
@@ -39,7 +39,7 @@ __all__ = [
     "FixedClock",
     "InMemoryComparisonRepository",
     "InMemoryDatasetStorage",
-    "InMemoryDepurationRepository",
+    "InMemoryExclusionRepository",
     "InMemoryFitRepository",
     "InMemoryLimitsRepository",
     "InMemoryModelRepository",

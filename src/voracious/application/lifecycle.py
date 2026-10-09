@@ -173,7 +173,6 @@ def exclusion_reason(disposition: RowDisposition) -> ExclusionReason | None:
     """
     return {
         RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE: ExclusionReason.ASSIGNABLE_CAUSE,
-        RowDisposition.EXCLUDED_AUTOMATIC: ExclusionReason.AUTOMATIC,
         RowDisposition.ALREADY_IN_BASE: ExclusionReason.ALREADY_IN_BASE,
     }.get(disposition)
 

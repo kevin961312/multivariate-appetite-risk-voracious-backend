@@ -164,17 +164,16 @@ class T2MRCDRecalibrationSteps:
         )
         return self.chart.encode_params(inherited)
 
-    def depuration_bounds(self, recalibration_params: Mapping[str, object]) -> tuple[int, int]:
-        """``(max_depuration_rounds, min_observations)`` de la recalibración.
+    def min_observations(self, recalibration_params: Mapping[str, object]) -> int:
+        """``min_observations`` de la recalibración.
 
         Args:
             recalibration_params: Parámetros de la recalibración.
 
         Returns:
-            Rondas máximas y mínimo de filas.
+            El mínimo de filas nuevas conservadas.
         """
-        params = self._recalibration(recalibration_params)
-        return params.max_depuration_rounds, params.min_observations
+        return self._recalibration(recalibration_params).min_observations
 
     def compare(
         self,
@@ -191,8 +190,8 @@ class T2MRCDRecalibrationSteps:
         Args:
             active_model: Modelo vigente.
             base: Base vigente.
-            new_kept: Filas nuevas de la ronda final.
-            fit: Ajuste de la ronda final.
+            new_kept: Filas nuevas conservadas.
+            fit: Ajuste de esas filas.
             recalibration_params: Parámetros de la recalibración.
             mapper: Reparto de los remuestreos.
 
@@ -241,7 +240,7 @@ class T2MRCDRecalibrationSteps:
         fit: object,
         calibration: Calibration,
     ) -> T2MRCDModel:
-        """Modelo recalibrado: todas las filas en la base, sin depurar, régimen ``PHASE2``.
+        """Modelo recalibrado: todas las filas en la base, régimen ``PHASE2``.
 
         Args:
             x: Base nueva.
@@ -252,18 +251,13 @@ class T2MRCDRecalibrationSteps:
         Returns:
             El modelo.
         """
-        n = x.shape[0]
         return self.chart.assemble_model(
             x,
             self.chart.decode_params(params),
             _fit(fit),
             calibration.clean,
             _limits(calibration.limits),
-            kept=np.ones(n, dtype=np.bool_),
-            excluded=np.zeros(n, dtype=np.bool_),
-            automatic=np.zeros(n, dtype=np.bool_),
-            rounds=0,
-            converged=None,
+            excluded=np.zeros(x.shape[0], dtype=np.bool_),
             regime=LimitRegime.PHASE2,
         )
 
@@ -276,8 +270,6 @@ class T2MRCDRecalibrationSteps:
         n_base: int,
         new_dispositions: Sequence[RowDisposition],
         recalibration_params: Mapping[str, object],
-        depuration_rounds: int,
-        depuration_converged: bool | None,
         comparison: object | None,
         model: object | None,
     ) -> T2MRCDRecalibrationReport:
@@ -290,8 +282,6 @@ class T2MRCDRecalibrationSteps:
             n_base: Filas de la base vigente.
             new_dispositions: Destino de cada fila nueva.
             recalibration_params: Parámetros de la recalibración.
-            depuration_rounds: Rondas de la depuración de las filas nuevas.
-            depuration_converged: Su convergencia.
             comparison: Comparación o ``None``.
             model: Modelo nuevo o ``None``.
 
@@ -309,11 +299,8 @@ class T2MRCDRecalibrationSteps:
             n_excluded_assignable_cause=dispositions.count(
                 RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE
             ),
-            n_excluded_automatic=dispositions.count(RowDisposition.EXCLUDED_AUTOMATIC),
             n_kept_new=dispositions.count(RowDisposition.KEPT),
             min_observations=self._recalibration(recalibration_params).min_observations,
-            depuration_rounds=depuration_rounds,
-            depuration_converged=depuration_converged,
             comparison=None if comparison is None else _comparison(comparison),
             before=LimitsSnapshot.of(_model(active_model)),
             after=None if new_model is None else LimitsSnapshot.of(new_model),

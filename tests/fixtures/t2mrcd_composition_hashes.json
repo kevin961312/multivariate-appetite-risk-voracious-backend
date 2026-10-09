@@ -4,16 +4,15 @@
     "arm64"
   ],
   "hashes": {
-    "phase1/contaminated": "b7e6b33ca82789eeef6a1ccbdfdd55c5fcb123cf3c8b793d41110992d5ea295f",
-    "phase1/human_exclusion": "57f495628402938ce53a1bdd1463de71d025acf79292dbc12d4616dc105c08bd",
-    "phase1/max_rounds": "c4a1a2e21ead7c8d880695ddc1b091a4594007227e3683b2f27e56ebbab5c818",
-    "phase1/n_gt_p": "a7de624cf01f6a577bd66342a9f0073f83463ce52dcac008ef5c214d354d3f40",
-    "phase1/p_gt_n": "b83545a43e93419a9280f67f08b219c1191ee14e143c91893cf49642c0346ad2",
-    "recalibration/extend": "0185d52ce24fb6897a14cda7a76dc37f6e01c32643d7bf03244c560522bf1a21",
-    "recalibration/forced": "03298673ecad2bed97bb5e4737f19578c82cc25d77f2e501cc972979cbde95b0",
-    "recalibration/insufficient": "4750263e1b4478bf98c31fd0bd88235365c5d1248459bc9e1a853c5c73739591",
-    "recalibration/insufficient_in_loop": "e3f3ac503f7b3265e43827f7e35df3ca9cba5479c49a1982431fdb84b15938cb",
-    "recalibration/replace": "b7e5830e6e4df781dde49fd5c488e0161688624de992d47807778cae2a3ca15e"
+    "phase1/contaminated": "b845447747a753fc35dfed8f7c062e5724adfccfa933da21af1dae2aece9c190",
+    "phase1/human_exclusion": "3204f3eb7aa703d478044856d4c5e10ec81f7395419a05801585a93c62b97c77",
+    "phase1/n_gt_p": "c8083b3be610db8e56848a14bde279e989ed8ce17c88ac850fcaa491728a34d6",
+    "phase1/p_gt_n": "fa3b550865e9e186495299690def861966ab3eab6a42ba2688533e6b1dfe5b33",
+    "recalibration/extend": "ca84e8ae91a1546e628bcd427dfa3fc684aa3c2183d0bedca13a9f9f30acc918",
+    "recalibration/forced": "291b23774eac189e4834bee120c79138441ccc36c843d92dec3a23203acf75ba",
+    "recalibration/insufficient": "08ee818ef6e78b5f10b37be16ea2193f6fce791f518fd7c9e2e8cb45381eeb42",
+    "recalibration/insufficient_after_exclusion": "9adc85d4aee2a4f493eb735b15098d145f379455ef4a904f316ee16c9ffd8f9d",
+    "recalibration/replace": "0cae927d2a1eeb02a700c80386a397fb38c1e6bf9dfc849c72d245a157c9294e"
   },
   "numpy": "2.5.3",
   "platform": [

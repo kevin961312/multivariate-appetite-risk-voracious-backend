@@ -118,10 +118,10 @@ Decisión del dueño. Sustituye los puntos 3 y 4 de la «Decisión» y la fila �
 - **Remuestreo solo sobre `best` (dueño, 2026-10-07):** para ambos límites. Con todas las filas, una contaminación
   no detectada inflaría el límite (enmascaramiento); `best` es la mejor estimación. Consecuencia medida (n = 200,
   p = 3, normal limpia, B = 50): falsa alarma real ≈ 2.0–2.4 % en Fase I y ≈ 1.6–2.2 % en Fase II frente al 0.5 %
-  nominal (≈ 0.4 % con todas las filas), pues `best` es el 75 % central y las nuevas incluyen las colas; la
-  depuración automática puede quitar 1–10 filas buenas. Es una característica del diseño. Estudio futuro:
+  nominal (≈ 0.4 % con todas las filas), pues `best` es el 75 % central y las nuevas incluyen las colas. Es una
+  característica del diseño (cifras re-medidas en la enmienda 2026-10-09). Estudio futuro:
   reponderado tipo MCD.
-- **Semillas por huecos fijos** (`seeds.py`), no `spawn(B)`: cambiar B, rondas o remuestreos de una prueba no
+- **Semillas por huecos fijos** (`seeds.py`), no `spawn(B)`: cambiar B o los remuestreos de una prueba no
   desplaza las demás semillas. Esto sustituye lo escrito en «Detalles de implementación» sobre `spawn(B)`.
 - **M6:** el reporte incluye el error Monte Carlo del límite.
 - **Persistencia:** `BootstrapLimits` deja de ser un único `limit`; guarda `phase1_limit`, `phase2_limit` y su
@@ -153,3 +153,22 @@ quiere capturar. Remuestrear *filas* y reajustar MRCD en cada réplica propaga e
 **Decisión del dueño (2026-10-07), opción (a): mantener lo implementado** (remuestrear filas de `best` y reajustar
 MRCD en cada réplica). El coste de minutos (ver «Consecuencias») se acepta; se atacará con M5 (optimizar
 `pymrcd`), no cambiando el método.
+
+## Enmienda 2026-10-09: sin depuración automática
+
+Decisión del dueño: no hay depuración automática iterativa, así que cada calibración se hace **una sola vez**
+sobre la base (menos las filas excluidas por una persona). **Por qué:** quitar las filas con `T² > límite` y
+repetir nunca converge, porque MRCD no es «de composición»: cada vuelta deja fuera otro 25 % del nuevo total y el
+límite se calcula siempre sobre el 75 % sobrante (medido en el servidor, 200 × 300, B = 100, 2 vCPU: 200 → 150 →
+113 → 85 → 64 → 48 → 36 filas en 6 rondas, 18,3 min, sin converger). El 25 % fuera de `best` no es «malo»: no
+se elimina, solo no entra en la estimación ni en el bootstrap.
+
+- **Confirmado por el dueño:** cuantil por **pool** y grupo de Fase I = **toda la muestra sorteada** (opción i);
+  **no** se hace estudio de simulación del sesgo.
+- **Falsa alarma real, re-medida sin depuración** (validador; 12 réplicas, n = 200, p = 3, B = 50, 20 000
+  observaciones nuevas): Fase I media 2.29 % (0.96–3.77 %), Fase II 2.10 % (0.91–2.82 %). Son medias entre
+  semillas; una semilla concreta varía ~1–3.8 %. La depuración apenas las movía. No medido: p > n.
+- **Semillas:** el segundo componente de `(0, ·)` y `(1, ·)` era la ronda y se fija en 0 (`STAGE_INDEX`) para
+  conservar los bits.
+- **Tiempos:** una calibración con 200 × 300, B = 100, 2 procesos × 1 hilo: 5,5 min; Fase I ≈ 6 min; memoria pico
+  245 MB.

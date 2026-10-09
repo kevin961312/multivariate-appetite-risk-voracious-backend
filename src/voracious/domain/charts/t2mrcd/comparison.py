@@ -4,7 +4,7 @@ Decisiones del dueño (2026-10-07, Q4, revisada en la vuelta de corrección del 
 
 - **Cambio relativo, informativo por defecto:** norma de Frobenius relativa
   ``‖S₁ - S₀‖_F / ‖S₀‖_F`` entre la dispersión MRCD de la base vigente (``S₀``) y la de las filas
-  nuevas depuradas (``S₁``), con umbral parametrizable (0.10 por defecto, documento del dueño).
+  nuevas conservadas (``S₁``), con umbral parametrizable (0.10 por defecto, documento del dueño).
   Siempre se calcula y se informa (``exceeds_threshold``). Con ``threshold_decides = False``
   (default) **no decide**: con datos estables el ruido de estimación de MRCD entre dos muestras
   de la misma distribución ya la lleva por encima de 0.10 (≈ 0.25-0.5 con n = 200 y p = 3).
@@ -141,7 +141,7 @@ class _ChangeTest(Protocol):
 
         Args:
             base: Base vigente ``n0 x p``.
-            new: Filas nuevas depuradas ``n1 x p``.
+            new: Filas nuevas conservadas ``n1 x p``.
             fit0: Ajuste de la base vigente.
             fit1: Ajuste de las filas nuevas.
             estimator: Estimador de la carta (para reajustar en cada remuestreo).
@@ -260,11 +260,11 @@ def compare_bases(
     n_test_resamples: int,
     mapper: TaskMapper,
 ) -> ComparisonResult:
-    """Compara la base vigente con las filas nuevas depuradas.
+    """Compara la base vigente con las filas nuevas conservadas.
 
     Args:
         base: Base vigente ``n0 x p``.
-        new: Filas nuevas depuradas ``n1 x p``.
+        new: Filas nuevas conservadas ``n1 x p``.
         fit0: Ajuste de la base vigente (``μ₀``, ``S₀``).
         fit1: Ajuste de las filas nuevas (``μ₁``, ``S₁``).
         metric: Medida del cambio relativo.

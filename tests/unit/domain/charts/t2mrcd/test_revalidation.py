@@ -1,4 +1,7 @@
-"""Recalibración de T²MRCD: depuración, decisión EXTEND/REPLACE/INSUFFICIENT e informe.
+"""Recalibración de T²MRCD: exclusión humana, decisión EXTEND/REPLACE/INSUFFICIENT e informe.
+
+Sin depuración automática iterativa (decisión del dueño, 2026-10-09): las filas nuevas solo pasan
+por la exclusión humana y se recalibra en una sola pasada.
 
 Los escenarios (a)-(c) usan las pruebas de permutación «SOLO TEST» de ``tests/support`` (las de
 producción están pendientes), que son las que deciden. La Frobenius relativa con el umbral de
@@ -17,7 +20,7 @@ from support.solo_test import fast_params, solo_test_recalibration
 from voracious.domain.charts.t2mrcd import (
     DEFAULT_MIN_OBSERVATIONS,
     DEFAULT_RELATIVE_CHANGE_THRESHOLD,
-    SLOT_NEW_ROWS_DEPURATION,
+    SLOT_NEW_ROWS,
     SLOT_PHASE1,
     T2MRCD_DECISION_PENDING,
     T2MRCD_MRCD_ALPHA,
@@ -28,7 +31,6 @@ from voracious.domain.charts.t2mrcd import (
     T2MRCDRecalibrationParams,
     any_formal_test_change,
     decide,
-    depurate,
     frobenius_relative_change,
 )
 from voracious.domain.common import (
@@ -93,7 +95,6 @@ def _spy_fit(monkeypatch: pytest.MonkeyPatch) -> list[object]:
 def test_production_defaults_and_pending() -> None:
     params = T2MRCDRecalibrationParams(seed=1)
     assert params.min_observations == DEFAULT_MIN_OBSERVATIONS == 25  # documento del dueño
-    assert params.max_depuration_rounds == 5  # Q5
     assert params.relative_change_threshold == DEFAULT_RELATIVE_CHANGE_THRESHOLD == 0.10  # Q4
     assert params.threshold_decides is False  # Q4: el umbral es informativo por defecto
     assert params.relative_change_metric is frobenius_relative_change  # Q4
@@ -118,7 +119,6 @@ def test_seed_is_mandatory() -> None:
         ({"seed": -1}, "recalibration.seed"),
         ({"seed": 1.0}, "recalibration.seed"),
         ({"seed": 1, "min_observations": 0}, "recalibration.min_observations"),
-        ({"seed": 1, "max_depuration_rounds": -1}, "recalibration.max_depuration_rounds"),
         ({"seed": 1, "relative_change_threshold": 0.0}, "recalibration.relative_change_threshold"),
         (
             {"seed": 1, "relative_change_threshold": float("inf")},
@@ -135,79 +135,13 @@ def test_invalid_recalibration_params(kwargs: dict[str, object], field: str) -> 
     assert info.value.details["field"] == field
 
 
-# --- depurate y decide (puros) -----------------------------------------------------------------
+def test_there_is_no_automatic_depuration_parameter() -> None:
+    """Decisión del dueño (2026-10-09): sin depuración automática iterativa ni su parámetro."""
+    with pytest.raises(TypeError):
+        T2MRCDRecalibrationParams(**{"seed": 1, "max_depuration_rounds": 1})
 
 
-@dataclasses.dataclass(frozen=True)
-class _Stage:
-    limit: float
-    rows: np.ndarray
-
-    @property
-    def phase1_limit(self) -> float:
-        return self.limit
-
-    def t2(self, x: np.ndarray) -> np.ndarray:
-        return x[:, 0]
-
-
-def _fake_round(limit: float, seen: list[tuple[int, list[int]]]) -> object:
-    def fit_round(x: np.ndarray, rows: np.ndarray, r: int) -> _Stage:
-        seen.append((r, rows.tolist()))
-        return _Stage(limit, rows)
-
-    return fit_round
-
-
-def test_depurate_removes_all_rows_above_limit_each_round() -> None:
-    # T² = primera columna; la ronda 0 quita 9 y 8; la ronda 1 ya converge.
-    x = np.array([[1.0], [9.0], [2.0], [8.0], [3.0]])
-    seen: list[tuple[int, list[int]]] = []
-    kept = np.array([True, True, True, True, False])
-    res = depurate(x, kept, fit_round=_fake_round(5.0, seen), max_rounds=5, min_rows=1)
-    assert seen == [(0, [0, 1, 2, 3]), (1, [0, 2])]
-    assert res.converged
-    assert res.rounds == 1
-    assert res.kept.tolist() == [True, False, True, False, False]
-    assert res.excluded_automatic.tolist() == [False, True, False, True, False]
-    assert res.stage is not None
-    assert res.stage.rows.tolist() == [0, 2]
-    assert kept.tolist() == [True, True, True, True, False]  # no muta la entrada
-
-
-def test_depurate_stops_after_max_rounds_without_converging() -> None:
-    x = np.array([[1.0], [9.0]])
-    seen: list[tuple[int, list[int]]] = []
-    res = depurate(
-        x, np.ones(2, dtype=np.bool_), fit_round=_fake_round(5.0, seen), max_rounds=0, min_rows=1
-    )
-    assert not res.converged
-    assert res.rounds == 0
-    assert res.kept.all()
-    assert seen == [(0, [0, 1])]
-
-
-def test_depurate_stops_below_min_rows_without_fitting() -> None:
-    x = np.array([[1.0], [9.0], [8.0]])
-    seen: list[tuple[int, list[int]]] = []
-    res = depurate(
-        x, np.ones(3, dtype=np.bool_), fit_round=_fake_round(5.0, seen), max_rounds=5, min_rows=2
-    )
-    assert res.stage is None
-    assert res.kept.tolist() == [True, False, False]
-    assert seen == [(0, [0, 1, 2])]
-    seen.clear()
-    assert (
-        depurate(
-            x,
-            np.zeros(3, dtype=np.bool_),
-            fit_round=_fake_round(5.0, seen),
-            max_rounds=5,
-            min_rows=1,
-        ).stage
-        is None
-    )
-    assert seen == []
+# --- decide (pura) -----------------------------------------------------------------------------
 
 
 def _comparison(changed: bool) -> ComparisonResult:
@@ -256,14 +190,9 @@ def test_stable_data_extends_the_base(active: tuple[T2MRCDModel, np.ndarray]) ->
     assert np.array_equal(new_model.mrcd.cov, fit.cov)
     assert new_model.limit_regime is LimitRegime.PHASE2
     assert new_model.operative_limit == new_model.limits.phase2_limit
-    # La nueva base no se vuelve a depurar: se registra aparte, sin tocar los parámetros.
-    assert new_model.depuration_rounds == 0
-    assert new_model.final_depuration_skipped
-    assert new_model.depuration_converged is None
-    assert not model.final_depuration_skipped
-    # Q8: hereda B, niveles, MRCD y rondas de depuración; la semilla es la de la recalibración
-    # (hueco de Fase I).
-    assert new_model.params.max_depuration_rounds == model.params.max_depuration_rounds
+    # Sin depuración automática: se conservan todas las filas nuevas (sin causa asignable).
+    assert report.n_kept_new == 200
+    # Q8: hereda B, niveles y MRCD; la semilla es la de la recalibración (hueco de Fase I).
     assert new_model.params.mrcd == model.params.mrcd
     assert new_model.params.bootstrap.n_replicates == model.params.bootstrap.n_replicates
     assert new_model.params.bootstrap.alpha_limit == model.params.bootstrap.alpha_limit
@@ -279,7 +208,6 @@ def test_stable_data_extends_the_base(active: tuple[T2MRCDModel, np.ndarray]) ->
     assert report.after.regime is LimitRegime.PHASE2
     assert report.after.n_base == new_model.n_base
     assert report.phase2_exceeds_phase1 == new_model.limits.phase2_exceeds_phase1
-    assert report.depuration_converged is not None
 
 
 def test_production_threshold_is_informative_only(
@@ -357,9 +285,10 @@ def test_shifted_mean_replaces_the_base(active: tuple[T2MRCDModel, np.ndarray]) 
     assert new_model.n_base == int(kept.sum())
     fit = fit_mrcd(x_new[kept], MRCDParams(alpha=T2MRCD_MRCD_ALPHA))
     assert np.array_equal(new_model.mrcd.cov, fit.cov)
-    assert new_model.final_depuration_skipped
-    assert new_model.depuration_converged is None
-    assert new_model.params.max_depuration_rounds == active[0].params.max_depuration_rounds
+    assert new_model.params == dataclasses.replace(
+        active[0].params,
+        bootstrap=dataclasses.replace(active[0].params.bootstrap, seed=new_model.seed),
+    )
 
 
 @pytest.mark.parametrize("factor", [1.5, 2.0])
@@ -389,7 +318,6 @@ def test_few_observations_are_insufficient_without_fitting(
     assert report.after is None
     assert report.comparison is None
     assert report.phase2_exceeds_phase1 is None
-    assert report.depuration_converged is None
     assert report.n_kept_new == 24
     assert report.min_observations == 25
 
@@ -410,35 +338,28 @@ def test_human_exclusion_can_make_it_insufficient(
     assert new_rows[6:] == (RowDisposition.KEPT,) * 24
 
 
-def test_depuration_can_make_it_insufficient(active: tuple[T2MRCDModel, np.ndarray]) -> None:
-    x_new = _normal(6, n=27)
-    x_new[:4] += 15.0
-    out = _recalibrate(active, x_new)
-    assert out.decision is RecalibrationDecision.INSUFFICIENT
-    assert out.model is None
-    report = out.report
-    assert report.n_excluded_automatic >= 3
-    assert report.n_kept_new < 25
-    assert report.depuration_rounds >= 1
-
-
-def test_human_exclusion_and_depuration_of_new_rows(
+def test_outliers_without_assignable_cause_stay_in_the_new_rows(
     active: tuple[T2MRCDModel, np.ndarray],
 ) -> None:
+    # Sin depuración automática: una atípica sin causa asignable no se quita (antes la quitaba la
+    # depuración); solo sale la fila con causa asignable confirmada.
     x_new = _normal(101)
     x_new[0] += 40.0  # causa asignable confirmada
-    x_new[1] += 12.0  # atípica sin causa: la quita la depuración automática
+    x_new[1] += 12.0  # atípica sin causa: se conserva
     cause = np.zeros(200, dtype=np.bool_)
     cause[0] = True
     out = _recalibrate(active, x_new, assignable_cause=cause)
     report = out.report
     new_rows = report.row_disposition[report.n_base :]
     assert new_rows[0] is RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE
-    assert new_rows[1] is RowDisposition.EXCLUDED_AUTOMATIC
+    assert new_rows[1:] == (RowDisposition.KEPT,) * 199
+    assert set(report.row_disposition) <= {
+        RowDisposition.ALREADY_IN_BASE,
+        RowDisposition.KEPT,
+        RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE,
+    }
     assert report.n_excluded_assignable_cause == 1
-    assert report.n_excluded_automatic == new_rows.count(RowDisposition.EXCLUDED_AUTOMATIC)
-    assert report.n_kept_new == 200 - 1 - report.n_excluded_automatic
-    assert report.depuration_rounds >= 1
+    assert report.n_kept_new == 199
 
 
 def test_force_replace_skips_comparison_and_pending(
@@ -502,19 +423,17 @@ def _record_spawn_keys(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, ...]]
     return keys
 
 
-def test_replace_reuses_the_last_depuration_calibration(
+def test_replace_reuses_the_new_rows_calibration(
     active: tuple[T2MRCDModel, np.ndarray], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # REPLACE: la nueva base es la de la ronda final de la depuración de las filas nuevas, así que
-    # se reutiliza su calibración (sin repetir las B réplicas en el hueco de Fase I).
+    # REPLACE: la nueva base son las filas nuevas conservadas, así que se reutiliza su única
+    # calibración (sin repetir las B réplicas en el hueco de Fase I).
     keys = _record_spawn_keys(monkeypatch)
     out = _recalibrate(active, _normal(101) + 1.0)
     assert out.decision is RecalibrationDecision.REPLACE
-    assert keys[0] == (SLOT_NEW_ROWS_DEPURATION, 0)
-    assert all(k[0] == SLOT_NEW_ROWS_DEPURATION for k in keys)
+    assert keys == [(SLOT_NEW_ROWS, 0)]
     assert out.model is not None
-    assert out.model.limits.spawn_key == keys[-1]
-    assert out.model.limits.spawn_key == (SLOT_NEW_ROWS_DEPURATION, out.report.depuration_rounds)
+    assert out.model.limits.spawn_key == (SLOT_NEW_ROWS, 0)
 
 
 def test_extend_calibrates_in_the_phase1_slot(
@@ -523,9 +442,7 @@ def test_extend_calibrates_in_the_phase1_slot(
     keys = _record_spawn_keys(monkeypatch)
     out = _recalibrate(active, _normal(101))
     assert out.decision is RecalibrationDecision.EXTEND
-    assert keys[0] == (SLOT_NEW_ROWS_DEPURATION, 0)
-    assert keys[-1] == (SLOT_PHASE1, 0)
-    assert keys.count((SLOT_PHASE1, 0)) == 1
+    assert keys == [(SLOT_NEW_ROWS, 0), (SLOT_PHASE1, 0)]
 
 
 def test_base_must_be_the_active_base(active: tuple[T2MRCDModel, np.ndarray]) -> None:

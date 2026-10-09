@@ -22,12 +22,12 @@ Ver [ADR 0001](adr/0001-hexagonal.md).
                      Kubernetes con autoescalado
 ```
 
-## Arquitectura de hoy (Pasos 1 a 3)
+## Arquitectura de hoy (Pasos 1 a 4.1)
 
 Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, tenant), `workers`
 (punto de entrada sin lógica), `infrastructure` (cola en hilos por carriles, repositorios en memoria, almacenamiento,
 `ProcessPoolTaskMapper`, reloj, ids, logging), `application` (casos de uso, puertos, registros) y el dominio. Siguen
-siendo **objetivo** (Paso 4+): Celery, Postgres/TimescaleDB, S3, JWT/OIDC, Docker y CI.
+siendo **objetivo** (Paso 4.2+): Celery, Postgres/TimescaleDB, S3 y JWT/OIDC (Docker y CI existen desde el Paso 4.1).
 
 ```
  HTTP ─▶ api/ (routers por paso y por carta, schemas, errores, tenant por X-Tenant-ID)
@@ -40,7 +40,7 @@ siendo **objetivo** (Paso 4+): Celery, Postgres/TimescaleDB, S3, JWT/OIDC, Docke
           infrastructure/ (InlineJobQueue por carriles, repos en memoria, almacenamiento, pasos por carta, logging)
                      │ implementa los puertos de
                      ▼
-          application/ (casos de uso por paso: ajuste, límites, depuración, modelo, tubería, puntuación,
+          application/ (casos de uso por paso: ajuste, límites, exclusión, modelo, tubería, puntuación,
           recalibración, comparación, versión; puertos Protocol)
                      │ usa
                      ▼
@@ -51,6 +51,26 @@ siendo **objetivo** (Paso 4+): Celery, Postgres/TimescaleDB, S3, JWT/OIDC, Docke
 ```
 
 Flujo de dependencias: `api | workers` → `container` → `infrastructure` → `application` → `domain`.
+
+## Despliegue (Paso 4.1)
+
+Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md).
+
+- **Compose** (`docker-compose.yml`): un solo servicio `api` con un worker de uvicorn, porque la cola y el estado
+  viven en el proceso. Raíz de solo lectura con `/tmp` en `tmpfs`, `restart: unless-stopped` y logs rotados.
+- **Datasets:** volumen `datasets` montado en `/data` con `VORACIOUS_STORAGE=local` y
+  `VORACIOUS_STORAGE_DIR=/data/datasets`; sobrevive a reinicios (los repositorios no).
+- **Límites (M7):** `mem_limit` 2g, `cpus` 1.5, `pids_limit` 512, pensados para 2 vCPU y 3.7 GiB: con la cola en el
+  proceso la memoria crece con los trabajos en curso y los datasets cargados.
+- **Puerto:** `127.0.0.1:8000`, sin exponer a la red; acceso remoto por túnel SSH.
+- **Perfil 2 vCPU** (`.env.example`, comentado): `VORACIOUS_REPLICATE_PROCESSES=2`, `VORACIOUS_MRCD_THREADS=1`,
+  carriles `ESTIMATION=1`, `CALIBRATION=1`, `LIGHT=2`, `ORCHESTRATION=1`. Procesos × hilos MRCD no supera los
+  núcleos. Solo rendimiento: no cambia ningún resultado.
+- **Tiempos medidos (2026-10-09, servidor 2 vCPU, 200×300, B = 100, 2 procesos × 1 hilo):** una calibración
+  bootstrap 5,5 min; Fase I completa de una sola pasada ≈ 6 min (estimado a partir de la calibración medida);
+  memoria pico 245 MB, dentro del `mem_limit` de 2g. Con la cascada de depuración antigua: 18,3 min sin converger
+  (200 → 36 filas en 6 rondas; ver [`metodos/t2mrcd.md`](metodos/t2mrcd.md)). Siguen sin medirse la
+  recalibración completa y el caso p > n.
 
 ## Dominio extensible
 
@@ -134,7 +154,7 @@ los de la columna «después» son objetivo (Paso 4+).
 | --- | --- | --- | --- | --- |
 | Ejecución de trabajos | `JobQueue` (recibe `JobRequest`) | `InlineJobQueue`: un `ThreadPoolExecutor` por carril ([ADR 0003](adr/0003-api-asincrona.md)) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
 | Datasets (linaje, huella) | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash, M6) | `S3DatasetStorage` | `VORACIOUS_STORAGE`, `VORACIOUS_STORAGE_DIR` |
-| Ajustes, límites, depuraciones, tuberías, comparaciones | `FitRepository`, `LimitsRepository`, `DepurationRepository`, `PipelineRepository`, `ComparisonRepository` | en memoria, seguros entre hilos, con `claim` (CAS `queued → running`) | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
+| Ajustes, límites, exclusiones, tuberías, comparaciones | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ComparisonRepository` | en memoria, seguros entre hilos, con `claim` (CAS `queued → running`) | Postgres (TimescaleDB) | `VORACIOUS_REPOSITORY=memory` |
 | Modelos y puntuaciones | `ModelRepository`, `MonitoringRepository` | en memoria, con `claim` | Postgres (TimescaleDB) | ídem |
 | Ciclo de vida | `ModelVersionRepository` (append-only, CAS de estado, `add_proposal_if_none`), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` (`add_if_none_in_progress`) | en memoria; altas atómicas (D6) | Postgres (TimescaleDB) | ídem |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta nueva | — |
@@ -146,8 +166,8 @@ Decisiones de diseño de los puertos y registros:
 
 - **`JobRequest` solo lleva identificadores** (`kind`, `tenant_id`, `scope` = la carta, `resource_id` y, en los
   hijos de un modelo, `model_id`): los datos están en el repositorio y el mensaje sirve para cualquier cola.
-- **`JobKind` y carriles** (`lane_of`): `mrcd_fit` → `estimation`; `limits`, `depuration`, `comparison` →
-  `calibration`; `model_assembly`, `score`, `version_proposal` → `light`; `pipeline` → `orchestration`. Separarlos
+- **`JobKind` y carriles** (`lane_of`): `mrcd_fit` → `estimation`; `limits`, `comparison` →
+  `calibration`; `exclusion`, `model_assembly`, `score`, `version_proposal` → `light`; `pipeline` → `orchestration`. Separarlos
   evita que un bootstrap de minutos bloquee una puntuación (ADR 0003, enmienda). `TRAIN`, `MONITOR` y `RECALIBRATE`
   se retiraron: ya no hay trabajos monolíticos (ADR 0009).
 - **Todo `get` exige `tenant_id`** y devuelve `None` si el recurso es de otro tenant: un recurso ajeno es
@@ -191,7 +211,7 @@ del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
 | Paso | Rutas | Respuesta |
 | --- | --- | --- |
 | Dataset | `POST /v1/datasets`, `GET /v1/datasets/{id}` | `201`; JSON, CSV o multipart |
-| Fase I | `POST/GET <c>/fits`, `<c>/limits`, `<c>/depurations`; `POST <c>/models` (solo referencias) | `202 {id, status:"queued"}` + `GET` |
+| Fase I | `POST/GET <c>/fits`, `<c>/limits`, `<c>/exclusions`; `POST <c>/models` (solo referencias) | `202 {id, status:"queued"}` + `GET` |
 | Orquestación | `POST <c>/pipelines/phase1`, `GET <c>/pipelines/{id}` | `202`; encadena los pasos anteriores |
 | Fase II | `POST <c>/models/{id}/scores`, `GET …/scores/{id}` | `202` + `GET` |
 | Ciclo de vida | `…/observations`, `…/annotations` (POST), `…/structural-events`, `…/recalibrations` (+ `cancel`), `…/comparisons`, `…/versions` (+ `approve`, `reject`), `…/status` | ver ADR 0005 |

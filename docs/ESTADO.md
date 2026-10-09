@@ -1,19 +1,66 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-07 (Paso 3 hecho: API por pasos, adaptadores y cableado).
+Última actualización: 2026-10-09 (Paso 4: 4.0 y 4.1 hechas; eliminada la depuración automática y medidos los tiempos de Fase I en el servidor).
 
-**Siguiente hito:** Paso 4 (Dockerfile, docker-compose, CI), y a continuación el Paso 5 (golden por método).
+**Siguiente hito:** 4.2 (Postgres/TimescaleDB, demo y backup), y a continuación el Paso 5 (golden por método).
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
 | 0 | Fundaciones del repo: docs, ADR, `CLAUDE.md`, equipo de agentes | **hecho** |
 | 1 | Esqueleto: `pyproject`/uv, ruff, mypy, pytest, import-linter (6 contratos), `config`, app factory, `/health`, `/ready`, structlog, `scripts/gate.sh` y hook pre-commit | **hecho** |
 | 2 | Dominio extensible, puertos y casos de uso (ver abajo) | **hecho** (veredicto LT-QA: LISTO CON DEUDA); commiteado (`b73dcf6`) |
-| 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, depuración, comparación S/μ. **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **hecho.** 2b.1 commiteado (`c44f86d`); 2b.2 hecho y commiteado (2026-10-07). Validador: APROBADO CON OBSERVACIONES, ya aplicadas |
+| 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, comparación S/μ (la depuración automática se eliminó el 2026-10-09). **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **hecho.** 2b.1 commiteado (`c44f86d`); 2b.2 hecho y commiteado (2026-10-07). Validador: APROBADO CON OBSERVACIONES, ya aplicadas |
 | M5 | Optimizar `pymrcd`: `Qn` y pares de OGK en C ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07; [especificación §3.12.9](metodos/mrcd-especificacion.md)) | **hecho.** Validador: APROBADO CON OBSERVACIONES. Criterio «≥ 10× con 1 hilo» **no cumplido** (4.1×); ver abajo |
 | 3 | Adaptadores, `container.py`, tenant, errores uniformes y API por pasos independientes encadenables por id ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); 3.1 infraestructura, 3.2 dominio en piezas, 3.3 Fase I por API, 3.4 Fase II y recalibración por API | **hecho** (14 contratos de import-linter). Validador: APROBADO CON OBSERVACIONES en 3.2 y 3.4, ya aplicadas. Ver «Paso 3» abajo |
-| 4 | Dockerfile, docker-compose (perfiles distribuidos comentados), CI | pendiente |
+| 4 | Docker, CI y Postgres. 4.0 y 4.1 hechas (Dockerfile, compose, CI, validación en Linux; [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)); 4.2 (Postgres, demo, backup) pendiente | **en curso** |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
+
+## Paso 4: Docker, CI y validación en Linux (2026-10-09)
+
+Por qué: el C de `pymrcd` solo se había ejecutado en macOS arm64 y su igualdad en bits con R depende del
+compilador. Decisiones y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (propuesto); las
+tolerancias D1–D3 en la enmienda del [ADR 0006](adr/0006-libreria-pymrcd.md) y la
+[especificación](metodos/mrcd-especificacion.md).
+
+- **4.0 y 4.1: hecho.** Dockerfile de tres etapas, `.dockerignore`, `docker-compose.yml`, CI de cuatro trabajos,
+  Dependabot, `check_pymrcd_fma.sh` con traza, `pymrcd_poison_sweep.py`, `httpx2` y avisos como error.
+- **Validación en el servidor** (Ubuntu 26.04, AMD EPYC-Rome 2 vCPU con fma/avx2, 3.7 GiB, Docker 29.9; gcc 14.2.0 en
+  Debian trixie): build de la etapa gate 32–56 s; compuerta completa en el contenedor EXIT=0 en 267 s (voracious
+  552 passed / 1 skipped, cobertura 97 %; pymrcd 1405 passed / 304 skipped; 14 contratos). FMA 0 y conversiones 4/4
+  en `qn0`. Con `-march=x86-64-v3`: 0 FMA y 688 tests de Qn pasan. Prueba negativa (`-ffp-contract=fast` en
+  `setup.py`): 5 FMA (`vfmadd132sd`) y el check falla como debe. Imagen runtime: 490 MB.
+- **Validación local previa:** Linux arm64 nativo y amd64 emulado EXIT=0; Mac sin cambios (bit a bit).
+- **Clon limpio:** pymrcd 1400 passed / 299 skipped, cobertura 98.17 %: no hace falta versionar los ~145 MiB de
+  intermedios.
+- **Nota de proceso:** el primer intento en el servidor dio rojo por archivos AppleDouble `._*` del tar de macOS;
+  se copia con `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`.
+- **Deudas cerradas:** validación de gcc/objdump en Linux, sanitizers en CI, aviso de `httpx`, empaquetado de
+  `pymrcd` en la imagen.
+- **Abiertas:** 4.2 (Postgres/TimescaleDB, demo, backup); huellas de composición solo en Darwin arm64; `/ready` sin
+  checks hasta 4.2; consecuencia de producto con p ≥ n en Linux (D1–D3); tiempos de recalibración completa y caso
+  p > n sin medir (Fase I 200×300 medida: ver «Sin depuración automática»).
+
+## Sin depuración automática y tiempos medidos (2026-10-09)
+
+Decisión del dueño: no hay depuración automática iterativa. **Por qué:** con MRCD nunca converge (no es «de
+composición»: cada vuelta deja fuera otro 25 % del nuevo total y el límite se calcula siempre sobre el 75 %
+sobrante). Medido en el servidor, 200 × 300, B = 100, 2 vCPU: 200 → 150 → 113 → 85 → 64 → 48 → 36 filas en 6
+rondas, 18,3 min, sin converger. Estado: **hecho**. Detalle en [`metodos/t2mrcd.md`](metodos/t2mrcd.md), la
+enmienda del [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md) (supera Q3 y Q5), la del
+[ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [ADR 0005](adr/0005-api-fase-i-fase-ii.md) (contratos).
+
+- **Flujos:** Fase I = exclusión humana opcional → ajuste → límites → modelo, una pasada. Recalibración =
+  candidatas → exclusión humana desde anotaciones → ajuste → límites → comparación (o versión directa) → si
+  EXTEND, ajuste y límites de la extensión → versión.
+- **Tiempos (servidor, 200×300, B = 100, 2 procesos × 1 hilo):** una calibración 5,5 min; Fase I ≈ 6 min
+  (estimado de la ronda 0 medida); memoria pico 245 MB.
+- **Confirmado por el dueño:** cuantil por pool, grupo de Fase I = toda la muestra sorteada, sin estudio de
+  simulación del sesgo.
+- **Falsa alarma real** (12 réplicas, n = 200, p = 3, B = 50, 20 000 nuevas): Fase I media 2.29 % [0.96–3.77],
+  Fase II 2.10 % [0.91–2.82]; medias entre semillas (~1–3.8 %). **No medido:** p > n.
+- **Compatibilidad:** formatos de modelo, informe y metadatos de dataset = 2; el 1 se rechaza, sin migración.
+- **Equivalencia de la recalibración por HTTP:** cubiertos en bits los cuatro casos (EXTEND, REPLACE no forzado,
+  REPLACE forzado e INSUFFICIENT); REPLACE reutiliza el hueco `(1, 0)` (`test_recalibration_chain.py`).
 
 ## Paso 3: API por pasos (2026-10-07)
 
@@ -26,7 +73,7 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
   por carriles, `ProcessPoolTaskMapper` (idéntico en bits a serie), reloj, ids, tenant, errores uniformes,
   contrato 14 `workers ↛ infrastructure|config`, stub `typings/threadpoolctl.pyi`.
 - **3.2 Dominio en piezas públicas** sin cambiar bits, codecs exactos y fixture de huellas.
-- **3.3 Fase I por API:** datasets, `fits`, `limits`, `depurations`, `models` (solo referencias), `pipelines`.
+- **3.3 Fase I por API:** datasets, `fits`, `limits`, `exclusions`, `models` (solo referencias), `pipelines`.
   Equivalencia en bits cadena HTTP = tubería = `fit_phase1`. Semilla deducida del linaje
   ([`metodos/t2mrcd.md`](metodos/t2mrcd.md)).
 - **3.4 Fase II y recalibración por API:** `scores`, `recalibrations` (stepwise/pipeline, `cancel`), `comparisons`,
@@ -49,7 +96,7 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
 - **Sesiones stepwise sin expiración automática:** una recalibración paso a paso queda abierta hasta `cancel`,
   aprobación o rechazo.
 - **Pool de procesos por llamada** en `ProcessPoolTaskMapper`: el coste del `spawn` se paga en cada calibración.
-- **Huellas de composición solo en Darwin arm64;** falta validar en Linux (también el C de `pymrcd`).
+- **Huellas de composición solo en Darwin arm64** (el C de `pymrcd` ya se validó en Linux en el Paso 4.1).
 - **`/ready` sin checks** y su código HTTP cuando falle (decisión abierta).
 - **Autenticación real** (JWT/OIDC) y roles (M4 antiguo); hoy solo `X-Tenant-ID`.
 - **Coste no medido de extremo a extremo** de la Fase I con réplicas en procesos sobre la API.
@@ -102,14 +149,13 @@ pendiente). Sustituye a la estimación de 20–70 min de 2b.
 **Deuda de M5:**
 - Fixtures R versionados de `R_qsort`, `rPsort` y `whimed_i` (hoy se prueban contra la transliteración literal; el
   contraste con R fue ad hoc).
-- Trabajo de CI con ASan/UBSan (hoy solo la corrida manual del validador: 200 000 vectores sin avisos).
-- Validación en Linux (gcc, `objdump`): `check_pymrcd_fma.sh` y el C solo se han ejecutado en macOS arm64.
+- (Cerrado en el Paso 4.1) Trabajo de CI con ASan/UBSan y validación en Linux (gcc, `objdump`).
 - Test versionado de la `U` de OGK completa con p > 60 (hoy compara un bloque de 60 columnas; la completa se
   cubrió con la instantánea no versionada).
 - `assert_r_equal("E")` de los fixtures antiguos de `Qn` está limitado a la plataforma de referencia; la
   especificación pide exactitud en todas (el C no depende de libm ni BLAS).
 - (Cerrado en el Paso 3) `VORACIOUS_MRCD_THREADS` cableada en `container`; el mapper por procesos fija `PYMRCD_NUM_THREADS`.
-- Imagen del Paso 4: compilador de C o *wheels* precompiladas.
+- (Cerrado en el Paso 4.1) Imagen: compilador solo en la etapa builder.
 
 ## Paso 2b: decisiones del dueño (2026-10-07)
 
@@ -121,15 +167,15 @@ la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [A
 - **Límites:** remuestreo no paramétrico, nunca normal; Fase II por OOB (**revierte** la anulación del Paso 2);
   **Q1 pool** en ambas fases (sustituye el promedio de cuantiles; motivo: α efectivo ≈ 0.018 y ≈ 0.035 frente a 0.005);
   `phase2_alpha_limit` 0.005. Q2: v0 vigila con el límite de Fase I; las recalibradas con el de Fase II.
-- **Recalibración:** Q3 depuración humana + automática; Q4 Frobenius relativa, umbral 0.10 orientativo, reemplazar si
-  cualquier señal de cambio; Q5 máx. 5 vueltas; Q6 `effective_from` no retroactivo; Q7 con «requiere nueva base» se
+- **Recalibración:** Q3 ~~depuración humana + automática~~ (solo humana desde el 2026-10-09); Q4 Frobenius relativa, umbral 0.10 orientativo, reemplazar si
+  cualquier señal de cambio; Q5 ~~máx. 5 vueltas~~ (superada: no hay depuración); Q6 `effective_from` no retroactivo; Q7 con «requiere nueva base» se
   sigue vigilando; Q8 hereda B, α y MRCD; Q9 «Fase II > Fase I» es diagnóstico; Q12 solo se anotan señales.
   Mínimo 25 observaciones.
 - **Mejoras:** aprobadas M1 (estrategias por nombre, en 2b.2) y M6 (error Monte Carlo); M5 (optimizar `pymrcd`) antes de
   producción; M2 (ARL al 90 %), M3 (avisos activos), M4 (roles con JWT) después. Ojo: la numeración M1–M6 de 2b no
   coincide con la del Paso 2 (más abajo).
-- **Coste:** la v0 hasta `(1 + max_depuration_rounds)·B` ajustes MRCD; una recalibración hasta `(1 + rondas)·B`
-  más B en EXTEND (estimación previa del dueño: ≈ 300 ajustes, 20–70 min en 8 núcleos con `pymrcd` actual).
+- **Coste:** `B` ajustes MRCD por calibración (v0: una; recalibración: filas nuevas, más una en EXTEND).
+  Estimación previa del dueño: ≈ 300 ajustes, 20–70 min en 8 núcleos; medido en el servidor, ver abajo.
 - **Prueba de calidad de la tubería:** estimador clásico + muestreador de muestras independientes (normal, solo en
   `tests/`) reproduce Beta (Fase I) y F (Fase II), n > p. No valida el OOB: con el clásico la Fase II sale ≈ +16 %
   sobre la F (efecto .632), conservadora.
@@ -138,7 +184,7 @@ la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [A
 
 - **Remuestreo solo sobre `best` (0.75)** para ambos límites: evita que una contaminación no detectada infle el
   límite (enmascaramiento). Consecuencia medida: falsa alarma real ≈ 2.0–2.4 % (Fase I) y ≈ 1.6–2.2 % (Fase II)
-  frente al 0.5 % nominal (≈ 0.4 % con todas las filas); la depuración automática puede quitar 1–10 filas buenas.
+  frente al 0.5 % nominal (≈ 0.4 % con todas las filas). Re-medida sin depuración: ver «Sin depuración automática».
   Característica del diseño, no error.
 - **Umbral Frobenius parametrizable:** `relative_change_threshold` 0.10 y `threshold_decides = False` (informativo;
   deciden las pruebas formales de S y μ). Motivo: con datos estables la Frobenius de MRCD sale ≈ 0.25–0.5. Sin
@@ -245,7 +291,7 @@ correrlo en un servidor con más núcleos.
   falsa alarma 27–30 % (p = 10) y 100 % (p = 250), y sobre todas las filas fue inestable (0.2–0.9 %) y expuesto al
   enmascaramiento; además ignora el error de estimación de μ y S. Solo podría suavizar el cuantil del pool
   (≈ 7 500 valores), con ganancia pequeña.
-- **Empaquetado de `packages/pymrcd` en la imagen** (Paso 4, afecta al diseño del Dockerfile; compilador de C o *wheels*).
+- (Cerrado en el Paso 4.1) Empaquetado de `pymrcd` en la imagen: ADR 0010.
 - **Cerradas en el Paso 3:** persistencia del objeto modelo (M1, codecs), atomicidad de propuestas y recalibraciones
   (D6), `ProcessPoolTaskMapper`, `queued → running` atómico (`claim`), Fase I fuera del hilo de la API, contrato
   `workers ↛ infrastructure|config`, validación síncrona del histórico, `DatasetStorage` (M6), cableado de
@@ -258,7 +304,7 @@ correrlo en un servidor con más núcleos.
   Se optimiza la implementación, nunca el método.
 - El comentario de `tools/r/experimentos/mc_canonico2.R:2` apunta al nombre antiguo del protocolo
   (`2026-10-07-…`); no se toca para no alterar el MD5 pre-registrado (ver nota de trazabilidad en el protocolo).
-- `StarletteDeprecationWarning` por el cambio `httpx` → `httpx2` (Paso 4).
+- (Cerrado en el Paso 4.1) `StarletteDeprecationWarning` por `httpx` → `httpx2`.
 
 ## Notas del entorno
 

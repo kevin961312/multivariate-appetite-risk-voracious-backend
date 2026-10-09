@@ -28,7 +28,7 @@ from voracious.infrastructure.memory.logs import (
 )
 from voracious.infrastructure.memory.steps import (
     InMemoryDatasetStorage,
-    InMemoryDepurationRepository,
+    InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
     InMemoryPipelineRepository,
@@ -41,7 +41,7 @@ __all__ = [
     "FitRecordCodec",
     "InMemoryComparisonRepository",
     "InMemoryDatasetStorage",
-    "InMemoryDepurationRepository",
+    "InMemoryExclusionRepository",
     "InMemoryFitRepository",
     "InMemoryLimitsRepository",
     "InMemoryModelRepository",

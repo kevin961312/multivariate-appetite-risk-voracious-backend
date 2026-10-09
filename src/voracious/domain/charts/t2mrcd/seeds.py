@@ -1,19 +1,22 @@
 """Huecos fijos de semillas de T²MRCD (``SeedSequence`` con ``spawn_key``).
 
 Cada uso aleatorio de la carta tiene un hueco fijo bajo la semilla raíz, de modo que cambiar un
-parámetro (B, número de rondas, remuestreos de una prueba) no desplaza las semillas de los demás
+parámetro (B, remuestreos de una prueba) no desplaza las semillas de los demás
 usos y el resultado no depende del orden de ejecución ni del número de procesos:
 
-- ``(0, r)``: calibración de la ronda ``r`` de la Fase I (``fit_phase1``) y, con ``r = 0``, la
-  Fase I final de una recalibración que amplía la base (EXTEND);
-- ``(1, r)``: calibración de la ronda ``r`` de la depuración de las filas nuevas al recalibrar; si
-  la recalibración reemplaza la base (REPLACE), el modelo reutiliza la calibración de la última
-  ronda, así que sus límites conservan ese hueco;
+- ``(0, 0)``: calibración de la Fase I (``fit_phase1``) y de la Fase I final de una recalibración
+  que amplía la base (EXTEND);
+- ``(1, 0)``: calibración de las filas nuevas al recalibrar; si la recalibración reemplaza la base
+  (REPLACE), el modelo reutiliza esa calibración, así que sus límites conservan ese hueco;
 - ``(2,)``: prueba de cambio de la dispersión; ``(3,)``: prueba de cambio de la ubicación.
 
 Dentro de una calibración con clave ``k``: ``k + (0, i)`` es la réplica ``i`` (``i < B``) y
 ``k + (1, 0)`` y ``k + (1, 1)`` los diagnósticos del error Monte Carlo de los límites de Fase I y
 de Fase II.
+
+El segundo componente de los dos primeros huecos (``0``) se conserva para que las semillas, y por
+tanto los bits, sean los mismos que antes de quitar la depuración automática iterativa (decisión
+del dueño, 2026-10-09), cuando era el número de ronda.
 
 ``SeedSequence(seed, spawn_key=k + (i,))`` es exactamente el hijo ``i`` de
 ``SeedSequence(seed, spawn_key=k).spawn(...)``.
@@ -26,8 +29,9 @@ import numpy as np
 __all__ = [
     "SLOT_COVARIANCE_TEST",
     "SLOT_MEAN_TEST",
-    "SLOT_NEW_ROWS_DEPURATION",
+    "SLOT_NEW_ROWS",
     "SLOT_PHASE1",
+    "STAGE_INDEX",
     "SpawnKey",
     "child",
 ]
@@ -36,9 +40,12 @@ SpawnKey = tuple[int, ...]
 """Clave de un hijo de ``SeedSequence`` (secuencia de enteros no negativos)."""
 
 SLOT_PHASE1: Final = 0
-SLOT_NEW_ROWS_DEPURATION: Final = 1
+SLOT_NEW_ROWS: Final = 1
 SLOT_COVARIANCE_TEST: Final = 2
 SLOT_MEAN_TEST: Final = 3
+
+STAGE_INDEX: Final = 0
+"""Segundo componente, fijo, de los huecos de calibración (``(SLOT_PHASE1, 0)``, ``(1, 0)``)."""
 
 
 def child(seed: int, spawn_key: SpawnKey) -> np.random.SeedSequence:

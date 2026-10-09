@@ -6,9 +6,9 @@ el informe y crea la versión **propuesta** inmutable (solo rige al aprobarse).
 
 - **EXTEND** (sin cambio detectado): ajuste y límites del dataset ``recalibration_extension``
   (linaje ``EXTENSION``, hueco ``(0, 0)``).
-- **REPLACE** (cambio detectado o reemplazo forzado): ajuste y límites de la **última ronda** de la
-  depuración de las filas nuevas (linaje ``NEW_ROWS``, hueco ``(1, r)``), reutilizados como hace
-  ``ControlChart.recalibrate``.
+- **REPLACE** (cambio detectado o reemplazo forzado): ajuste y límites de las filas nuevas
+  conservadas tras la exclusión humana (operación ``NEW_ROWS``, hueco ``(1, 0)``), reutilizados
+  como hace ``ControlChart.recalibrate``.
 
 Base nueva, justificación, ``base_hash``, ``base_refs``, exclusiones y la regla del evento
 estructural son las de la recalibración en una sola llamada (ADR 0008).
@@ -34,17 +34,12 @@ from voracious.application.lifecycle import (
     pending_proposal,
     unresolved_structural_event,
 )
-from voracious.application.phase1_steps import (
-    Calibration,
-    Phase1Steps,
-    Phase1StepsRegistry,
-    resolve_steps,
-)
+from voracious.application.phase1_steps import Calibration
 from voracious.application.ports import (
     Clock,
     ComparisonRepository,
     DatasetStorage,
-    DepurationRepository,
+    ExclusionRepository,
     FitRepository,
     JobKind,
     JobQueue,
@@ -69,7 +64,6 @@ from voracious.application.records import (
     ErrorInfo,
     Exclusion,
     ExclusionReason,
-    FitRecord,
     JobStatus,
     LimitsRecord,
     ModelVersion,
@@ -93,7 +87,6 @@ from voracious.application.use_cases.recalibration_chain import (
 from voracious.application.use_cases.steps import (
     dataset_chain,
     get_dataset,
-    get_depuration,
     notify_pipeline,
     ready_fit,
     ready_limits,
@@ -234,7 +227,6 @@ class RequestVersionProposal:
     """Valida y encola la propuesta de versión de una recalibración.
 
     Attributes:
-        steps: Pasos de Fase I por carta (evalúa si la ronda es final en un reemplazo forzado).
         recalibration_steps: Pasos de la recalibración por carta.
         recalibrations: Repositorio de recalibraciones.
         versions: Repositorio de versiones.
@@ -246,7 +238,6 @@ class RequestVersionProposal:
         clock: Reloj.
     """
 
-    steps: Phase1StepsRegistry
     recalibration_steps: RecalibrationStepsRegistry
     recalibrations: RecalibrationRepository
     versions: ModelVersionRepository
@@ -296,8 +287,7 @@ class RequestVersionProposal:
             ComparisonNotReadyError: Si no está ``succeeded``.
             VersionInputsMismatchError: Si los pasos no son los que exige la decisión.
         """
-        recalibration = resolve_recalibration_steps(self.recalibration_steps, chart_id)
-        steps = resolve_steps(self.steps, chart_id)
+        resolve_recalibration_steps(self.recalibration_steps, chart_id)
         session = open_session(
             get_recalibration(self.recalibrations, tenant_id, chart_id, model_id, recalibration_id)
         )
@@ -316,7 +306,7 @@ class RequestVersionProposal:
         if chain[0].origin_ref != recalibration_id:
             raise _mismatch("fit_not_of_recalibration", fit_id=fit_id)
         if session.force_replace:
-            _check_forced(steps, recalibration, session, chain, fit, limits, comparison_id)
+            _check_forced(chain, fit_id, comparison_id)
         else:
             self._check_compared(session, chain, fit_id, limits_id, comparison_id)
         request = ProposalRequest(
@@ -349,7 +339,7 @@ class RequestVersionProposal:
         limits_id: str,
         comparison_id: str | None,
     ) -> None:
-        """Con comparación: EXTEND usa el dataset de extensión; REPLACE, la ronda comparada.
+        """Con comparación: EXTEND usa el dataset de extensión; REPLACE, el ajuste comparado.
 
         Args:
             session: Recalibración.
@@ -384,77 +374,27 @@ class RequestVersionProposal:
                 )
         elif (fit_id, limits_id) != (comparison.fit_id, comparison.limits_id):
             raise _mismatch(
-                "replace_uses_last_new_rows_round",
+                "replace_uses_compared_fit",
                 fit_id=comparison.fit_id,
                 limits_id=comparison.limits_id,
             )
 
 
-def _check_forced(
-    steps: Phase1Steps,
-    recalibration: RecalibrationSteps,
-    session: RecalibrationRecord,
-    chain: Sequence[DatasetRecord],
-    fit: FitRecord,
-    limits: LimitsRecord,
-    comparison_id: str | None,
-) -> None:
-    """Reemplazo forzado: sin comparación y con la ronda final de las filas nuevas.
+def _check_forced(chain: Sequence[DatasetRecord], fit_id: str, comparison_id: str | None) -> None:
+    """Reemplazo forzado: sin comparación y con el ajuste de las filas nuevas.
 
     Args:
-        steps: Pasos de la Fase I de la carta.
-        recalibration: Pasos de la recalibración.
-        session: Recalibración.
         chain: Ascendencia del dataset del ajuste.
-        fit: Ajuste.
-        limits: Límites.
+        fit_id: Ajuste.
         comparison_id: Debe ser ``None``.
 
     Raises:
-        VersionInputsMismatchError: Si hay comparación, el ajuste no es de las filas nuevas o su
-            ronda no es la final.
+        VersionInputsMismatchError: Si hay comparación o el ajuste no es de las filas nuevas.
     """
     if comparison_id is not None:
         raise _mismatch("forced_replace_has_no_comparison", comparison_id=comparison_id)
     if chain[0].source is not DatasetSource.RECALIBRATION_CANDIDATES:
-        raise _mismatch("replace_uses_new_rows", fit_id=fit.fit_id)
-    final, _ = _final_round(steps, recalibration, session, chain[-1], fit, limits)
-    if not final:
-        raise _mismatch("round_not_final", fit_id=fit.fit_id)
-
-
-def _final_round(
-    steps: Phase1Steps,
-    recalibration: RecalibrationSteps,
-    session: RecalibrationRecord,
-    dataset: DatasetRecord,
-    fit: FitRecord,
-    limits: LimitsRecord,
-) -> tuple[bool, bool]:
-    """Evalúa (sin quitar nada) si la ronda de las filas nuevas es la final.
-
-    Args:
-        steps: Pasos de la Fase I de la carta (``Phase1Steps``).
-        recalibration: Pasos de la recalibración.
-        session: Recalibración.
-        dataset: Dataset de la ronda.
-        fit: Ajuste de la ronda.
-        limits: Límites de la ronda.
-
-    Returns:
-        ``(final y no agotada, convergió)``.
-    """
-    max_rounds, min_rows = recalibration.depuration_bounds(session.params)
-    outcome = steps.depurate(
-        dataset.data,
-        fit.result,
-        _calibration(limits),
-        limits.params,
-        round_index=dataset.lineage_round,
-        max_rounds=max_rounds,
-        min_rows=min_rows,
-    )
-    return outcome.final and not outcome.exhausted, outcome.converged
+        raise _mismatch("replace_uses_new_rows", fit_id=fit_id)
 
 
 @dataclass(frozen=True)
@@ -463,7 +403,6 @@ class _Inputs:
 
     decision: RecalibrationDecision
     comparison: object | None
-    converged: bool
     outcome: CandidateOutcome
 
 
@@ -472,7 +411,6 @@ class RunVersionProposalJob:
     """Ensambla el modelo, el informe y la versión propuesta (carril ``light``).
 
     Attributes:
-        steps: Pasos de Fase I por carta.
         recalibration_steps: Pasos de la recalibración por carta.
         models: Repositorio de modelos.
         versions: Repositorio de versiones (recibe la propuesta).
@@ -481,13 +419,12 @@ class RunVersionProposalJob:
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones (linaje de las filas nuevas).
+        exclusions: Repositorio de exclusiones (destino de las candidatas).
         comparisons: Repositorio de comparaciones.
         queue: Cola (aviso a la tubería).
         clock: Reloj.
     """
 
-    steps: Phase1StepsRegistry
     recalibration_steps: RecalibrationStepsRegistry
     models: ModelRepository
     versions: ModelVersionRepository
@@ -496,7 +433,7 @@ class RunVersionProposalJob:
     datasets: DatasetStorage
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
     comparisons: ComparisonRepository
     queue: JobQueue
     clock: Clock
@@ -522,14 +459,13 @@ class RunVersionProposalJob:
             msg = f"RunVersionProposalJob solo ejecuta 'version_proposal', no '{job.kind}'"
             raise ValueError(msg)
         recalibration = resolve_recalibration_steps(self.recalibration_steps, job.scope)
-        steps = resolve_steps(self.steps, job.scope)
         key = (job.tenant_id, job.scope, job.model_id)
         get_recalibration(self.recalibrations, *key, job.resource_id)
         claimed = self.recalibrations.claim_proposal(*key, job.resource_id)
         if claimed is None:
             return
         try:
-            done = self._run(steps, recalibration, claimed)
+            done = self._run(recalibration, claimed)
         except (DomainError, ApplicationError) as exc:
             self._close(claimed, error=ErrorInfo(exc.code, exc.message, exc.details))
             return
@@ -540,44 +476,37 @@ class RunVersionProposalJob:
 
     def _inputs(
         self,
-        steps: Phase1Steps,
         recalibration: RecalibrationSteps,
         session: RecalibrationRecord,
         proposal: ProposalRequest,
-        fit: FitRecord,
-        limits: LimitsRecord,
         dataset: DatasetRecord,
     ) -> _Inputs:
-        """Decisión, comparación, convergencia y destino de las candidatas.
+        """Decisión, comparación y destino de las candidatas.
 
         Args:
-            steps: Pasos de la Fase I.
             recalibration: Pasos de la recalibración.
             session: Recalibración.
             proposal: Petición.
-            fit: Ajuste final.
-            limits: Límites finales.
-            dataset: Dataset del ajuste final.
+            dataset: Dataset del ajuste de la versión.
 
         Returns:
             Las entradas de la propuesta.
         """
         tenant, chart = session.tenant_id, session.chart_id
         if proposal.comparison_id is None:
-            _, converged = _final_round(steps, recalibration, session, dataset, fit, limits)
-            chain = dataset_chain(self.datasets, dataset)
             decision = recalibration.decide(
                 None,
                 n_kept=int(dataset.data.shape[0]),
                 recalibration_params=session.params,
                 force_replace=True,
             )
-            outcome = candidate_outcome(self.depurations, chart, chain, None)
-            return _Inputs(decision, None, converged, outcome)
+            outcome = candidate_outcome(
+                self.exclusions, chart, dataset_chain(self.datasets, dataset)
+            )
+            return _Inputs(decision, None, outcome)
         comparison: ComparisonRecord = get_comparison(
             self.comparisons, tenant, chart, session.model_id, proposal.comparison_id
         )
-        final = get_depuration(self.depurations, tenant, chart, comparison.depuration_id)
         new_fit = ready_fit(self.fits, tenant, chart, comparison.fit_id)
         chain = dataset_chain(self.datasets, get_dataset(self.datasets, tenant, new_fit.dataset_id))
         if comparison.decision is None:
@@ -586,17 +515,15 @@ class RunVersionProposalJob:
         return _Inputs(
             comparison.decision,
             comparison.result,
-            bool(final.converged),
-            candidate_outcome(self.depurations, chart, chain, final),
+            candidate_outcome(self.exclusions, chart, chain),
         )
 
     def _run(
-        self, steps: Phase1Steps, recalibration: RecalibrationSteps, session: RecalibrationRecord
+        self, recalibration: RecalibrationSteps, session: RecalibrationRecord
     ) -> RecalibrationRecord:
         """Ensambla y guarda la versión propuesta.
 
         Args:
-            steps: Pasos de la Fase I.
             recalibration: Pasos de la recalibración.
             session: Recalibración con la propuesta en ``running``.
 
@@ -613,7 +540,7 @@ class RunVersionProposalJob:
         fit = ready_fit(self.fits, session.tenant_id, session.chart_id, proposal.fit_id)
         limits = ready_limits(self.limits, session.tenant_id, session.chart_id, proposal.limits_id)
         dataset = get_dataset(self.datasets, session.tenant_id, fit.dataset_id)
-        inputs = self._inputs(steps, recalibration, session, proposal, fit, limits, dataset)
+        inputs = self._inputs(recalibration, session, proposal, dataset)
         model = recalibration.assemble_model(
             dataset.data, limits.params, fit.result, _calibration(limits)
         )
@@ -624,8 +551,6 @@ class RunVersionProposalJob:
             n_base=int(active.base_data.shape[0]),
             new_dispositions=inputs.outcome.dispositions,
             recalibration_params=session.params,
-            depuration_rounds=inputs.outcome.rounds,
-            depuration_converged=inputs.converged,
             comparison=inputs.comparison,
             model=model,
         )

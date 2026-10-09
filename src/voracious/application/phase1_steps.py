@@ -1,16 +1,15 @@
 """Puerto de los pasos encadenables de la Fase I de una carta (vuelta 3.3 del Paso 3).
 
 La Fase I se puede pedir por pasos independientes, cada uno con su recurso y su trabajo:
-ajuste del estimador (``/fits``), límites (``/limits``), depuración (``/depurations``) y
-ensamblado del modelo (``/models``). Los casos de uso (``use_cases/steps.py``) son comunes a todas
-las cartas y solo guardan y pasan **datos** (parámetros codificados) y valores opacos (el ajuste y
-los límites de la carta); la carta concreta los interpreta a través de este puerto, cuyo
-adaptador vive en ``infrastructure`` (``T2MRCDPhase1Steps``). Así ``application`` no depende de
-ninguna carta (ADR 0004, enmienda 2b.2).
+exclusión humana opcional (``/exclusions``), ajuste del estimador (``/fits``), límites
+(``/limits``) y ensamblado del modelo (``/models``). Los casos de uso (``use_cases/steps.py``)
+son comunes a todas las cartas y solo guardan y pasan **datos** (parámetros codificados) y
+valores opacos (el ajuste y los límites de la carta); la carta concreta los interpreta a través
+de este puerto, cuyo adaptador vive en ``infrastructure`` (``T2MRCDPhase1Steps``). Así
+``application`` no depende de ninguna carta (ADR 0004, enmienda 2b.2).
 
-Contrato de equivalencia: encadenar ``fit``, ``calibrate``, ``depurate`` y
-``assemble_initial_model`` con el linaje que deduce la aplicación da el mismo modelo, en bits,
-que ``ControlChart.fit_phase1``.
+Contrato de equivalencia: encadenar ``fit``, ``calibrate`` y ``assemble_initial_model`` con la
+operación que deduce la aplicación da el mismo modelo, en bits, que ``ControlChart.fit_phase1``.
 """
 
 from collections.abc import Mapping
@@ -18,11 +17,10 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from voracious.application.errors import UnknownChartError
-from voracious.domain.common import BoolVector, FloatMatrix, StageLineage, TaskMapper
+from voracious.domain.common import BoolVector, FloatMatrix, StageKind, TaskMapper
 
 __all__ = [
     "Calibration",
-    "DepurationOutcome",
     "Phase1Steps",
     "Phase1StepsRegistry",
     "resolve_steps",
@@ -31,7 +29,7 @@ __all__ = [
 
 @dataclass(frozen=True, eq=False)
 class Calibration:
-    """Límites de una ronda y sus filas limpias.
+    """Límites de un ajuste y sus filas limpias.
 
     Attributes:
         limits: Límites de la carta (opacos para la aplicación).
@@ -40,25 +38,6 @@ class Calibration:
 
     limits: object
     clean: BoolVector
-
-
-@dataclass(frozen=True, eq=False)
-class DepurationOutcome:
-    """Resultado de evaluar una ronda de la depuración automática sobre su dataset.
-
-    Attributes:
-        kept: Filas conservadas (máscara sobre las filas del dataset).
-        excluded_automatic: Filas que la ronda quita (máscara sobre las filas del dataset).
-        converged: ``True`` si ninguna fila supera el límite.
-        final: ``True`` si la depuración termina en esta ronda.
-        exhausted: ``True`` si terminó por quedarse sin filas (no hay ronda final).
-    """
-
-    kept: BoolVector
-    excluded_automatic: BoolVector
-    converged: bool
-    final: bool
-    exhausted: bool
 
 
 class Phase1Steps(Protocol):
@@ -157,11 +136,11 @@ class Phase1Steps(Protocol):
         """
         ...
 
-    def stage_spawn_key(self, lineage: StageLineage) -> tuple[int, ...]:
-        """Hueco de semilla de una ronda.
+    def stage_spawn_key(self, kind: StageKind) -> tuple[int, ...]:
+        """Hueco de semilla de una calibración.
 
         Args:
-            lineage: Operación y ronda.
+            kind: Operación.
 
         Returns:
             La clave bajo la semilla raíz.
@@ -189,16 +168,16 @@ class Phase1Steps(Protocol):
         fit: object,
         params: Mapping[str, object],
         *,
-        lineage: StageLineage,
+        kind: StageKind,
         mapper: TaskMapper,
     ) -> Calibration:
-        """Filas limpias y límites de una ronda ya ajustada.
+        """Filas limpias y límites de un ajuste.
 
         Args:
             x: Dataset del ajuste.
             fit: Ajuste.
             params: Parámetros de la carta codificados.
-            lineage: Linaje de la ronda (elige el hueco de semilla).
+            kind: Operación (elige el hueco de semilla).
             mapper: Reparto de las réplicas.
 
         Returns:
@@ -209,38 +188,6 @@ class Phase1Steps(Protocol):
         """
         ...
 
-    def depurate(
-        self,
-        x: FloatMatrix,
-        fit: object,
-        calibration: Calibration,
-        params: Mapping[str, object],
-        *,
-        round_index: int,
-        evaluate_only: bool = False,
-        max_rounds: int | None = None,
-        min_rows: int = 1,
-    ) -> DepurationOutcome:
-        """Evalúa una ronda de la depuración automática (sin ajustar nada).
-
-        Args:
-            x: Dataset del ajuste.
-            fit: Ajuste de la ronda.
-            calibration: Calibración de la ronda.
-            params: Parámetros de la carta codificados (rondas máximas).
-            round_index: Número de ronda.
-            evaluate_only: Si ``True``, no quita filas (la ronda es final): modelo sin más
-                depuración automática.
-            max_rounds: Rondas máximas de exclusión; ``None`` usa las de ``params`` (en una
-                recalibración, las de sus parámetros).
-            min_rows: Mínimo de filas para seguir (1 en la Fase I; ``min_observations`` al
-                recalibrar: por debajo la depuración se agota).
-
-        Returns:
-            El resultado.
-        """
-        ...
-
     def assemble_initial_model(
         self,
         root: FloatMatrix,
@@ -248,24 +195,16 @@ class Phase1Steps(Protocol):
         fit: object,
         calibration: Calibration,
         *,
-        kept: BoolVector,
         excluded: BoolVector,
-        automatic: BoolVector,
-        rounds: int,
-        converged: bool,
     ) -> object:
-        """Construye el modelo de Fase I (versión inicial) con la ronda final.
+        """Construye el modelo de Fase I (versión inicial).
 
         Args:
             root: Dataset raíz ``n x p``.
             params: Parámetros de la carta codificados.
-            fit: Ajuste final (sobre ``root[kept]``).
-            calibration: Calibración final.
-            kept: Filas de la base (máscara sobre ``root``).
-            excluded: Filas excluidas por una persona.
-            automatic: Filas excluidas por la depuración automática.
-            rounds: Rondas de depuración que quitaron filas.
-            converged: Convergencia de la depuración.
+            fit: Ajuste de ``root[~excluded]``.
+            calibration: Calibración de ese ajuste.
+            excluded: Filas excluidas por una persona (máscara sobre ``root``).
 
         Returns:
             El modelo de la carta.

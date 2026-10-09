@@ -25,7 +25,7 @@ packages = ["src/voracious"]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.13.1",
     "import-linter>=2.15",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
@@ -79,6 +79,14 @@ testpaths = ["tests"]
 pythonpath = ["tests"]
 addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 xfail_strict = true
+# M9 (Paso 4): los avisos de obsolescencia de la pila web son error, para enterarse al subir versiones
+# (p. ej. starlette avisa con su propia clase, subclase de UserWarning, si TestClient usa httpx y no httpx2).
+filterwarnings = [
+    "error::starlette.exceptions.StarletteDeprecationWarning",
+    "error::DeprecationWarning:starlette.*",
+    "error::DeprecationWarning:fastapi.*",
+    "error::DeprecationWarning:httpx2.*",
+]
 
 # --- coverage --------------------------------------------------------------
 [tool.coverage.run]
@@ -126,6 +134,7 @@ forbidden_modules = [
     "pydantic_settings",
     "structlog",
     "httpx",
+    "httpx2",
     "uvicorn",
     "multiprocessing",
     "concurrent",
@@ -146,6 +155,7 @@ forbidden_modules = [
     "starlette",
     "uvicorn",
     "httpx",
+    "httpx2",
     "structlog",
 ]
 

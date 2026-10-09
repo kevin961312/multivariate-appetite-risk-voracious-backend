@@ -21,8 +21,10 @@ Estado de cada campo:
   reversible).
 - ``phase2_alpha_limit``: **decidido** (dueño, 2026-10-07), default ``0.005``.
 - ``phase2_aggregation``: **decidido** (dueño, 2026-10-07): igual que Fase I (``pooled_quantile``).
-- ``max_depuration_rounds``: parámetro técnico (dueño, 2026-10-07, Q5), default 5: rondas de la
-  depuración automática de Fase I (ajuste + límite de Fase I, quitar ``T² > límite``, repetir).
+
+Sin depuración automática iterativa (decisión del dueño, 2026-10-09): la Fase I es exclusión humana
+opcional, **un** ajuste MRCD y **una** calibración. Las filas fuera de ``best`` no se eliminan;
+simplemente no entran en la estimación ni en el bootstrap.
 
 Con los defaults no queda ningún campo pendiente. Si un campo decisivo se pasa explícitamente como
 ``None``, la Fase I termina en ``failed / T2MRCD_DECISION_PENDING`` sin ajustar nada.
@@ -41,7 +43,6 @@ from voracious.domain.estimators.mrcd import MRCDFit, MRCDParams
 
 __all__ = [
     "DEFAULT_ALPHA_LIMIT",
-    "DEFAULT_MAX_DEPURATION_ROUNDS",
     "DEFAULT_N_REPLICATES",
     "DEFAULT_PHASE2_ALPHA_LIMIT",
     "T2MRCD_MRCD_ALPHA",
@@ -64,9 +65,6 @@ DEFAULT_ALPHA_LIMIT = 0.005
 
 DEFAULT_PHASE2_ALPHA_LIMIT = 0.005
 """``phase2_alpha_limit`` (cuantil 0.995 de los T² *out-of-bag*): decisión del dueño 2026-10-07."""
-
-DEFAULT_MAX_DEPURATION_ROUNDS = 5
-"""Rondas máximas de depuración automática: parámetro técnico, dueño 2026-10-07 (Q5)."""
 
 T2MRCD_MRCD_ALPHA = 0.75
 """``alpha`` de MRCD en T²MRCD: decisión del dueño 2026-10-07, t2mrcd.md P2.
@@ -227,22 +225,7 @@ class T2MRCDParams:
         mrcd: Parámetros de MRCD; se usan en el ajuste del histórico y en cada réplica. Por
             defecto, los de ``rrcov`` salvo ``alpha = T2MRCD_MRCD_ALPHA`` (0.75, decisión del
             dueño, P2).
-        max_depuration_rounds: Rondas máximas de la depuración automática de Fase I (entero
-            ``>= 0``; 0 = sin depuración automática). Parámetro técnico, 5 por defecto (Q5).
     """
 
     bootstrap: T2MRCDBootstrap
     mrcd: MRCDParams = field(default_factory=lambda: MRCDParams(alpha=T2MRCD_MRCD_ALPHA))
-    max_depuration_rounds: int = DEFAULT_MAX_DEPURATION_ROUNDS
-
-    def __post_init__(self) -> None:
-        """Valida ``max_depuration_rounds``.
-
-        Raises:
-            InvalidInputError: Si no es un entero ``>= 0``.
-        """
-        if not _is_int(self.max_depuration_rounds) or self.max_depuration_rounds < 0:
-            raise InvalidInputError(
-                "'max_depuration_rounds' debe ser un entero >= 0",
-                details={"field": "max_depuration_rounds"},
-            )

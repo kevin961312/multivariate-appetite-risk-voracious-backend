@@ -1,4 +1,8 @@
-"""Pasos encadenables de Fase I y tubería (T19, T20): linaje, errores, idempotencia y avisos."""
+"""Pasos encadenables de Fase I y tubería (T19, T20): linaje, errores, idempotencia y avisos.
+
+Sin depuración automática iterativa (decisión del dueño, 2026-10-09): la única exclusión de filas
+es la humana (``/exclusions``), al principio.
+"""
 
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -7,18 +11,14 @@ import numpy as np
 import pytest
 
 from support.app import CHART, TENANT, App, lifecycle_app
-from support.composition_cases import contaminated
 from support.solo_test import fast_params, small_data
 from voracious.application.errors import (
     DatasetNotFoundError,
-    DepurationNotFinalError,
-    DepurationNotFoundError,
+    ExclusionNotFoundError,
     LimitsNotFoundError,
-    LimitsParamsMismatchError,
     PipelineNotFoundError,
     UnknownChartError,
 )
-from voracious.application.phase1_steps import DepurationOutcome
 from voracious.application.ports import JobKind, JobRequest
 from voracious.application.records import (
     AssignableCause,
@@ -27,7 +27,7 @@ from voracious.application.records import (
     JobStatus,
     ModelRecord,
 )
-from voracious.application.use_cases.steps import parse_csv, stage_lineage
+from voracious.application.use_cases.steps import parse_csv, stage_kind
 from voracious.domain.charts.t2mrcd import (
     T2MRCD_DECISION_PENDING,
     T2MRCDBootstrap,
@@ -39,17 +39,14 @@ from voracious.domain.common import (
     EstimationError,
     InvalidInputError,
     StageKind,
-    StageLineage,
 )
 from voracious.domain.estimators.mrcd import MRCDFit
-from voracious.infrastructure.charts import T2MRCDPhase1Steps
 
 T = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-def _record(source: DatasetSource, round_: int = 0) -> DatasetRecord:
-    data = np.zeros((2, 2))
-    return DatasetRecord("t", "d", data, "h", source, T, lineage_round=round_)
+def _record(source: DatasetSource) -> DatasetRecord:
+    return DatasetRecord("t", "d", np.zeros((2, 2)), "h", source, T)
 
 
 def _fitted(app: App, x: np.ndarray | None = None) -> tuple[str, str]:
@@ -77,16 +74,15 @@ def test_parse_csv_header_blank_lines_and_errors() -> None:
         (DatasetSource.RECALIBRATION_EXTENSION, StageKind.EXTENSION),
     ],
 )
-def test_stage_lineage_comes_from_the_root(source: DatasetSource, kind: StageKind) -> None:
+def test_stage_kind_comes_from_the_root(source: DatasetSource, kind: StageKind) -> None:
     root = _record(source)
-    assert stage_lineage([root]) == StageLineage(kind, 0)
-    if kind is not StageKind.EXTENSION:
-        assert stage_lineage([root, _record(DatasetSource.DEPURATION_OUTPUT, 2)]).round == 2
+    assert stage_kind([root]) is kind
+    assert stage_kind([root, _record(DatasetSource.EXCLUSION_OUTPUT)]) is kind
 
 
-def test_stage_lineage_rejects_a_derived_root() -> None:
+def test_stage_kind_rejects_a_derived_root() -> None:
     with pytest.raises(InvalidInputError, match="raíz"):
-        stage_lineage([_record(DatasetSource.DEPURATION_OUTPUT)])
+        stage_kind([_record(DatasetSource.EXCLUSION_OUTPUT)])
 
 
 def test_upload_and_get_dataset() -> None:
@@ -113,8 +109,8 @@ def test_unknown_chart_and_missing_resources() -> None:
         app.request_fit().execute(TENANT, CHART, "nada", None)
     with pytest.raises(LimitsNotFoundError):
         app.get_limits().execute(TENANT, CHART, "nada")
-    with pytest.raises(DepurationNotFoundError):
-        app.get_depuration().execute(TENANT, CHART, "nada")
+    with pytest.raises(ExclusionNotFoundError):
+        app.get_exclusion().execute(TENANT, CHART, "nada")
     with pytest.raises(PipelineNotFoundError):
         app.get_pipeline().execute(TENANT, CHART, "nada")
     with pytest.raises(DatasetNotFoundError):
@@ -135,8 +131,8 @@ def test_fit_validation_is_synchronous() -> None:
     ("kind", "runner"),
     [
         (JobKind.MRCD_FIT, "run_limits"),
-        (JobKind.LIMITS, "run_depuration"),
-        (JobKind.DEPURATION, "run_assembly"),
+        (JobKind.LIMITS, "run_exclusion"),
+        (JobKind.EXCLUSION, "run_assembly"),
         (JobKind.MODEL_ASSEMBLY, "run_fit"),
         (JobKind.MRCD_FIT, "run_pipeline"),
     ],
@@ -225,66 +221,65 @@ def test_a_stale_advance_does_not_duplicate_the_step() -> None:
     assert app.get_pipeline().execute(TENANT, CHART, pid).status is JobStatus.SUCCEEDED
 
 
-def test_exhausted_depuration_has_no_final_round(monkeypatch: pytest.MonkeyPatch) -> None:
-    def exhausted(self: object, x: np.ndarray, *args: object, **kwargs: object) -> object:
-        n = x.shape[0]
-        return DepurationOutcome(
-            kept=np.zeros(n, dtype=np.bool_),
-            excluded_automatic=np.ones(n, dtype=np.bool_),
-            converged=False,
-            final=True,
-            exhausted=True,
-        )
-
-    monkeypatch.setattr(T2MRCDPhase1Steps, "depurate", exhausted)
+def test_pipeline_is_fit_limits_model_without_automatic_depuration() -> None:
     app = lifecycle_app()
     record = app.pipeline(TENANT, CHART, small_data(), fast_params())
+    assert record.status is JobStatus.SUCCEEDED, record.error
+    assert [s.kind for s in record.steps] == ["fit", "limits", "model"]
+    with_cause = app.pipeline(
+        TENANT, CHART, small_data(), fast_params(), (AssignableCause(2, "x"),)
+    )
+    assert with_cause.status is JobStatus.SUCCEEDED, with_cause.error
+    assert [s.kind for s in with_cause.steps] == ["exclusion", "fit", "limits", "model"]
+
+
+def test_pipeline_fails_if_the_exclusion_left_no_dataset() -> None:
+    app = lifecycle_app()
+    dataset = app.upload().execute(TENANT, small_data())
+    pid = app.request_pipeline().execute(
+        TENANT, CHART, dataset.dataset_id, fast_params(), [AssignableCause(0)]
+    )
+    app.run_pipeline().execute(app.queue.jobs.pop(0))  # arranca y pide la exclusión
+    exclusion_id = app.get_pipeline().execute(TENANT, CHART, pid).steps[0].resource_id
+    app.run_exclusion().execute(app.queue.jobs.pop(0))
+    done = app.get_exclusion().execute(TENANT, CHART, exclusion_id)
+    app.exclusions.update(replace(done, output_dataset_id=None))  # integridad rota (simulada)
+    with pytest.raises(TypeError, match="sin dataset de salida"):
+        app.run_all()
+    record = app.get_pipeline().execute(TENANT, CHART, pid)
     assert record.status is JobStatus.FAILED
     assert record.error is not None
-    assert record.error.code == "DEPURATION_NOT_FINAL"
-    assert record.error.details["reason"] == "exhausted"
-    depuration_id = record.steps[-1].resource_id
-    depuration = app.get_depuration().execute(TENANT, CHART, depuration_id)
-    assert (depuration.final, depuration.exhausted, depuration.next_step) == (True, True, None)
-    assert depuration.output_dataset_id is None
-    with pytest.raises(DepurationNotFinalError):
-        app.request_model().execute(TENANT, CHART, depuration_id=depuration_id)
+    assert record.error.code == "INTERNAL_ERROR"
 
 
 def test_human_exclusion_keeps_order_and_lineage() -> None:
     app = lifecycle_app()
     x = small_data(20, 3, seed=9)
-    dataset_id, fit_id = _fitted(app, x)
-    depuration_id = app.request_depuration().execute(
-        TENANT,
-        CHART,
-        dataset_id=dataset_id,
-        assignable_cause=[AssignableCause(3, "a"), AssignableCause(0)],
+    dataset_id, _ = _fitted(app, x)
+    exclusion_id = app.request_exclusion().execute(
+        TENANT, CHART, dataset_id, [AssignableCause(3, "a"), AssignableCause(0)]
     )
     app.run_all()
-    done = app.get_depuration().execute(TENANT, CHART, depuration_id)
+    done = app.get_exclusion().execute(TENANT, CHART, exclusion_id)
+    assert done.insufficient is False
     assert done.output_dataset_id is not None
     derived = app.get_dataset().execute(TENANT, done.output_dataset_id)
+    assert derived.dataset.source is DatasetSource.EXCLUSION_OUTPUT
+    assert derived.dataset.origin_ref == exclusion_id
     assert derived.dataset.parent_id == dataset_id
     assert derived.dataset.rows is not None
     assert derived.dataset.rows.tolist() == [i for i in range(20) if i not in {0, 3}]
     assert np.array_equal(derived.dataset.data, x[derived.dataset.rows])
     assert derived.dataset.data.flags.c_contiguous
     assert [d.dataset_id for d in derived.chain] == [dataset_id, derived.dataset.dataset_id]
-    with pytest.raises(InvalidInputError):
-        app.request_model().execute(TENANT, CHART, fit_id=fit_id)
-    with pytest.raises(InvalidInputError):
-        app.request_model().execute(TENANT, CHART, depuration_id=depuration_id, fit_id=fit_id)
 
 
-def test_model_from_refs_records_the_previous_depurations() -> None:
+def test_model_from_refs_records_the_human_exclusion() -> None:
     app = lifecycle_app()
     dataset_id = app.upload().execute(TENANT, small_data()).dataset_id
-    human = app.request_depuration().execute(
-        TENANT, CHART, dataset_id=dataset_id, assignable_cause=[AssignableCause(1)]
-    )
+    human = app.request_exclusion().execute(TENANT, CHART, dataset_id, [AssignableCause(1)])
     app.run_all()
-    derived = app.get_depuration().execute(TENANT, CHART, human).output_dataset_id
+    derived = app.get_exclusion().execute(TENANT, CHART, human).output_dataset_id
     assert derived is not None
     fit2 = app.request_fit().execute(TENANT, CHART, derived, None)
     app.run_all()
@@ -295,10 +290,11 @@ def test_model_from_refs_records_the_previous_depurations() -> None:
     record = app.get_model().execute(TENANT, CHART, model_id)
     assert record.status is JobStatus.SUCCEEDED, record.error
     assert record.provenance is not None
-    assert record.provenance.depuration_ids == (human,)
+    assert record.provenance.exclusion_id == human
     model = record.model
     assert model is not None
     assert not bool(model.base_mask[1])
+    assert int(model.base_mask.sum()) == 39
     assert replace(record, model=None).training_data.shape == (40, 4)
 
 
@@ -314,63 +310,32 @@ def test_limits_check_pending_decisions_before_queueing() -> None:
     assert app.limits._steps.store.rows == {}
 
 
-def _first_automatic_round(app: App) -> tuple[str, str, str]:
-    """Raíz contaminada, ajuste, límites y una ronda que quita filas.
-
-    Returns ``(raíz, límites, derivado)``.
-    """
-    root = app.upload().execute(TENANT, contaminated()).dataset_id
-    fit_id = app.request_fit().execute(TENANT, CHART, root, None)
-    app.run_all()
-    limits_id = app.request_limits().execute(TENANT, CHART, fit_id, fast_params())
-    app.run_all()
-    depuration_id = app.request_depuration().execute(
-        TENANT, CHART, fit_id=fit_id, limits_id=limits_id
-    )
-    app.run_all()
-    derived = app.get_depuration().execute(TENANT, CHART, depuration_id).output_dataset_id
-    assert derived is not None
-    return root, limits_id, derived
+def test_phase1_limits_require_params() -> None:
+    app = lifecycle_app()
+    _, fit_id = _fitted(app)
+    with pytest.raises(InvalidInputError) as info:
+        app.request_limits().execute(TENANT, CHART, fit_id, None)
+    assert info.value.details["reason"] == "params_required"
 
 
 def test_human_exclusion_only_at_start() -> None:
     app = lifecycle_app()
-    root, _, derived = _first_automatic_round(app)
+    root = app.upload().execute(TENANT, small_data()).dataset_id
+    human = app.request_exclusion().execute(TENANT, CHART, root, [AssignableCause(0)])
+    app.run_all()
+    record = app.get_exclusion().execute(TENANT, CHART, human)
+    assert record.dataset_id == root
+    assert record.output_dataset_id is not None
+    # Sobre un dataset derivado (otra exclusión) ya no se admite: solo al principio.
     with pytest.raises(InvalidInputError) as info:
-        app.request_depuration().execute(
-            TENANT, CHART, dataset_id=derived, assignable_cause=[AssignableCause(0)]
+        app.request_exclusion().execute(
+            TENANT, CHART, record.output_dataset_id, [AssignableCause(1)]
         )
     assert info.value.details["reason"] == "human_exclusion_only_at_start"
-    # Sobre la raíz (o tras otra exclusión humana) sí se admite.
-    human = app.request_depuration().execute(
-        TENANT, CHART, dataset_id=root, assignable_cause=[AssignableCause(0)]
-    )
-    app.run_all()
-    record = app.get_depuration().execute(TENANT, CHART, human)
-    assert (record.dataset_id, record.fit_id, record.limits_id) == (root, None, None)
-    assert record.output_dataset_id is not None
-    again = app.request_depuration().execute(
-        TENANT, CHART, dataset_id=record.output_dataset_id, assignable_cause=[AssignableCause(1)]
-    )
-    assert app.get_depuration().execute(TENANT, CHART, again).round == 0
     with pytest.raises(InvalidInputError) as info:
-        app.request_depuration().execute(TENANT, CHART, dataset_id=root)
+        app.request_exclusion().execute(TENANT, CHART, root)
     assert info.value.details["reason"] == "assignable_cause_required"
-
-
-def test_rounds_of_a_chain_inherit_the_parameters_of_its_limits() -> None:
-    app = lifecycle_app()
-    _, limits_id, derived = _first_automatic_round(app)
-    fit_id = app.request_fit().execute(TENANT, CHART, derived, None)
-    app.run_all()
-    inherited = app.request_limits().execute(TENANT, CHART, fit_id, None)
-    same = app.request_limits().execute(TENANT, CHART, fit_id, fast_params())
-    source = app.get_limits().execute(TENANT, CHART, limits_id)
-    for rid in (inherited, same):
-        record = app.get_limits().execute(TENANT, CHART, rid)
-        assert record.params == source.params
-        assert (record.seed, record.round) == (source.seed, 1)
-    with pytest.raises(LimitsParamsMismatchError) as info:
-        app.request_limits().execute(TENANT, CHART, fit_id, fast_params(n_replicates=6))
-    assert info.value.details["source_limits_id"] == limits_id
-    assert info.value.details["fields"] == ["bootstrap.n_replicates"]
+    with pytest.raises(InvalidInputError, match="todas las filas"):
+        app.request_exclusion().execute(
+            TENANT, CHART, root, [AssignableCause(i) for i in range(40)]
+        )

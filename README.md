@@ -13,8 +13,11 @@ referencia, su documento, sus golden tests y su API, sin tocar las demás
 
 ## Estado
 
-**Cascarón.** Esqueleto, cableado y compuerta de calidad listos (Paso 1); ni el estimador MRCD ni la API de cartas existen todavía.
-El avance por paso está en [`docs/ESTADO.md`](docs/ESTADO.md).
+**Pasos 0–3 hechos; Paso 4 en curso (Docker y CI hechos; Postgres pendiente).** Existen el port de MRCD (`pymrcd`, con
+`Qn` y los pares de OGK en C), la carta T²MRCD (Fase I con límites por bootstrap, Fase II y ciclo de
+vida con recalibración) y la API por pasos encadenables. Los repositorios y la cola viven aún en el proceso
+(reiniciar pierde el estado) y la Fase I termina en `failed / T2MRCD_DECISION_PENDING` si un campo decisivo
+queda pendiente. El avance por paso y la deuda están en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Cómo levantarlo
 
@@ -37,7 +40,22 @@ Compuerta de calidad (la misma que CI y el pre-commit; cada etapa deja su log en
 scripts/gate.sh; echo "EXIT=$?"
 ```
 
-> Docker se completa en el Paso 4.
+### Con Docker
+
+```bash
+docker compose up -d --build              # construye la imagen runtime y levanta la API
+docker compose ps                         # salud del servicio
+```
+
+La API escucha solo en `127.0.0.1:8000` del anfitrión. Para usarla desde otra máquina, túnel SSH:
+`ssh -L 8000:127.0.0.1:8000 kevin@<servidor>`. La imagen se construye donde se usa y no se publica
+(`pymrcd` es GPL-3.0-or-later; [ADR 0010](docs/adr/0010-empaquetado-docker-y-ci.md)).
+
+La compuerta también corre en Linux dentro de un contenedor:
+
+```bash
+docker build --target gate -t voracious:gate . && docker run --rm voracious:gate
+```
 
 ## Documentación
 

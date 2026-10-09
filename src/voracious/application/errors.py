@@ -7,15 +7,13 @@ __all__ = [
     "ComparisonNotFoundError",
     "ComparisonNotReadyError",
     "DatasetNotFoundError",
-    "DepurationNotFinalError",
-    "DepurationNotFoundError",
     "EffectiveFromNotAfterScoredError",
+    "ExclusionNotFoundError",
     "FitNotFoundError",
     "FitNotReadyError",
     "LimitsFitMismatchError",
     "LimitsNotFoundError",
     "LimitsNotReadyError",
-    "LimitsParamsMismatchError",
     "ModelNotFoundError",
     "ModelNotReadyError",
     "MonitoringNotFoundError",
@@ -213,30 +211,10 @@ class LimitsFitMismatchError(ApplicationError):
     code = "LIMITS_FIT_MISMATCH"
 
 
-class LimitsParamsMismatchError(ApplicationError):
-    """Los parámetros de unos límites no son los de la cadena de Fase I del dataset.
+class ExclusionNotFoundError(ApplicationError):
+    """La exclusión no existe, es de otra carta o de otro tenant (``EXCLUSION_NOT_FOUND``)."""
 
-    Código ``LIMITS_PARAMS_MISMATCH``: todas las rondas de una cadena usan los parámetros de los
-    límites que produjeron su dataset; un modelo con parámetros distintos por ronda sería un
-    híbrido que ``fit_phase1`` no reproduce.
-    """
-
-    code = "LIMITS_PARAMS_MISMATCH"
-
-
-class DepurationNotFoundError(ApplicationError):
-    """La depuración no existe, es de otra carta o de otro tenant (``DEPURATION_NOT_FOUND``)."""
-
-    code = "DEPURATION_NOT_FOUND"
-
-
-class DepurationNotFinalError(ApplicationError):
-    """La depuración no está ``succeeded`` o no es la final de su cadena.
-
-    Código ``DEPURATION_NOT_FINAL``: un modelo solo se ensambla con la ronda final.
-    """
-
-    code = "DEPURATION_NOT_FINAL"
+    code = "EXCLUSION_NOT_FOUND"
 
 
 class PipelineNotFoundError(ApplicationError):
@@ -280,7 +258,7 @@ class VersionInputsMismatchError(ApplicationError):
     """Los pasos pedidos para la versión no son los que exige la decisión de la recalibración.
 
     Código ``VERSION_INPUTS_MISMATCH`` (vuelta 3.4): EXTEND exige el ajuste y los límites del
-    dataset de extensión; REPLACE, los de la última ronda de las filas nuevas; sin reemplazo
+    dataset de extensión; REPLACE, los de las filas nuevas (los comparados); sin reemplazo
     forzado hace falta la comparación. ``details.reason`` dice cuál falló.
     """
 

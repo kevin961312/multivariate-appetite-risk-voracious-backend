@@ -29,7 +29,6 @@ def test_params_round_trip_by_name_is_plain_data() -> None:
     params = T2MRCDParams(
         bootstrap=T2MRCDBootstrap(n_replicates=7, seed=3, alpha_limit=0.01, aggregation=None),
         mrcd=MRCDParams(alpha=0.8, h=30, rho=0.1, target="equicorrelation", maxcond=40.0),
-        max_depuration_rounds=2,
     )
     data = encode_params(params)
     assert json.loads(json.dumps(data)) == data  # solo datos, sin invocables
@@ -100,7 +99,6 @@ def test_unregistered_strategy_cannot_be_persisted() -> None:
         ({"bootstrap": {"seed": 1, "extra": 1}}, "bootstrap"),
         ({"bootstrap": {"seed": 1}, "mrcd": {"target": "other"}}, "mrcd.target"),
         ({"bootstrap": {"seed": 1}, "mrcd": []}, "mrcd"),
-        ({"bootstrap": {"seed": 1}, "max_depuration_rounds": 1.5}, "max_depuration_rounds"),
         ({"bootstrap": {"seed": 1, "clean_criterion": 3}}, "bootstrap.clean_criterion"),
     ],
 )
@@ -123,6 +121,18 @@ def test_invalid_recalibration_data(data: dict[str, object], field: str) -> None
     with pytest.raises(InvalidInputError) as info:
         decode_recalibration_params(data)
     assert info.value.details["field"] == field
+
+
+def test_stored_max_depuration_rounds_is_an_unknown_field() -> None:
+    """Parámetros guardados antes de quitar la depuración automática (dueño, 2026-10-09)."""
+    with pytest.raises(InvalidInputError) as info:
+        decode_params({"bootstrap": {"seed": 1}, "max_depuration_rounds": 5})
+    assert info.value.details["reason"] == "unknown_fields"
+    assert info.value.details["unknown"] == ["max_depuration_rounds"]
+    with pytest.raises(InvalidInputError) as info:
+        decode_recalibration_params({"seed": 1, "max_depuration_rounds": 5})
+    assert info.value.details["reason"] == "unknown_fields"
+    assert info.value.details["unknown"] == ["max_depuration_rounds"]
 
 
 def test_chart_codec_uses_its_registry() -> None:

@@ -102,7 +102,6 @@ def test_recalibration_vocabulary_is_stable() -> None:
     assert [d.value for d in RowDisposition] == [
         "kept",
         "excluded_assignable_cause",
-        "excluded_automatic",
         "already_in_base",
     ]
     out = RecalibrationOutcome(RecalibrationDecision.INSUFFICIENT, None, {"r": 1})

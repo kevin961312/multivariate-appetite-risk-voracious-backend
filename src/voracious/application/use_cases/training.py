@@ -67,7 +67,7 @@ def initial_version(record: ModelRecord, model: object, now: datetime) -> ModelV
     """Versión 0 de un modelo recién ajustado: vigente desde el origen.
 
     La base son las filas del histórico marcadas en ``base_mask``; las excluidas por la
-    depuración de la carta quedan en ``exclusions``.
+    exclusión humana quedan en ``exclusions``.
 
     Args:
         record: Modelo (con su histórico).

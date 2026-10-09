@@ -97,7 +97,7 @@ con tenant y el contrato asíncrono `202` + polling cuando el trabajo es largo:
 | `GET …/observations?from=&to=&signals_only=` | observaciones registradas (fecha, lote, valores, T², límite usado, versión) por rango |
 | `PUT …/observations/{observation_id}/annotation` | anota una señal: causa asignable, cuál, acción (solo observaciones con señal) |
 | `POST …/structural-events` | registra un evento estructural y marca «requiere nueva base» |
-| `POST …/recalibrations` | `202 {recalibration_id}` (base + rango de fechas + criterios de depuración); produce una **propuesta** |
+| `POST …/recalibrations` | `202 {recalibration_id}` (base + rango de fechas); produce una **propuesta** |
 | `GET …/recalibrations/{recalibration_id}` | estado; si `succeeded`, el reporte y la versión propuesta |
 
 **Códigos nuevos** (formato `{code, message, details}`; el mapeo a HTTP es del Paso 3):
@@ -141,7 +141,7 @@ responde como inexistente.
 | Dataset | `POST /v1/datasets` (`201`), `GET /v1/datasets/{id}` | JSON, CSV o multipart; `413`/`415`; guarda linaje y huella |
 | Ajuste MRCD | `POST <c>/fits`, `GET <c>/fits/{id}` | única API de MRCD, `alpha` parametrizable (default 0.75) |
 | Límites | `POST <c>/limits`, `GET <c>/limits/{id}` | `{fit_id, params}`; en datasets derivados hereda los parámetros |
-| Depuración | `POST <c>/depurations`, `GET <c>/depurations/{id}` | humana `{dataset_id, assignable_cause}` solo sobre el dataset raíz; automática `{fit_id, limits_id}` |
+| Exclusión humana | `POST <c>/exclusions`, `GET <c>/exclusions/{id}` | `{dataset_id, assignable_cause}` solo sobre el dataset subido (enmienda 2026-10-09; antes `/depurations`) |
 | Modelo | `POST <c>/models` | **solo por referencias** (ajuste y límites); ya no recibe datos. Sustituye a `POST …/models` de este ADR |
 | Orquestación | `POST <c>/pipelines/phase1`, `GET <c>/pipelines/{id}` (alias `/pipelines/phase1/{id}`) | solo encadena los pasos anteriores |
 | Modelo | `GET <c>/models/{id}` (`?include=` para matrices, M3), `GET …/status` | estado de la carta (ADR 0008) |
@@ -149,7 +149,7 @@ responde como inexistente.
 | Observaciones | `GET …/observations?from=&to=&signals_only=`, `POST …/observations/{id}/annotations` (`201`) | la anotación es un `POST` **append-only** (P4): sustituye a `PUT …/annotation`; no se sobrescribe, se añade |
 | Eventos | `POST …/structural-events` (`201`), `GET …/structural-events` | |
 | Recalibración | `POST …/recalibrations {mode: stepwise\|pipeline}`, `GET …/recalibrations/{id}`, `POST …/recalibrations/{id}/cancel` | `stepwise` responde `201` con `candidates_dataset_id` (candidatas congeladas); `cancel` cancela la recalibración en curso |
-| Pasos de recalibración | `POST <c>/limits {fit_id, recalibration_id}`, `POST <c>/depurations` | hereda parámetros (Q8); exclusión humana tomada de las anotaciones |
+| Pasos de recalibración | `POST <c>/limits {fit_id, recalibration_id}`, `POST <c>/exclusions {dataset_id}` | hereda parámetros (Q8); exclusión humana tomada de las anotaciones |
 | Comparación | `POST …/comparisons`, `GET …/comparisons/{id}` | `RECALIBRATION_DECISION_PENDING` (422) mientras no haya pruebas formales citadas; con reemplazo forzado no hay comparación |
 | Versiones | `POST …/versions` (propuesta, `202`), `GET …/versions`, `GET …/versions/{number}` (`?include=`), `POST …/versions/{number}/approve`, `…/reject` | la versión se identifica por su número dentro del modelo |
 
@@ -166,12 +166,12 @@ es del Paso 3» queda resuelto aquí):
 | HTTP | Códigos |
 | --- | --- |
 | 400 | `TENANT_REQUIRED` (falta `X-Tenant-ID`) |
-| 404 | `CHART_NOT_FOUND`, `MODEL_NOT_FOUND`, `MONITORING_NOT_FOUND`, `VERSION_NOT_FOUND`, `RECALIBRATION_NOT_FOUND`, `OBSERVATION_NOT_FOUND`, `DATASET_NOT_FOUND`, `FIT_NOT_FOUND`, `LIMITS_NOT_FOUND`, `DEPURATION_NOT_FOUND`, `PIPELINE_NOT_FOUND`, `COMPARISON_NOT_FOUND`, `ROUTE_NOT_FOUND` |
+| 404 | `CHART_NOT_FOUND`, `MODEL_NOT_FOUND`, `MONITORING_NOT_FOUND`, `VERSION_NOT_FOUND`, `RECALIBRATION_NOT_FOUND`, `OBSERVATION_NOT_FOUND`, `DATASET_NOT_FOUND`, `FIT_NOT_FOUND`, `LIMITS_NOT_FOUND`, `EXCLUSION_NOT_FOUND`, `PIPELINE_NOT_FOUND`, `COMPARISON_NOT_FOUND`, `ROUTE_NOT_FOUND` |
 | 405 | `METHOD_NOT_ALLOWED` |
-| 409 | `MODEL_NOT_READY`, `FIT_NOT_READY`, `LIMITS_NOT_READY`, `COMPARISON_NOT_READY`, `DEPURATION_NOT_FINAL`, `VERSION_NOT_PROPOSED`, `PROPOSAL_PENDING`, `RECALIBRATION_IN_PROGRESS`, `RECALIBRATION_NOT_IN_PROGRESS`, `NOT_A_SIGNAL`, `EFFECTIVE_FROM_NOT_AFTER_SCORED` |
+| 409 | `MODEL_NOT_READY`, `FIT_NOT_READY`, `LIMITS_NOT_READY`, `COMPARISON_NOT_READY`, `VERSION_NOT_PROPOSED`, `PROPOSAL_PENDING`, `RECALIBRATION_IN_PROGRESS`, `RECALIBRATION_NOT_IN_PROGRESS`, `NOT_A_SIGNAL`, `EFFECTIVE_FROM_NOT_AFTER_SCORED` |
 | 413 | `PAYLOAD_TOO_LARGE` (por encima de `VORACIOUS_MAX_UPLOAD_MB`) |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` |
-| 422 | `INVALID_INPUT` (incluye errores de schema, con `details.errors`), `RANGE_BEFORE_STRUCTURAL_EVENT`, `RECALIBRATION_INSUFFICIENT_OBSERVATIONS`, `RECALIBRATION_DECISION_PENDING`, `OBSERVATION_BEFORE_FIRST_VERSION`, `T2MRCD_FIT_PARAMS_MISMATCH`, `LIMITS_FIT_MISMATCH`, `LIMITS_PARAMS_MISMATCH`, `RECALIBRATION_MISMATCH`, `VERSION_INPUTS_MISMATCH` y, por defecto, cualquier `DomainError` síncrono (p. ej. `T2MRCD_DECISION_PENDING`) |
+| 422 | `INVALID_INPUT` (incluye errores de schema, con `details.errors`), `RANGE_BEFORE_STRUCTURAL_EVENT`, `RECALIBRATION_INSUFFICIENT_OBSERVATIONS`, `RECALIBRATION_DECISION_PENDING`, `OBSERVATION_BEFORE_FIRST_VERSION`, `T2MRCD_FIT_PARAMS_MISMATCH`, `LIMITS_FIT_MISMATCH`, `RECALIBRATION_MISMATCH`, `VERSION_INPUTS_MISMATCH` y, por defecto, cualquier `DomainError` síncrono (p. ej. `T2MRCD_DECISION_PENDING`) |
 | 500 | `INTERNAL_ERROR` (el detalle va al log, nunca al cuerpo) |
 | variable | `HTTP_ERROR`: cualquier otro error HTTP del enrutado (conserva su estado y su texto) |
 
@@ -181,10 +181,9 @@ Códigos nuevos del Paso 3 y su porqué:
 | --- | --- |
 | `T2MRCD_FIT_PARAMS_MISMATCH` | Los parámetros enviados difieren de los del ajuste referenciado |
 | `LIMITS_FIT_MISMATCH` | Los límites no se calibraron sobre el ajuste indicado |
-| `LIMITS_PARAMS_MISMATCH` | Parámetros de los límites distintos de los heredados del dataset derivado |
 | `RECALIBRATION_MISMATCH` | Un paso referencia recursos que no pertenecen a esa recalibración (o a ninguna) |
-| `VERSION_INPUTS_MISMATCH` | Los pasos pedidos para la versión no son los que exige la decisión (EXTEND: ajuste y límites del dataset de extensión; REPLACE: los de la última ronda de las filas nuevas; sin reemplazo forzado, la comparación); `details.reason` dice cuál |
-| `FIT_NOT_READY`, `LIMITS_NOT_READY`, `COMPARISON_NOT_READY`, `DEPURATION_NOT_FINAL` | El paso referenciado no ha terminado; `DEPURATION_NOT_FINAL`: la depuración no está `succeeded` o no es la final de su cadena (un modelo solo se ensambla con la ronda final) |
+| `VERSION_INPUTS_MISMATCH` | Los pasos pedidos para la versión no son los que exige la decisión (EXTEND: ajuste y límites del dataset de extensión; REPLACE: los de las filas nuevas; sin reemplazo forzado, la comparación); `details.reason` dice cuál |
+| `FIT_NOT_READY`, `LIMITS_NOT_READY`, `COMPARISON_NOT_READY` | El paso referenciado no ha terminado |
 | `RECALIBRATION_NOT_IN_PROGRESS` | La recalibración ya terminó (o ya tiene su propuesta pedida) y no admite más pasos |
 | `ROUTE_NOT_FOUND`, `METHOD_NOT_ALLOWED`, `HTTP_ERROR` | Errores de enrutado en el mismo formato uniforme |
 
@@ -193,7 +192,25 @@ Códigos nuevos del Paso 3 y su porqué:
 (`T2MRCD_DECISION_PENDING`, `RECALIBRATION_DECISION_PENDING`). Cierra la deuda «validación síncrona del histórico».
 
 **Jobs.** El `JobRequest` lleva `kind`, `tenant_id`, `scope` (la carta), `resource_id` y, para los hijos de un
-modelo, `model_id`. `JobKind`: `mrcd_fit`, `limits`, `depuration`, `model_assembly`, `score`, `comparison`,
+modelo, `model_id`. `JobKind`: `mrcd_fit`, `limits`, `exclusion`, `model_assembly`, `score`, `comparison`,
 `version_proposal`, `pipeline`. Se retiran `TRAIN`, `MONITOR` y `RECALIBRATE` (y `monitorings` pasa a `scores`),
 porque ya no hay un trabajo monolítico. La idempotencia pasa de «no hacer nada si no está `queued`» a un `claim`
 atómico `queued → running`, que cierra la limitación anotada en la enmienda del Paso 2.
+
+## Enmienda 2026-10-09: contratos sin depuración automática
+
+Por qué: la depuración iterativa no converge con MRCD (ADR 0008, enmienda 2026-10-09), así que desaparecen sus
+recursos y códigos. Sustituye lo anterior en lo que choque.
+
+- `/depurations` se elimina. `POST/GET /v1/charts/t2mrcd/exclusions`: en Fase I `{dataset_id, assignable_cause}`
+  solo sobre el dataset subido (`422 INVALID_INPUT`, `human_exclusion_only_at_start`); en recalibración
+  `{dataset_id}` y las filas salen de las anotaciones con causa asignable. `JobKind.EXCLUSION`, carril light;
+  `provenance.exclusion_id`.
+- `POST /models` recibe solo `{fit_id, limits_id}`. `/comparisons` recibe `{recalibration_id, fit_id, limits_id}`
+  (`RECALIBRATION_MISMATCH`, `LIMITS_FIT_MISMATCH`).
+- `/limits` en Fase I exige `params` (`422 params_required`) y ya no devuelve `round`. `max_depuration_rounds`
+  da `422` por campo extra.
+- Códigos eliminados: `DEPURATION_NOT_FINAL`, `LIMITS_PARAMS_MISMATCH`; `DEPURATION_NOT_FOUND` pasa a
+  `EXCLUSION_NOT_FOUND`.
+- Pasos de tubería: `exclusion, fit, limits, model, comparison, version`. Formatos de modelo, informe y
+  metadatos de dataset: 2; el 1 se rechaza (`unknown_format_version`), sin migración.

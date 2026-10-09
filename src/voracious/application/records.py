@@ -1,6 +1,6 @@
 """Registros persistentes del ciclo de vida de una carta, comunes a todas las cartas.
 
-Datasets, pasos encadenables de la Fase I (ajustes, límites, depuraciones y tuberías; vuelta 3.3
+Datasets, pasos encadenables de la Fase I (exclusiones, ajustes, límites y tuberías; vuelta 3.3
 del Paso 3), modelos (Fase I), monitoreos (Fase II), versiones, observaciones, anotaciones,
 eventos estructurales y recalibraciones (ADR 0005, ADR 0008). Los registros son inmutables; cada
 transición de estado crea uno nuevo con ``dataclasses.replace`` y se guarda con ``update`` (o, en
@@ -34,10 +34,10 @@ __all__ = [
     "ComparisonRecord",
     "DatasetRecord",
     "DatasetSource",
-    "DepurationRecord",
     "ErrorInfo",
     "Exclusion",
     "ExclusionReason",
+    "ExclusionRecord",
     "FitRecord",
     "IndexVector",
     "JobStatus",
@@ -48,7 +48,6 @@ __all__ = [
     "ModelVersion",
     "MonitoringRecord",
     "MonitoringSummary",
-    "NextStep",
     "ObservationRecord",
     "PipelineKind",
     "PipelineRecord",
@@ -146,8 +145,8 @@ class ModelRecord:
         model: Modelo de la carta si ``succeeded`` (el de la versión 0).
         error: Error si ``failed``.
         lifecycle_policy: Política de revalidación periódica.
-        provenance: Recursos de los que se ensambló (vuelta 3.3): dataset raíz, ajuste, límites y
-            depuraciones; ``None`` en un modelo sin cadena de pasos.
+        provenance: Recursos de los que se ensambló (vuelta 3.3): dataset raíz, exclusión humana,
+            ajuste y límites; ``None`` en un modelo sin cadena de pasos.
         pipeline_id: Tubería que lo pidió, si la hay (al terminar se la avisa).
     """
 
@@ -175,14 +174,14 @@ class ModelProvenance:
         root_dataset_id: Dataset raíz (el histórico subido): ``training_data`` del modelo.
         fit_id: Ajuste final.
         limits_id: Límites finales.
-        depuration_ids: Depuraciones de la cadena, de la primera a la última (vacía si el modelo
-            se pidió con ``{fit_id, limits_id}`` sin depuraciones previas).
+        exclusion_id: Exclusión humana de la que sale el dataset del ajuste, o ``None`` si se
+            ajustó el dataset raíz.
     """
 
     root_dataset_id: str
     fit_id: str
     limits_id: str
-    depuration_ids: tuple[str, ...] = ()
+    exclusion_id: str | None = None
 
 
 class DatasetSource(StrEnum):
@@ -191,11 +190,11 @@ class DatasetSource(StrEnum):
     UPLOAD = "upload"
     """Subido por el cliente (raíz de una Fase I)."""
 
-    DEPURATION_OUTPUT = "depuration_output"
-    """Filas conservadas por una depuración (``parent[rows]``)."""
+    EXCLUSION_OUTPUT = "exclusion_output"
+    """Filas conservadas por una exclusión humana (``parent[rows]``)."""
 
     RECALIBRATION_CANDIDATES = "recalibration_candidates"
-    """Observaciones candidatas de una recalibración (raíz de su depuración; vuelta 3.4)."""
+    """Observaciones candidatas de una recalibración (raíz de sus pasos; vuelta 3.4)."""
 
     RECALIBRATION_EXTENSION = "recalibration_extension"
     """Base ampliada de una recalibración (``vstack(base, nuevas)``; vuelta 3.4)."""
@@ -215,9 +214,7 @@ class DatasetRecord:
         parent_id: Dataset del que deriva (``None`` en una raíz).
         rows: Índices de sus filas en ``parent_id`` (``data == parent.data[rows]``); ``None`` en
             una raíz.
-        lineage_round: Rondas de depuración automática que quitaron filas en su ascendencia
-            (``0`` en una raíz): el número de ronda de la calibración sobre este dataset.
-        origin_ref: Recurso que lo creó (la depuración o la recalibración), si lo hay.
+        origin_ref: Recurso que lo creó (la exclusión o la recalibración), si lo hay.
     """
 
     tenant_id: str
@@ -228,7 +225,6 @@ class DatasetRecord:
     created_at: datetime
     parent_id: str | None = None
     rows: IndexVector | None = None
-    lineage_round: int = 0
     origin_ref: str | None = None
 
 
@@ -277,9 +273,9 @@ class LimitsRecord:
         status: Estado del trabajo.
         params: Parámetros de la carta codificados como datos.
         seed: Semilla raíz de la calibración.
-        stage_kind: Operación del linaje (``phase1``, ``new_rows`` o ``extension``).
-        round: Ronda del linaje (deducida del dataset, nunca la elige el cliente).
-        spawn_key: Hueco de semilla de la ronda (``stage_spawn_key``).
+        stage_kind: Operación (``phase1``, ``new_rows`` o ``extension``), deducida del dataset;
+            nunca la elige el cliente.
+        spawn_key: Hueco de semilla de la operación (``stage_spawn_key``).
         created_at: Instante de creación (UTC).
         recalibration_id: Recalibración de la que forma parte, si la hay (vuelta 3.4).
         started_at: Instante en que pasó a ``running`` (UTC).
@@ -299,7 +295,6 @@ class LimitsRecord:
     params: Mapping[str, object]
     seed: int
     stage_kind: str
-    round: int
     spawn_key: tuple[int, ...]
     created_at: datetime
     recalibration_id: str | None = None
@@ -327,65 +322,45 @@ class AssignableCause:
     annotation_id: str | None = None
 
 
-class NextStep(StrEnum):
-    """Paso que sigue a una depuración."""
-
-    FIT = "fit"
-    """Quitó filas: hay que ajustar el dataset derivado."""
-
-    MODEL = "model"
-    """Es final: se puede ensamblar el modelo."""
-
-
 @dataclass(frozen=True, eq=False)
-class DepurationRecord:
-    """Depuración de un dataset: exclusión humana o una ronda de la automática (``/depurations``).
+class ExclusionRecord:
+    """Exclusión humana de las filas de un dataset con causa asignable (``/exclusions``).
 
-    La exclusión humana referencia el dataset (sin ajuste: se aplica antes de ajustar nada, como
-    en ``fit_phase1``); la ronda automática, el ajuste y sus límites (el dataset es el del ajuste).
+    Referencia el dataset, sin ajuste: se aplica antes de ajustar nada, como en ``fit_phase1``.
+    En la Fase I la piden las filas del cliente; sobre las candidatas de una recalibración, las
+    anotaciones con causa asignable confirmada.
 
     Attributes:
         tenant_id: Tenant propietario.
         chart_id: Carta.
-        depuration_id: Identificador.
-        dataset_id: Dataset depurado (la entrada).
+        exclusion_id: Identificador.
+        dataset_id: Dataset de entrada.
         status: Estado del trabajo.
         assignable_cause: Filas excluidas por una persona.
-        round: Ronda (la del dataset depurado).
         created_at: Instante de creación (UTC).
-        fit_id: Ajuste evaluado en la ronda automática (``None``: exclusión humana).
-        limits_id: Límites con los que se evalúa la ronda automática (``None``: solo exclusión
-            humana).
         started_at: Instante en que pasó a ``running`` (UTC).
         finished_at: Instante en que terminó (UTC).
         result: Destino de cada fila del dataset si ``succeeded``.
-        converged: Convergencia de la ronda automática (``None`` si no la hubo).
-        final: ``True`` si la depuración terminó en esta ronda (el modelo se ensambla con ella).
-        exhausted: ``True`` si quitó todas las filas (no hay ronda final).
-        output_dataset_id: Dataset derivado con las filas conservadas, si quitó alguna.
-        next_step: Paso siguiente.
+        insufficient: ``True`` si, en una recalibración, quedan menos filas que
+            ``min_observations`` (la recalibración termina ``insufficient`` y no hay dataset de
+            salida); ``False`` si no; ``None`` mientras no termine.
+        output_dataset_id: Dataset derivado con las filas conservadas.
         error: Error si ``failed``.
         pipeline_id: Tubería que lo pidió, si la hay.
     """
 
     tenant_id: str
     chart_id: str
-    depuration_id: str
+    exclusion_id: str
     dataset_id: str
     status: JobStatus
     assignable_cause: tuple[AssignableCause, ...]
-    round: int
     created_at: datetime
-    fit_id: str | None = None
-    limits_id: str | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     result: tuple[RowDisposition, ...] | None = None
-    converged: bool | None = None
-    final: bool | None = None
-    exhausted: bool | None = None
+    insufficient: bool | None = None
     output_dataset_id: str | None = None
-    next_step: NextStep | None = None
     error: ErrorInfo | None = None
     pipeline_id: str | None = None
 
@@ -394,11 +369,11 @@ class PipelineKind(StrEnum):
     """Tipo de tubería."""
 
     PHASE1 = "phase1"
-    """Fase I completa: ajuste, límites y depuraciones hasta el modelo."""
+    """Fase I completa: exclusión humana (si la hay), ajuste, límites y modelo."""
 
     RECALIBRATION = "recalibration"
-    """Recalibración completa (modo ``pipeline``): depuración de las filas nuevas, comparación,
-    extensión y propuesta de versión (vuelta 3.4)."""
+    """Recalibración completa (modo ``pipeline``): exclusión humana de las filas nuevas, ajuste,
+    límites, comparación, extensión y propuesta de versión (vuelta 3.4)."""
 
 
 @dataclass(frozen=True)
@@ -406,7 +381,7 @@ class PipelineStep:
     """Paso de una tubería: el recurso que creó.
 
     Attributes:
-        kind: ``fit``, ``limits``, ``depuration``, ``model``, ``comparison`` o ``version``.
+        kind: ``exclusion``, ``fit``, ``limits``, ``model``, ``comparison`` o ``version``.
         resource_id: Identificador del recurso.
     """
 
@@ -554,9 +529,6 @@ class ExclusionReason(StrEnum):
     ASSIGNABLE_CAUSE = "assignable_cause"
     """Excluida por una persona: anotación con causa asignable confirmada."""
 
-    AUTOMATIC = "automatic"
-    """Excluida por la depuración automática de la carta."""
-
     ALREADY_IN_BASE = "already_in_base"
     """Ya formaba parte de la base de la versión vigente (no se vuelve a pasar como nueva)."""
 
@@ -568,14 +540,11 @@ class Exclusion:
     Attributes:
         ref: Fila excluida.
         reason: Motivo.
-        round: Ronda de la depuración automática en que salió, o ``None`` si la carta no la
-            informa por fila (T²MRCD solo informa el total de rondas) o no aplica.
         annotation_id: Anotación que la excluyó (solo ``ASSIGNABLE_CAUSE``).
     """
 
     ref: BaseRowRef
     reason: ExclusionReason
-    round: int | None = None
     annotation_id: str | None = None
 
 
@@ -828,7 +797,7 @@ class RecalibrationRecord:
 
 @dataclass(frozen=True, eq=False)
 class ComparisonRecord:
-    """Comparación de la base vigente con las filas nuevas depuradas (``/comparisons``).
+    """Comparación de la base vigente con las filas nuevas conservadas (``/comparisons``).
 
     Attributes:
         tenant_id: Tenant propietario.
@@ -836,9 +805,8 @@ class ComparisonRecord:
         model_id: Modelo recalibrado.
         comparison_id: Identificador.
         recalibration_id: Recalibración a la que pertenece.
-        depuration_id: Depuración final de las filas nuevas.
-        fit_id: Ajuste de esa ronda final (``μ₁``, ``S₁``).
-        limits_id: Límites de esa ronda final.
+        fit_id: Ajuste de las filas nuevas conservadas (``μ₁``, ``S₁``).
+        limits_id: Límites de ese ajuste (operación ``new_rows``).
         status: Estado del trabajo.
         created_at: Instante de creación (UTC).
         started_at: Instante en que pasó a ``running`` (UTC).
@@ -855,7 +823,6 @@ class ComparisonRecord:
     model_id: str
     comparison_id: str
     recalibration_id: str
-    depuration_id: str
     fit_id: str
     limits_id: str
     status: JobStatus

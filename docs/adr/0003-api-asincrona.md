@@ -43,7 +43,7 @@ el contrato (`202` + polling, estados, tenant que oculta lo ajeno) se mantiene.
 | Carril | Trabajos | Variable (hilos, default) |
 | --- | --- | --- |
 | `estimation` | `mrcd_fit` | `VORACIOUS_QUEUE_WORKERS_ESTIMATION` (1) |
-| `calibration` | `limits`, `depuration`, `comparison` (lo más costoso) | `VORACIOUS_QUEUE_WORKERS_CALIBRATION` (1) |
+| `calibration` | `limits`, `comparison` (lo más costoso) | `VORACIOUS_QUEUE_WORKERS_CALIBRATION` (1) |
 | `light` | `model_assembly`, `score`, `version_proposal` | `VORACIOUS_QUEUE_WORKERS_LIGHT` (4) |
 | `orchestration` | `pipeline` | `VORACIOUS_QUEUE_WORKERS_ORCHESTRATION` (2) |
 

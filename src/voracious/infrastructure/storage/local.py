@@ -27,8 +27,12 @@ __all__ = ["DatasetIntegrityError", "LocalDatasetStorage"]
 _SAFE_ID: Final = re.compile(r"[A-Za-z0-9_-]{1,128}")
 """Forma admitida de un tenant o un dataset en una ruta (coincidencia completa)."""
 
-_META_VERSION: Final = 1
-"""Versión del formato de los metadatos."""
+_META_VERSION: Final = 2
+"""Versión del formato de los metadatos (se comprueba al leer).
+
+La 2 quita ``lineage_round`` y el origen ``depuration_output`` (sin depuración automática
+iterativa, decisión del dueño 2026-10-09).
+"""
 
 
 class DatasetIntegrityError(RuntimeError):
@@ -118,7 +122,6 @@ class LocalDatasetStorage:
             "created_at": record.created_at.isoformat(),
             "parent_id": record.parent_id,
             "rows": None if record.rows is None else [int(i) for i in record.rows],
-            "lineage_round": record.lineage_round,
             "origin_ref": record.origin_ref,
         }
         with self._lock:
@@ -141,7 +144,8 @@ class LocalDatasetStorage:
             El dataset (matriz de solo lectura) o ``None`` si no existe para ese tenant.
 
         Raises:
-            DatasetIntegrityError: Si el contenido no coincide con la huella guardada.
+            DatasetIntegrityError: Si los metadatos son de otro formato o el contenido no coincide
+                con la huella guardada.
         """
         paths = self._paths(tenant_id, dataset_id)
         if paths is None:
@@ -150,6 +154,9 @@ class LocalDatasetStorage:
         if not meta.exists() or not npy.exists():
             return None
         doc = json.loads(meta.read_text(encoding="utf-8"))
+        if doc.get("format_version") != _META_VERSION:
+            msg = f"los metadatos del dataset '{dataset_id}' tienen un formato desconocido"
+            raise DatasetIntegrityError(msg)
         data = np.load(npy, allow_pickle=False)
         if data.dtype != np.float64 or data.ndim != 2:
             msg = f"el dataset '{dataset_id}' no es una matriz float64"
@@ -167,6 +174,5 @@ class LocalDatasetStorage:
             created_at=datetime.fromisoformat(doc["created_at"]),
             parent_id=doc["parent_id"],
             rows=None if rows is None else np.asarray(rows, dtype=np.int64),
-            lineage_round=int(doc["lineage_round"]),
             origin_ref=doc["origin_ref"],
         )

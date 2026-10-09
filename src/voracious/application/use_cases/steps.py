@@ -1,41 +1,35 @@
 """Pasos encadenables de la Fase I (vuelta 3.3 del Paso 3): cada uno su recurso y su trabajo.
 
-``UploadDataset`` (síncrono) → ``RequestFit``/``RunFitJob`` (carril ``estimation``) →
-``RequestLimits``/``RunLimitsJob`` (``calibration``) → ``RequestDepuration``/``RunDepurationJob``
+``UploadDataset`` (síncrono) → (opcional) ``RequestExclusion``/``RunExclusionJob`` (carril
+``light``) → ``RequestFit``/``RunFitJob`` (``estimation``) → ``RequestLimits``/``RunLimitsJob``
 (``calibration``) → ``RequestModel``/``RunModelAssemblyJob`` (``light``). El paso siguiente
 **referencia** al anterior por su id: no se reenvían datos ni se recalcula nada.
 
-Linaje y semilla: la ronda de una calibración no la elige el cliente. Se deduce del linaje del
-dataset ajustado: su raíz decide la operación (``upload`` → ``PHASE1``) y su ``lineage_round`` (las
-depuraciones automáticas que quitaron filas en su ascendencia) el número de ronda; la carta lo
-traduce a su hueco de semilla (``stage_spawn_key``). Con los mismos parámetros, encadenar los pasos
-da el mismo modelo, en bits, que ``fit_phase1`` (``tests/integration/test_phase1_chain.py``).
+Sin depuración automática iterativa (decisión del dueño, 2026-10-09): la única exclusión de filas
+es la humana, ``{dataset_id, assignable_cause}``, que referencia el dataset raíz, sin ajuste ni
+límites, y crea el dataset derivado ``parent[kept]`` (mismo orden, ``float64`` contiguo). Como en
+``fit_phase1``, las filas con causa asignable se quitan antes de ajustar nada.
 
-Depuración (Q3): la exclusión humana ``{dataset_id, assignable_cause}`` referencia el dataset,
-sin ajuste ni límites, y solo al principio (sin rondas automáticas en la ascendencia): como en
-``fit_phase1``, las filas con causa asignable se quitan antes de ajustar nada. La ronda
-automática ``{fit_id, limits_id}`` evalúa un ajuste con sus límites. Si quita filas crea el
-dataset derivado ``parent[kept]`` (mismo orden, ``float64`` contiguo) y el paso siguiente es otro
-ajuste; si es final, el modelo.
-
-Parámetros por cadena: sobre un dataset derivado de una ronda automática, ``/limits`` hereda los
-parámetros de los límites que lo produjeron (si el cliente los manda, deben coincidir: si no,
-``LIMITS_PARAMS_MISMATCH``). Así todas las rondas usan los mismos, como ``fit_phase1``.
+Operación y semilla: la operación de una calibración no la elige el cliente. Se deduce del origen
+del dataset raíz (``upload`` → ``PHASE1``, ``recalibration_candidates`` → ``NEW_ROWS``,
+``recalibration_extension`` → ``EXTENSION``); la carta la traduce a su hueco de semilla
+(``stage_spawn_key``). Con los mismos parámetros, encadenar los pasos da el mismo modelo, en bits,
+que ``fit_phase1`` (``tests/integration/test_phase1_chain.py``).
 
 Cada ``Run…Job`` es idempotente (``claim``) y, si el recurso lo pidió una tubería, la avisa al
 terminar (bien o mal) encolando su trabajo ``pipeline``.
 
-Recalibración por pasos (vuelta 3.4): los mismos pasos sirven para depurar las filas nuevas. Si la
-raíz del dataset es ``recalibration_candidates``, los límites heredan los parámetros de la versión
-base (``recalibration_id``, linaje ``NEW_ROWS``), la exclusión humana sale de las anotaciones (no
-del cliente) y la depuración usa ``min_rows = min_observations``: por debajo se agota y la
-recalibración termina ``insufficient``. Sobre ``recalibration_extension`` (linaje ``EXTENSION``)
-solo hay ajuste y límites. Lo propio de la recalibración llega por ``RecalibrationLinks``.
+Recalibración por pasos (vuelta 3.4): los mismos pasos sirven para las filas nuevas. Si la raíz del
+dataset es ``recalibration_candidates``, los límites heredan los parámetros de la versión base
+(``recalibration_id``, operación ``NEW_ROWS``) y la exclusión humana sale de las anotaciones (no
+del cliente); si deja menos de ``min_observations`` filas, la recalibración termina
+``insufficient``. Sobre ``recalibration_extension`` (operación ``EXTENSION``) solo hay ajuste y
+límites. Lo propio de la recalibración llega por ``RecalibrationLinks``.
 """
 
 import csv
 import io
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Protocol
@@ -46,14 +40,12 @@ import numpy.typing as npt
 from voracious.application.errors import (
     ApplicationError,
     DatasetNotFoundError,
-    DepurationNotFinalError,
-    DepurationNotFoundError,
+    ExclusionNotFoundError,
     FitNotFoundError,
     FitNotReadyError,
     LimitsFitMismatchError,
     LimitsNotFoundError,
     LimitsNotReadyError,
-    LimitsParamsMismatchError,
     RecalibrationMismatchError,
 )
 from voracious.application.lifecycle import base_content_hash, frozen_base
@@ -66,7 +58,7 @@ from voracious.application.phase1_steps import (
 from voracious.application.ports import (
     Clock,
     DatasetStorage,
-    DepurationRepository,
+    ExclusionRepository,
     FitRepository,
     IdGenerator,
     JobKind,
@@ -80,8 +72,8 @@ from voracious.application.records import (
     AssignableCause,
     DatasetRecord,
     DatasetSource,
-    DepurationRecord,
     ErrorInfo,
+    ExclusionRecord,
     FitRecord,
     IndexVector,
     JobStatus,
@@ -89,7 +81,6 @@ from voracious.application.records import (
     LimitsRecord,
     ModelProvenance,
     ModelRecord,
-    NextStep,
     RecalibrationRecord,
 )
 from voracious.application.use_cases.common import INTERNAL_ERROR, get_model
@@ -101,7 +92,6 @@ from voracious.domain.common import (
     InvalidInputError,
     RowDisposition,
     StageKind,
-    StageLineage,
     TaskMapper,
     as_matrix,
 )
@@ -109,22 +99,23 @@ from voracious.domain.common import (
 __all__ = [
     "DatasetLineage",
     "GetDataset",
-    "GetDepuration",
+    "GetExclusion",
     "GetFit",
     "GetLimits",
     "RecalibrationLinks",
-    "RequestDepuration",
+    "RequestExclusion",
     "RequestFit",
     "RequestLimits",
     "RequestModel",
-    "RunDepurationJob",
+    "RunExclusionJob",
     "RunFitJob",
     "RunLimitsJob",
     "RunModelAssemblyJob",
     "UploadDataset",
+    "check_same_fit",
     "dataset_chain",
     "get_dataset",
-    "get_depuration",
+    "get_exclusion",
     "get_fit",
     "get_limits",
     "human_mask",
@@ -134,7 +125,7 @@ __all__ = [
     "ready_limits",
     "recalibration_session",
     "root_indices",
-    "stage_lineage",
+    "stage_kind",
 ]
 
 MAX_REPORTED_CELLS = 20
@@ -145,7 +136,7 @@ _ROOT_KINDS: dict[DatasetSource, StageKind] = {
     DatasetSource.RECALIBRATION_CANDIDATES: StageKind.NEW_ROWS,
     DatasetSource.RECALIBRATION_EXTENSION: StageKind.EXTENSION,
 }
-"""Operación del linaje según el origen del dataset raíz."""
+"""Operación de la calibración según el origen del dataset raíz."""
 
 _RECALIBRATION_ROOTS = frozenset(
     {DatasetSource.RECALIBRATION_CANDIDATES, DatasetSource.RECALIBRATION_EXTENSION}
@@ -189,29 +180,23 @@ class RecalibrationLinks(Protocol):
         """
         ...
 
-    def bounds(self, session: RecalibrationRecord) -> tuple[int, int]:
-        """Rondas máximas y mínimo de filas de la depuración de las filas nuevas.
+    def min_observations(self, session: RecalibrationRecord) -> int:
+        """Mínimo de filas nuevas conservadas tras la exclusión humana.
 
         Args:
             session: Recalibración.
 
         Returns:
-            ``(max_rounds, min_rows)``.
+            El mínimo.
         """
         ...
 
-    def close_insufficient(
-        self,
-        session: RecalibrationRecord,
-        chain: Sequence[DatasetRecord],
-        final: DepurationRecord,
-    ) -> None:
-        """Cierra la recalibración ``insufficient`` porque la depuración se agotó.
+    def close_insufficient(self, session: RecalibrationRecord, exclusion: ExclusionRecord) -> None:
+        """Cierra la recalibración ``insufficient``: la exclusión humana dejó menos filas.
 
         Args:
             session: Recalibración.
-            chain: Ascendencia del dataset depurado.
-            final: Depuración agotada (con su resultado).
+            exclusion: Exclusión de las candidatas (con su resultado).
         """
         ...
 
@@ -339,28 +324,27 @@ def ready_limits(
     return record
 
 
-def get_depuration(
-    depurations: DepurationRepository, tenant_id: str, chart_id: str, depuration_id: str
-) -> DepurationRecord:
-    """Busca una depuración o lanza ``DepurationNotFoundError``.
+def get_exclusion(
+    exclusions: ExclusionRepository, tenant_id: str, chart_id: str, exclusion_id: str
+) -> ExclusionRecord:
+    """Busca una exclusión o lanza ``ExclusionNotFoundError``.
 
     Args:
-        depurations: Repositorio.
+        exclusions: Repositorio.
         tenant_id: Tenant.
         chart_id: Carta.
-        depuration_id: Depuración.
+        exclusion_id: Exclusión.
 
     Returns:
-        La depuración.
+        La exclusión.
 
     Raises:
-        DepurationNotFoundError: Si no existe para esa clave.
+        ExclusionNotFoundError: Si no existe para esa clave.
     """
-    record = depurations.get(tenant_id, chart_id, depuration_id)
+    record = exclusions.get(tenant_id, chart_id, exclusion_id)
     if record is None:
-        raise DepurationNotFoundError(
-            f"la depuración '{depuration_id}' no existe",
-            details={"depuration_id": depuration_id},
+        raise ExclusionNotFoundError(
+            f"la exclusión '{exclusion_id}' no existe", details={"exclusion_id": exclusion_id}
         )
     return record
 
@@ -387,17 +371,17 @@ def dataset_chain(datasets: DatasetStorage, record: DatasetRecord) -> list[Datas
     return chain
 
 
-def stage_lineage(chain: Sequence[DatasetRecord]) -> StageLineage:
-    """Linaje de la calibración sobre el último dataset de ``chain``.
+def stage_kind(chain: Sequence[DatasetRecord]) -> StageKind:
+    """Operación de la calibración sobre el último dataset de ``chain``.
 
     Args:
         chain: Ascendencia desde la raíz (``dataset_chain``).
 
     Returns:
-        Operación (por el origen de la raíz) y ronda (``lineage_round`` del dataset).
+        La operación, por el origen de la raíz.
 
     Raises:
-        InvalidInputError: Si la raíz no es un dataset raíz o el linaje no es válido.
+        InvalidInputError: Si la raíz no es un dataset raíz.
     """
     kind = _ROOT_KINDS.get(chain[0].source)
     if kind is None:
@@ -405,7 +389,7 @@ def stage_lineage(chain: Sequence[DatasetRecord]) -> StageLineage:
             "el dataset raíz no tiene un origen de raíz",
             details={"dataset_id": chain[0].dataset_id, "source": str(chain[0].source)},
         )
-    return StageLineage(kind, chain[-1].lineage_round)
+    return kind
 
 
 def _require_links(links: "RecalibrationLinks | None") -> RecalibrationLinks:
@@ -495,7 +479,7 @@ def _error_of(exc: DomainError | ApplicationError) -> ErrorInfo:
     return ErrorInfo(code=exc.code, message=exc.message, details=exc.details)
 
 
-def _check_same_fit(limits: LimitsRecord, fit_id: str) -> None:
+def check_same_fit(limits: LimitsRecord, fit_id: str) -> None:
     """Exige que los límites se calibraran sobre el ajuste indicado.
 
     Args:
@@ -909,7 +893,6 @@ class RequestLimits:
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones (parámetros heredados de la cadena).
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
@@ -920,7 +903,6 @@ class RequestLimits:
     datasets: DatasetStorage
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
@@ -937,10 +919,8 @@ class RequestLimits:
     ) -> str:
         """Encola la calibración.
 
-        Como mucho una de las dos: ``params`` (Fase I) o ``recalibration_id`` (filas nuevas o
-        base ampliada de esa recalibración: hereda los parámetros de la versión base). En la Fase
-        I, ``params`` es obligatorio sobre un dataset sin ronda automática previa y opcional sobre
-        uno derivado de una depuración automática (se heredan; si se mandan, deben coincidir).
+        Exactamente una de las dos: ``params`` (Fase I) o ``recalibration_id`` (filas nuevas o
+        base ampliada de esa recalibración: hereda los parámetros de la versión base).
 
         Args:
             tenant_id: Tenant.
@@ -959,7 +939,6 @@ class RequestLimits:
             FitNotFoundError: Si el ajuste no existe.
             FitNotReadyError: Si no está ``succeeded``.
             RecalibrationMismatchError: Si el dataset no es de esa recalibración (o de ninguna).
-            LimitsParamsMismatchError: Si ``params`` difiere de los heredados de la cadena.
             DomainError: Si hay decisiones pendientes (``T2MRCD_DECISION_PENDING``) o los
                 parámetros de su estimador no son los que usará la carta
                 (``T2MRCD_FIT_PARAMS_MISMATCH`` en T²MRCD).
@@ -989,20 +968,17 @@ class RequestLimits:
     ) -> str:
         """Crea la calibración con parámetros ya codificados (lo usa también la tubería).
 
-        El linaje (y con él el hueco de semilla) se deduce del dataset del ajuste. En un
+        La operación (y con ella el hueco de semilla) se deduce del dataset del ajuste. En un
         dataset de recalibración los parámetros son los heredados de la sesión (``params`` se
-        ignora) y, sobre las candidatas sin depurar, se exige antes la exclusión humana si hay
-        anotaciones con causa asignable. En la Fase I, sobre un dataset derivado de una
-        depuración automática, los parámetros son los de los límites que lo produjeron: todas
-        las rondas de la cadena usan los mismos, como ``fit_phase1``. Las decisiones pendientes
+        ignora) y, sobre las candidatas, se exige antes la exclusión humana si hay anotaciones
+        con causa asignable. En la Fase I, ``params`` es obligatorio. Las decisiones pendientes
         de la carta se comprueban aquí, antes de encolar.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
             fit_id: Ajuste.
-            params: Parámetros de la carta codificados (``None`` en una recalibración o para
-                heredarlos de la cadena).
+            params: Parámetros de la carta codificados (``None`` en una recalibración).
             steps: Pasos de la carta (``None``: se resuelven).
             recalibration_id: Recalibración a la que pertenece el dataset, si es de una.
             limits_id: Identificador ya reservado.
@@ -1015,7 +991,6 @@ class RequestLimits:
             RecalibrationMismatchError: Si ``recalibration_id`` no es el del dataset.
             InvalidInputError: Si falta la exclusión humana de las candidatas o faltan los
                 parámetros.
-            LimitsParamsMismatchError: Si ``params`` difiere de los heredados de la cadena.
             DomainError: Si hay decisiones pendientes o el ajuste no casa con los parámetros.
         """
         resolved = steps if steps is not None else resolve_steps(self.steps, chart_id)
@@ -1047,11 +1022,14 @@ class RequestLimits:
                     details={"fit_id": fit_id, "reason": "human_exclusion_required"},
                 )
             params = dict(session.inherited_params)
-        else:
-            params = self._chain_params(tenant_id, chart_id, fit_id, chain, params)
+        elif params is None:
+            raise InvalidInputError(
+                "faltan los parámetros de la carta",
+                details={"field": "params", "reason": "params_required"},
+            )
         resolved.check_params(params)
         resolved.check_fit_params(fit.params, params)
-        lineage = stage_lineage(chain)
+        kind = stage_kind(chain)
         record = LimitsRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -1060,9 +1038,8 @@ class RequestLimits:
             status=JobStatus.QUEUED,
             params=params,
             seed=resolved.seed(params),
-            stage_kind=lineage.kind.value,
-            round=lineage.round,
-            spawn_key=resolved.stage_spawn_key(lineage),
+            stage_kind=kind.value,
+            spawn_key=resolved.stage_spawn_key(kind),
             created_at=self.clock.now(),
             recalibration_id=recalibration_id,
             pipeline_id=pipeline_id,
@@ -1070,98 +1047,6 @@ class RequestLimits:
         self.limits.add(record)
         self.queue.enqueue(JobRequest(JobKind.LIMITS, tenant_id, chart_id, record.limits_id))
         return record.limits_id
-
-    def _chain_params(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        fit_id: str,
-        chain: Sequence[DatasetRecord],
-        params: dict[str, object] | None,
-    ) -> dict[str, object]:
-        """Parámetros de una calibración de Fase I: los heredados de la cadena o los del cliente.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            fit_id: Ajuste (para los mensajes).
-            chain: Ascendencia del dataset del ajuste.
-            params: Parámetros del cliente codificados, o ``None``.
-
-        Returns:
-            Los parámetros de la calibración.
-
-        Raises:
-            InvalidInputError: Si faltan y no hay de dónde heredarlos.
-            LimitsParamsMismatchError: Si difieren de los heredados.
-        """
-        source = self._source_limits(tenant_id, chart_id, chain)
-        if source is None:
-            if params is None:
-                raise InvalidInputError(
-                    "faltan los parámetros de la carta: el dataset no viene de una ronda "
-                    "automática de la que heredarlos",
-                    details={"field": "params", "reason": "params_required"},
-                )
-            return params
-        inherited = dict(source.params)
-        if params is None:
-            return inherited
-        if params != inherited:
-            raise LimitsParamsMismatchError(
-                "los parámetros no son los de la cadena de Fase I del dataset",
-                details={
-                    "fit_id": fit_id,
-                    "source_limits_id": source.limits_id,
-                    "fields": _differing_fields(params, inherited),
-                },
-            )
-        return params
-
-    def _source_limits(
-        self, tenant_id: str, chart_id: str, chain: Sequence[DatasetRecord]
-    ) -> LimitsRecord | None:
-        """Límites de la última ronda automática de la ascendencia (``None`` si no hubo).
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            chain: Ascendencia desde la raíz.
-
-        Returns:
-            Los límites que produjeron el último dataset derivado de una ronda automática.
-        """
-        for derived in reversed(chain[1:]):
-            if derived.origin_ref is None:
-                continue
-            depuration = get_depuration(self.depurations, tenant_id, chart_id, derived.origin_ref)
-            if depuration.limits_id is not None:
-                return get_limits(self.limits, tenant_id, chart_id, depuration.limits_id)
-        return None
-
-
-def _differing_fields(
-    left: Mapping[str, object], right: Mapping[str, object], prefix: str = ""
-) -> list[str]:
-    """Campos (con su ruta ``a.b``) en que difieren dos parámetros codificados.
-
-    Args:
-        left: Unos parámetros.
-        right: Otros.
-        prefix: Ruta del diccionario actual.
-
-    Returns:
-        Las rutas distintas, ordenadas.
-    """
-    out: list[str] = []
-    for key in sorted(set(left) | set(right)):
-        a, b = left.get(key), right.get(key)
-        path = f"{prefix}{key}"
-        if isinstance(a, Mapping) and isinstance(b, Mapping):
-            out.extend(_differing_fields(a, b, f"{path}."))
-        elif a != b or (key in left) != (key in right):
-            out.append(path)
-    return out
 
 
 @dataclass(frozen=True)
@@ -1241,7 +1126,7 @@ class RunLimitsJob:
                 dataset.data,
                 fit.result,
                 record.params,
-                lineage=StageLineage(StageKind(record.stage_kind), record.round),
+                kind=StageKind(record.stage_kind),
                 mapper=self.mapper,
             )
         except (DomainError, ApplicationError) as exc:
@@ -1279,7 +1164,7 @@ class RunLimitsJob:
         notify_pipeline(self.queue, record.tenant_id, record.chart_id, record.pipeline_id)
 
 
-# --- depuración ----------------------------------------------------------------------------------
+# --- exclusión humana ----------------------------------------------------------------------------
 
 
 def human_mask(causes: Sequence[AssignableCause], n: int) -> BoolVector:
@@ -1312,15 +1197,13 @@ def human_mask(causes: Sequence[AssignableCause], n: int) -> BoolVector:
 
 
 @dataclass(frozen=True)
-class RequestDepuration:
-    """Valida y encola una depuración de un ajuste (``/depurations``).
+class RequestExclusion:
+    """Valida y encola una exclusión humana de un dataset (``/exclusions``).
 
     Attributes:
         steps: Pasos de Fase I por carta.
         datasets: Almacenamiento.
-        fits: Repositorio de ajustes.
-        limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
+        exclusions: Repositorio de exclusiones.
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
@@ -1329,9 +1212,7 @@ class RequestDepuration:
 
     steps: Phase1StepsRegistry
     datasets: DatasetStorage
-    fits: FitRepository
-    limits: LimitsRepository
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
@@ -1341,87 +1222,40 @@ class RequestDepuration:
         self,
         tenant_id: str,
         chart_id: str,
-        *,
-        dataset_id: str | None = None,
-        fit_id: str | None = None,
-        limits_id: str | None = None,
+        dataset_id: str,
         assignable_cause: Sequence[AssignableCause] = (),
-        depuration_id: str | None = None,
+        *,
+        exclusion_id: str | None = None,
         pipeline_id: str | None = None,
     ) -> str:
-        """Encola la depuración.
+        """Encola la exclusión humana.
 
-        Dos formas, exactamente una:
-
-        - Exclusión humana ``{dataset_id, assignable_cause}``: referencia el dataset, sin ajuste
-          (las filas con causa asignable se quitan antes de ajustar nada, como en
-          ``fit_phase1``). Solo al principio: sobre un dataset sin rondas automáticas en su
-          ascendencia. Sobre las candidatas de una recalibración la exclusión **no** la manda el
-          cliente: ``{dataset_id}`` solo, y se toma de las anotaciones con causa asignable
-          confirmada (solo sobre el dataset de candidatas sin depurar).
-        - Ronda automática ``{fit_id, limits_id}``: límites ``succeeded`` del mismo ajuste.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            dataset_id: Dataset de la exclusión humana.
-            fit_id: Ajuste ``succeeded`` de la ronda automática.
-            limits_id: Límites ``succeeded`` del mismo ajuste.
-            assignable_cause: Filas del dataset con causa asignable (exclusión humana).
-            depuration_id: Identificador ya reservado (tubería).
-            pipeline_id: Tubería que la pide.
-
-        Returns:
-            El ``depuration_id``.
-
-        Raises:
-            UnknownChartError: Si la carta no expone pasos.
-            DatasetNotFoundError: Si el dataset no existe.
-            FitNotFoundError: Si el ajuste no existe.
-            FitNotReadyError: Si no está ``succeeded``.
-            LimitsNotFoundError: Si los límites no existen.
-            LimitsNotReadyError: Si no están ``succeeded``.
-            LimitsFitMismatchError: Si los límites son de otro ajuste.
-            InvalidInputError: Si no es exactamente una de las dos formas, una fila es inválida,
-                la exclusión humana no es al principio o deja el dataset vacío.
-            RecalibrationNotInProgressError: Si la recalibración del dataset ya terminó.
-        """
-        resolve_steps(self.steps, chart_id)
-        causes = tuple(assignable_cause)
-        if dataset_id is not None and fit_id is None and limits_id is None:
-            return self._human(tenant_id, chart_id, dataset_id, causes, depuration_id, pipeline_id)
-        if dataset_id is None and fit_id is not None and limits_id is not None and not causes:
-            return self._automatic(
-                tenant_id, chart_id, fit_id, limits_id, depuration_id, pipeline_id
-            )
-        raise InvalidInputError(
-            "una depuración se pide con {dataset_id, assignable_cause} (exclusión humana) o "
-            "con {fit_id, limits_id} (ronda automática)",
-            details={"field": "dataset_id", "reason": "one_of_human_or_automatic"},
-        )
-
-    def _human(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        dataset_id: str,
-        causes: tuple[AssignableCause, ...],
-        depuration_id: str | None,
-        pipeline_id: str | None,
-    ) -> str:
-        """Valida y encola una exclusión humana (sin ajuste).
+        Referencia el dataset, sin ajuste: las filas con causa asignable se quitan antes de
+        ajustar nada, como en ``fit_phase1``. En la Fase I, solo sobre el dataset subido (al
+        principio) y con las filas del cliente. Sobre las candidatas de una recalibración las
+        filas **no** las manda el cliente: se toman de las anotaciones con causa asignable
+        confirmada.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
             dataset_id: Dataset.
-            causes: Filas del cliente con causa asignable.
-            depuration_id: Identificador reservado o ``None``.
+            assignable_cause: Filas del dataset con causa asignable (vacías al recalibrar).
+            exclusion_id: Identificador ya reservado (tubería).
             pipeline_id: Tubería que la pide.
 
         Returns:
-            El ``depuration_id``.
+            El ``exclusion_id``.
+
+        Raises:
+            UnknownChartError: Si la carta no expone pasos.
+            DatasetNotFoundError: Si el dataset no existe.
+            InvalidInputError: Si faltan las filas, una fila es inválida, la exclusión no es al
+                principio o deja el dataset vacío (``details.reason``).
+            RecalibrationNotInProgressError: Si la recalibración del dataset ya terminó.
         """
+        resolve_steps(self.steps, chart_id)
+        causes = tuple(assignable_cause)
         dataset = get_dataset(self.datasets, tenant_id, dataset_id)
         chain = dataset_chain(self.datasets, dataset)
         session = recalibration_session(self.recalibration, tenant_id, chart_id, chain)
@@ -1429,81 +1263,33 @@ class RequestDepuration:
             causes = self._recalibration_causes(session, chain, causes)
             human_mask(causes, dataset.data.shape[0])
         else:
-            self._check_human(tenant_id, chart_id, chain, causes)
-        return self._add(
-            tenant_id, chart_id, dataset, None, None, causes, depuration_id, pipeline_id
+            self._check_phase1(chain, causes)
+        record = ExclusionRecord(
+            tenant_id=tenant_id,
+            chart_id=chart_id,
+            exclusion_id=exclusion_id if exclusion_id is not None else self.ids.new_id(),
+            dataset_id=dataset.dataset_id,
+            status=JobStatus.QUEUED,
+            assignable_cause=causes,
+            created_at=self.clock.now(),
+            pipeline_id=pipeline_id,
         )
+        self.exclusions.add(record)
+        self.queue.enqueue(JobRequest(JobKind.EXCLUSION, tenant_id, chart_id, record.exclusion_id))
+        return record.exclusion_id
 
-    def _automatic(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        fit_id: str,
-        limits_id: str,
-        depuration_id: str | None,
-        pipeline_id: str | None,
-    ) -> str:
-        """Valida y encola una ronda automática.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            fit_id: Ajuste.
-            limits_id: Límites del mismo ajuste.
-            depuration_id: Identificador reservado o ``None``.
-            pipeline_id: Tubería que la pide.
-
-        Returns:
-            El ``depuration_id``.
-
-        Raises:
-            InvalidInputError: Si la recalibración no admite la ronda (base ampliada o falta la
-                exclusión humana de las candidatas).
-        """
-        fit = ready_fit(self.fits, tenant_id, chart_id, fit_id)
-        dataset = get_dataset(self.datasets, tenant_id, fit.dataset_id)
-        chain = dataset_chain(self.datasets, dataset)
-        session = recalibration_session(self.recalibration, tenant_id, chart_id, chain)
-        if session is not None:
-            reason: str | None = None
-            if chain[0].source is DatasetSource.RECALIBRATION_EXTENSION:
-                reason = "extension_is_not_depurated"
-            elif len(chain) == 1 and _require_links(self.recalibration).human_causes(session):
-                reason = "human_exclusion_required"
-            if reason is not None:
-                raise InvalidInputError(
-                    "depuración no admitida en esta recalibración"
-                    if reason == "extension_is_not_depurated"
-                    else "hay candidatas con causa asignable: primero la exclusión humana",
-                    details={"recalibration_id": session.recalibration_id, "reason": reason},
-                )
-        _check_same_fit(ready_limits(self.limits, tenant_id, chart_id, limits_id), fit_id)
-        return self._add(
-            tenant_id, chart_id, dataset, fit_id, limits_id, (), depuration_id, pipeline_id
-        )
-
-    def _check_human(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        chain: Sequence[DatasetRecord],
-        causes: tuple[AssignableCause, ...],
+    def _check_phase1(
+        self, chain: Sequence[DatasetRecord], causes: tuple[AssignableCause, ...]
     ) -> None:
         """Valida una exclusión humana de Fase I: al principio, con filas y sin vaciar el dataset.
 
-        Como en ``fit_phase1`` (``docs/metodos/t2mrcd.md``), las filas con causa asignable se
-        quitan antes de la depuración automática: no se admite sobre un dataset con rondas
-        automáticas en su ascendencia.
-
         Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
             chain: Ascendencia del dataset.
             causes: Filas con causa asignable.
 
         Raises:
-            InvalidInputError: Si no hay filas, no es al principio, una fila es inválida o quita
-                todas.
+            InvalidInputError: Si no hay filas, no es sobre el dataset subido, una fila es
+                inválida o quita todas.
         """
         dataset = chain[-1]
         if not causes:
@@ -1511,16 +1297,9 @@ class RequestDepuration:
                 "una exclusión humana lleva 'assignable_cause'",
                 details={"field": "assignable_cause", "reason": "assignable_cause_required"},
             )
-        automatic = any(
-            get_depuration(self.depurations, tenant_id, chart_id, d.origin_ref).limits_id
-            is not None
-            for d in chain[1:]
-            if d.origin_ref is not None
-        )
-        if dataset.lineage_round != 0 or automatic:
+        if len(chain) != 1:
             raise InvalidInputError(
-                "la exclusión humana solo se admite al principio, antes de la depuración "
-                "automática",
+                "la exclusión humana solo se admite al principio, sobre el dataset subido",
                 details={
                     "dataset_id": dataset.dataset_id,
                     "reason": "human_exclusion_only_at_start",
@@ -1550,123 +1329,62 @@ class RequestDepuration:
             Las filas excluidas por una persona.
 
         Raises:
-            InvalidInputError: Si el cliente manda filas, la base ampliada se depura o la
-                exclusión humana no es sobre las candidatas sin depurar.
+            InvalidInputError: Si el cliente manda filas o la exclusión no es sobre las
+                candidatas.
         """
         links = _require_links(self.recalibration)
         reason: str | None = None
         if causes:
             reason = "assignable_cause_from_annotations"
-        elif chain[0].source is DatasetSource.RECALIBRATION_EXTENSION:
-            reason = "extension_is_not_depurated"
-        elif len(chain) != 1:
+        elif chain[0].source is not DatasetSource.RECALIBRATION_CANDIDATES or len(chain) != 1:
             reason = "human_exclusion_only_on_candidates"
         if reason is not None:
             raise InvalidInputError(
-                "depuración no admitida en esta recalibración",
+                "exclusión no admitida en esta recalibración",
                 details={"recalibration_id": session.recalibration_id, "reason": reason},
             )
         return links.human_causes(session)
 
-    def _add(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        dataset: DatasetRecord,
-        fit_id: str | None,
-        limits_id: str | None,
-        causes: tuple[AssignableCause, ...],
-        depuration_id: str | None,
-        pipeline_id: str | None,
-    ) -> str:
-        """Guarda la depuración ``queued`` y la encola.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            dataset: Dataset depurado.
-            fit_id: Ajuste (ronda automática) o ``None``.
-            limits_id: Límites (ronda automática) o ``None``.
-            causes: Exclusión humana.
-            depuration_id: Identificador reservado o ``None``.
-            pipeline_id: Tubería que la pide.
-
-        Returns:
-            El ``depuration_id``.
-        """
-        record = DepurationRecord(
-            tenant_id=tenant_id,
-            chart_id=chart_id,
-            depuration_id=depuration_id if depuration_id is not None else self.ids.new_id(),
-            dataset_id=dataset.dataset_id,
-            status=JobStatus.QUEUED,
-            assignable_cause=causes,
-            round=dataset.lineage_round,
-            created_at=self.clock.now(),
-            fit_id=fit_id,
-            limits_id=limits_id,
-            pipeline_id=pipeline_id,
-        )
-        self.depurations.add(record)
-        self.queue.enqueue(
-            JobRequest(JobKind.DEPURATION, tenant_id, chart_id, record.depuration_id)
-        )
-        return record.depuration_id
-
 
 @dataclass(frozen=True)
-class GetDepuration:
-    """Consulta una depuración.
+class GetExclusion:
+    """Consulta una exclusión.
 
     Attributes:
         steps: Pasos de Fase I por carta.
-        depurations: Repositorio.
+        exclusions: Repositorio.
     """
 
     steps: Phase1StepsRegistry
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
 
-    def execute(self, tenant_id: str, chart_id: str, depuration_id: str) -> DepurationRecord:
-        """Devuelve la depuración.
+    def execute(self, tenant_id: str, chart_id: str, exclusion_id: str) -> ExclusionRecord:
+        """Devuelve la exclusión.
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración.
+            exclusion_id: Exclusión.
 
         Returns:
             El registro.
 
         Raises:
             UnknownChartError: Si la carta no expone pasos.
-            DepurationNotFoundError: Si no existe.
+            ExclusionNotFoundError: Si no existe.
         """
         resolve_steps(self.steps, chart_id)
-        return get_depuration(self.depurations, tenant_id, chart_id, depuration_id)
+        return get_exclusion(self.exclusions, tenant_id, chart_id, exclusion_id)
 
 
 @dataclass(frozen=True)
-class _DepurationResult:
-    """Lo que una depuración terminada guarda."""
-
-    disposition: tuple[RowDisposition, ...]
-    kept: BoolVector
-    automatic_removed: bool
-    converged: bool | None
-    final: bool
-    exhausted: bool
-
-
-@dataclass(frozen=True)
-class RunDepurationJob:
-    """Ejecuta una depuración encolada (carril ``calibration``; no ajusta nada).
+class RunExclusionJob:
+    """Ejecuta una exclusión encolada (carril ``light``; no ajusta nada).
 
     Attributes:
         steps: Pasos de Fase I por carta.
         datasets: Almacenamiento (recibe el dataset derivado).
-        fits: Repositorio de ajustes.
-        limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
+        exclusions: Repositorio de exclusiones.
         queue: Cola (aviso a la tubería).
         ids: Identificadores (dataset derivado).
         clock: Reloj.
@@ -1675,9 +1393,7 @@ class RunDepurationJob:
 
     steps: Phase1StepsRegistry
     datasets: DatasetStorage
-    fits: FitRepository
-    limits: LimitsRepository
-    depurations: DepurationRepository
+    exclusions: ExclusionRepository
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
@@ -1686,143 +1402,87 @@ class RunDepurationJob:
     def execute(self, job: JobRequest) -> None:
         """Ejecuta el trabajo; idempotente.
 
+        Crea el dataset derivado ``parent[kept]``. En una recalibración, si quedan menos filas
+        que ``min_observations``, no lo crea y cierra la recalibración ``insufficient``.
+
         Args:
-            job: Petición ``depuration``.
+            job: Petición ``exclusion``.
 
         Raises:
-            ValueError: Si ``job`` no es de tipo ``depuration``.
+            ValueError: Si ``job`` no es de tipo ``exclusion``.
             UnknownChartError: Si la carta no expone pasos.
-            DepurationNotFoundError: Si la depuración no existe.
+            ExclusionNotFoundError: Si la exclusión no existe.
         """
-        _check_kind(job, JobKind.DEPURATION, "RunDepurationJob")
-        steps = resolve_steps(self.steps, job.scope)
-        get_depuration(self.depurations, job.tenant_id, job.scope, job.resource_id)
-        record = self.depurations.claim(job.tenant_id, job.scope, job.resource_id, self.clock.now())
+        _check_kind(job, JobKind.EXCLUSION, "RunExclusionJob")
+        resolve_steps(self.steps, job.scope)
+        get_exclusion(self.exclusions, job.tenant_id, job.scope, job.resource_id)
+        record = self.exclusions.claim(job.tenant_id, job.scope, job.resource_id, self.clock.now())
         if record is None:
             return
         try:
             dataset = get_dataset(self.datasets, job.tenant_id, record.dataset_id)
             chain = dataset_chain(self.datasets, dataset)
             session = recalibration_session(self.recalibration, job.tenant_id, job.scope, chain)
-            result = self._evaluate(steps, record, dataset, session)
-            output_id = self._derive(record, dataset, result)
-            next_step = (
-                None if result.exhausted else NextStep.MODEL if result.final else NextStep.FIT
-            )
-            done = replace(
-                record,
-                result=result.disposition,
-                converged=result.converged,
-                final=result.final,
-                exhausted=result.exhausted,
-                output_dataset_id=output_id,
-                next_step=next_step,
-            )
-            if session is not None and result.exhausted:
-                # Menos filas que ``min_observations``: la recalibración termina INSUFFICIENT.
-                _require_links(self.recalibration).close_insufficient(session, chain, done)
-        except (DomainError, ApplicationError) as exc:
-            self._close(record, error=_error_of(exc))
-            return
-        except Exception:
-            self._close(record, error=ErrorInfo(INTERNAL_ERROR, "error interno en la depuración"))
-            raise
-        self._close(done)
-
-    def _evaluate(
-        self,
-        steps: Phase1Steps,
-        record: DepurationRecord,
-        dataset: DatasetRecord,
-        session: RecalibrationRecord | None,
-    ) -> _DepurationResult:
-        """Exclusión humana (sin ajuste) o ronda automática (con su ajuste y sus límites).
-
-        En una recalibración las rondas máximas y el mínimo de filas son los de sus parámetros
-        (``min_observations``): si la exclusión humana o una ronda dejan menos, se agota.
-
-        Args:
-            steps: Pasos de la carta.
-            record: Depuración.
-            dataset: Dataset depurado.
-            session: Recalibración a la que pertenece, o ``None`` (Fase I).
-
-        Returns:
-            El resultado.
-        """
-        n = dataset.data.shape[0]
-        max_rounds, min_rows = (
-            (None, 1) if session is None else _require_links(self.recalibration).bounds(session)
-        )
-        if record.limits_id is None or record.fit_id is None:
-            human = human_mask(record.assignable_cause, n)
+            human = human_mask(record.assignable_cause, dataset.data.shape[0])
             disposition = tuple(
                 RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE if h else RowDisposition.KEPT
                 for h in human.tolist()
             )
-            short = session is not None and int((~human).sum()) < min_rows
-            return _DepurationResult(disposition, ~human, False, None, short, short)
-        fit = ready_fit(self.fits, record.tenant_id, record.chart_id, record.fit_id)
-        limits = ready_limits(self.limits, record.tenant_id, record.chart_id, record.limits_id)
-        clean = limits.clean_rows if limits.clean_rows is not None else np.zeros(0, np.bool_)
-        outcome = steps.depurate(
-            dataset.data,
-            fit.result,
-            Calibration(limits=limits.result, clean=clean),
-            limits.params,
-            round_index=record.round,
-            max_rounds=max_rounds,
-            min_rows=min_rows,
-        )
-        disposition = tuple(
-            RowDisposition.EXCLUDED_AUTOMATIC if a else RowDisposition.KEPT
-            for a in outcome.excluded_automatic.tolist()
-        )
-        removed = bool(outcome.excluded_automatic.any())
-        return _DepurationResult(
-            disposition, outcome.kept, removed, outcome.converged, outcome.final, outcome.exhausted
-        )
+            insufficient = session is not None and int((~human).sum()) < _require_links(
+                self.recalibration
+            ).min_observations(session)
+            output_id = None if insufficient else self._derive(record, dataset, ~human)
+            done = replace(
+                record,
+                result=disposition,
+                insufficient=insufficient,
+                output_dataset_id=output_id,
+            )
+            if session is not None and insufficient:
+                _require_links(self.recalibration).close_insufficient(session, done)
+        except (DomainError, ApplicationError) as exc:
+            self._close(record, error=_error_of(exc))
+            return
+        except Exception:
+            self._close(record, error=ErrorInfo(INTERNAL_ERROR, "error interno en la exclusión"))
+            raise
+        self._close(done)
 
-    def _derive(
-        self, record: DepurationRecord, dataset: DatasetRecord, result: _DepurationResult
-    ) -> str | None:
-        """Crea el dataset derivado ``parent[kept]`` si la depuración quitó filas.
+    def _derive(self, record: ExclusionRecord, dataset: DatasetRecord, kept: BoolVector) -> str:
+        """Crea el dataset derivado ``parent[kept]``.
 
         Args:
-            record: Depuración.
-            dataset: Dataset depurado (el padre).
-            result: Resultado.
+            record: Exclusión.
+            dataset: Dataset de entrada (el padre).
+            kept: Filas conservadas.
 
         Returns:
-            El id del dataset derivado, o ``None`` si no se crea (final o agotada).
+            El id del dataset derivado.
         """
-        if result.final or result.exhausted:
-            return None
-        rows = np.flatnonzero(result.kept).astype(np.int64)
+        rows = np.flatnonzero(kept).astype(np.int64)
         data = frozen_base(np.ascontiguousarray(dataset.data[rows], dtype=np.float64))
         derived = DatasetRecord(
             tenant_id=record.tenant_id,
             dataset_id=self.ids.new_id(),
             data=data,
             content_hash=base_content_hash(data),
-            source=DatasetSource.DEPURATION_OUTPUT,
+            source=DatasetSource.EXCLUSION_OUTPUT,
             created_at=self.clock.now(),
             parent_id=dataset.dataset_id,
             rows=rows,
-            lineage_round=dataset.lineage_round + (1 if result.automatic_removed else 0),
-            origin_ref=record.depuration_id,
+            origin_ref=record.exclusion_id,
         )
         self.datasets.add(derived)
         return derived.dataset_id
 
-    def _close(self, record: DepurationRecord, *, error: ErrorInfo | None = None) -> None:
-        """Cierra la depuración y avisa a su tubería.
+    def _close(self, record: ExclusionRecord, *, error: ErrorInfo | None = None) -> None:
+        """Cierra la exclusión y avisa a su tubería.
 
         Args:
             record: Registro (con el resultado si terminó bien).
             error: Error si falló.
         """
-        self.depurations.update(
+        self.exclusions.update(
             replace(
                 record,
                 status=JobStatus.FAILED if error is not None else JobStatus.SUCCEEDED,
@@ -1845,7 +1505,6 @@ class RequestModel:
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
         models: Repositorio de modelos.
         queue: Cola.
         ids: Identificadores.
@@ -1856,7 +1515,6 @@ class RequestModel:
     datasets: DatasetStorage
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
     models: ModelRepository
     queue: JobQueue
     ids: IdGenerator
@@ -1867,24 +1525,19 @@ class RequestModel:
         tenant_id: str,
         chart_id: str,
         *,
-        depuration_id: str | None = None,
-        fit_id: str | None = None,
-        limits_id: str | None = None,
+        fit_id: str,
+        limits_id: str,
         lifecycle_policy: LifecyclePolicy | None = None,
         model_id: str | None = None,
         pipeline_id: str | None = None,
     ) -> str:
-        """Encola el ensamblado.
-
-        Formas: ``{depuration_id}`` (la depuración final de la cadena) o ``{fit_id, limits_id}``
-        (sin más depuración automática: la ronda se toma como final).
+        """Encola el ensamblado con ``{fit_id, limits_id}`` (el ajuste y sus límites).
 
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
-            depuration_id: Depuración final.
-            fit_id: Ajuste final.
-            limits_id: Límites finales del mismo ajuste.
+            fit_id: Ajuste (del dataset subido o de su exclusión humana).
+            limits_id: Límites del mismo ajuste.
             lifecycle_policy: Política de revalidación (``None``: la de por defecto).
             model_id: Identificador ya reservado (tubería).
             pipeline_id: Tubería que lo pide.
@@ -1894,57 +1547,23 @@ class RequestModel:
 
         Raises:
             UnknownChartError: Si la carta no expone pasos.
-            InvalidInputError: Si no es exactamente una de las dos formas.
-            DepurationNotFoundError: Si la depuración no existe.
-            DepurationNotFinalError: Si no está ``succeeded`` o no es final.
             FitNotFoundError: Si el ajuste no existe.
             FitNotReadyError: Si no está ``succeeded``.
             LimitsNotFoundError: Si los límites no existen.
             LimitsNotReadyError: Si no están ``succeeded``.
             LimitsFitMismatchError: Si los límites son de otro ajuste.
+            RecalibrationMismatchError: Si el ajuste es de una recalibración.
         """
         resolve_steps(self.steps, chart_id)
-        refs = fit_id is not None or limits_id is not None
-        final_depuration: str | None = None
-        if depuration_id is not None and not refs:
-            depuration = get_depuration(self.depurations, tenant_id, chart_id, depuration_id)
-            if (
-                depuration.status is not JobStatus.SUCCEEDED
-                or not depuration.final
-                or depuration.exhausted
-                or depuration.fit_id is None
-                or depuration.limits_id is None
-            ):
-                raise DepurationNotFinalError(
-                    f"la depuración '{depuration_id}' no es la final de su cadena",
-                    details={
-                        "depuration_id": depuration_id,
-                        "status": str(depuration.status),
-                        "final": depuration.final,
-                        "exhausted": depuration.exhausted,
-                    },
-                )
-            fit_ref, limits_ref = depuration.fit_id, depuration.limits_id
-            final_depuration = depuration_id
-        elif depuration_id is None and fit_id is not None and limits_id is not None:
-            fit_ref, limits_ref = fit_id, limits_id
-        else:
-            raise InvalidInputError(
-                "un modelo se pide con {depuration_id} o con {fit_id, limits_id}",
-                details={"field": "depuration_id", "reason": "one_of_depuration_or_fit_limits"},
-            )
-        fit = ready_fit(self.fits, tenant_id, chart_id, fit_ref)
-        limits = ready_limits(self.limits, tenant_id, chart_id, limits_ref)
-        _check_same_fit(limits, fit_ref)
+        fit = ready_fit(self.fits, tenant_id, chart_id, fit_id)
+        limits = ready_limits(self.limits, tenant_id, chart_id, limits_id)
+        check_same_fit(limits, fit_id)
         chain = dataset_chain(self.datasets, get_dataset(self.datasets, tenant_id, fit.dataset_id))
         if chain[0].source in _RECALIBRATION_ROOTS:
             raise RecalibrationMismatchError(
                 "un modelo de Fase I no se ensambla con datos de una recalibración",
-                details={"fit_id": fit_ref, "reason": "recalibration_dataset"},
+                details={"fit_id": fit_id, "reason": "recalibration_dataset"},
             )
-        depurations = tuple(d.origin_ref for d in chain[1:] if d.origin_ref is not None)
-        if final_depuration is not None:
-            depurations += (final_depuration,)
         record = ModelRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -1958,9 +1577,9 @@ class RequestModel:
             else LifecyclePolicy(),
             provenance=ModelProvenance(
                 root_dataset_id=chain[0].dataset_id,
-                fit_id=fit_ref,
-                limits_id=limits_ref,
-                depuration_ids=depurations,
+                fit_id=fit_id,
+                limits_id=limits_id,
+                exclusion_id=chain[-1].origin_ref if len(chain) > 1 else None,
             ),
             pipeline_id=pipeline_id,
         )
@@ -1973,15 +1592,14 @@ class RequestModel:
 class RunModelAssemblyJob:
     """Ensambla un modelo encolado y crea su versión 0 (carril ``light``).
 
-    Recorre el linaje del dataset del ajuste hasta la raíz para obtener las máscaras de la base y
-    de las exclusiones humana y automática sobre el histórico raíz.
+    Recorre el linaje del dataset del ajuste hasta la raíz: las filas de la raíz que no llegan al
+    dataset del ajuste son las de la exclusión humana.
 
     Attributes:
         steps: Pasos de Fase I por carta.
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        depurations: Repositorio de depuraciones.
         models: Repositorio de modelos.
         versions: Repositorio de versiones (recibe la versión 0).
         queue: Cola (aviso a la tubería).
@@ -1992,7 +1610,6 @@ class RunModelAssemblyJob:
     datasets: DatasetStorage
     fits: FitRepository
     limits: LimitsRepository
-    depurations: DepurationRepository
     models: ModelRepository
     versions: ModelVersionRepository
     queue: JobQueue
@@ -2049,75 +1666,16 @@ class RunModelAssemblyJob:
         fit = ready_fit(self.fits, tenant, chart, provenance.fit_id)
         limits = ready_limits(self.limits, tenant, chart, provenance.limits_id)
         chain = dataset_chain(self.datasets, get_dataset(self.datasets, tenant, fit.dataset_id))
-        indices = root_indices(chain)
-        n_root = chain[0].data.shape[0]
-        human = np.zeros(n_root, dtype=np.bool_)
-        automatic = np.zeros(n_root, dtype=np.bool_)
-        for parent_rows, derived in zip(indices[:-1], chain[1:], strict=True):
-            if derived.origin_ref is None:
-                continue
-            depuration = get_depuration(self.depurations, tenant, chart, derived.origin_ref)
-            for i, disposition in enumerate(depuration.result or ()):
-                if disposition is RowDisposition.EXCLUDED_ASSIGNABLE_CAUSE:
-                    human[parent_rows[i]] = True
-                elif disposition is RowDisposition.EXCLUDED_AUTOMATIC:
-                    automatic[parent_rows[i]] = True
-        kept = np.zeros(n_root, dtype=np.bool_)
-        kept[indices[-1]] = True
+        excluded = np.ones(chain[0].data.shape[0], dtype=np.bool_)
+        excluded[root_indices(chain)[-1]] = False
         clean = limits.clean_rows if limits.clean_rows is not None else np.zeros(0, np.bool_)
-        calibration = Calibration(limits=limits.result, clean=clean)
-        final = provenance.depuration_ids[-1:] if provenance.depuration_ids else ()
-        converged = self._converged(steps, final, chain[-1], fit, calibration, limits)
         return steps.assemble_initial_model(
             chain[0].data,
             limits.params,
             fit.result,
-            calibration,
-            kept=kept,
-            excluded=human,
-            automatic=automatic,
-            rounds=chain[-1].lineage_round,
-            converged=converged,
+            Calibration(limits=limits.result, clean=clean),
+            excluded=excluded,
         )
-
-    def _converged(
-        self,
-        steps: Phase1Steps,
-        final: tuple[str, ...],
-        dataset: DatasetRecord,
-        fit: FitRecord,
-        calibration: Calibration,
-        limits: LimitsRecord,
-    ) -> bool:
-        """Convergencia de la ronda final.
-
-        Si la última depuración de la cadena evaluó este ajuste, su ``converged``; si no (modelo
-        pedido con ``{fit_id, limits_id}``), se evalúa la ronda sin quitar filas.
-
-        Args:
-            steps: Pasos de la carta.
-            final: La última depuración de la procedencia (vacía si no hay).
-            dataset: Dataset del ajuste final.
-            fit: Ajuste final.
-            calibration: Calibración final.
-            limits: Límites finales.
-
-        Returns:
-            ``True`` si ninguna fila de la base supera el límite.
-        """
-        if final:
-            depuration = get_depuration(self.depurations, fit.tenant_id, fit.chart_id, final[0])
-            if depuration.fit_id == fit.fit_id and depuration.converged is not None:
-                return depuration.converged
-        outcome = steps.depurate(
-            dataset.data,
-            fit.result,
-            calibration,
-            limits.params,
-            round_index=dataset.lineage_round,
-            evaluate_only=True,
-        )
-        return outcome.converged
 
     def _close(
         self,

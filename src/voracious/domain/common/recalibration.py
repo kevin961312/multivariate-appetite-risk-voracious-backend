@@ -1,7 +1,7 @@
 """Vocabulario común de la recalibración de una carta (Fase II → nueva versión del modelo).
 
 Solo enumeraciones y el contenedor del resultado; cómo decide cada carta (umbral, pruebas de
-cambio, depuración) vive en su paquete (``domain/charts/<carta>/``). Sin lógica estadística.
+cambio) vive en su paquete (``domain/charts/<carta>/``). Sin lógica estadística.
 """
 
 from dataclasses import dataclass
@@ -27,7 +27,7 @@ class RecalibrationDecision(StrEnum):
 
 
 class RowDisposition(StrEnum):
-    """Destino de cada fila en una recalibración o en la depuración de Fase I."""
+    """Destino de cada fila en una recalibración o en la exclusión humana de Fase I."""
 
     KEPT = "kept"
     """Conservada en la base."""
@@ -35,11 +35,8 @@ class RowDisposition(StrEnum):
     EXCLUDED_ASSIGNABLE_CAUSE = "excluded_assignable_cause"
     """Excluida por una persona: causa asignable confirmada."""
 
-    EXCLUDED_AUTOMATIC = "excluded_automatic"
-    """Excluida por la depuración automática (T² por encima del límite de Fase I)."""
-
     ALREADY_IN_BASE = "already_in_base"
-    """Fila de la base vigente (no se vuelve a depurar al recalibrar)."""
+    """Fila de la base vigente (no se vuelve a pasar como nueva al recalibrar)."""
 
 
 @dataclass(frozen=True, eq=False)

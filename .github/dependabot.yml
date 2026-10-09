@@ -1,0 +1,23 @@
+# M5 (Paso 4): propuestas de subida de lo que está fijado por versión o digest. Ninguna se aplica
+# sola: cada PR pasa la compuerta (ci.yml). Subir numpy/scipy exige volver a pasar los golden de
+# pymrcd (cotas de packages/pymrcd/pyproject.toml, ADR 0006).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

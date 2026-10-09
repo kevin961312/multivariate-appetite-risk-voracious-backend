@@ -1,0 +1,190 @@
+# CI de Voracious (Paso 4.1). La compuerta es la misma que en local y en el pre-commit
+# (scripts/gate.sh), aquí en Linux x86-64 con gcc. Ningún trabajo publica imágenes ni artefactos
+# fuera de GitHub (pymrcd es GPL-3.0-or-later; la imagen se construye donde se usa).
+# Acciones fijadas por SHA (M5); Dependabot propone las subidas (.github/dependabot.yml).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.23"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  gate:
+    name: compuerta (scripts/gate.sh)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Python
+        run: uv python install "${PYTHON_VERSION}"
+      - name: Dependencias (uv.lock al día con pyproject.toml)
+        run: uv sync --locked
+      - name: Traza de la plataforma
+        run: |
+          uname -a
+          gcc --version
+          echo "CFLAGS del entorno: ${CFLAGS:-<vacío>}"
+          uv run --no-sync python -c "import sysconfig; print('CC:', sysconfig.get_config_var('CC')); print('CFLAGS:', sysconfig.get_config_var('CFLAGS'))"
+          uv run --no-sync python -c "import numpy; numpy.show_config()"
+      - name: Compuerta
+        run: scripts/gate.sh
+      - name: Logs de la compuerta
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gates-${{ github.run_id }}
+          path: .gates/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+
+  image:
+    name: imagen runtime (sin publicar)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: docker-compose.yml válido
+        run: docker compose config --quiet
+      - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
+        run: docker build --progress=plain --target runtime -t voracious:ci .
+      - name: Arranque en solo lectura
+        run: |
+          docker run -d --name voracious --read-only --tmpfs /tmp \
+            -p 127.0.0.1:8000:8000 voracious:ci
+      - name: /health, /ready, HEALTHCHECK, usuario y compilador
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/health
+          echo
+          curl -fsS http://127.0.0.1:8000/ready
+          echo
+          uid=$(docker exec voracious id -u)
+          echo "uid: ${uid}"
+          test "${uid}" != "0"
+          if docker exec voracious sh -c 'command -v gcc || command -v cc'; then
+            echo "la imagen runtime no debe tener compilador"
+            exit 1
+          fi
+          for _ in $(seq 1 30); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' voracious)
+            [ "${status}" = healthy ] && break
+            sleep 3
+          done
+          echo "HEALTHCHECK: ${status}"
+          test "${status}" = healthy
+      - name: Logs del contenedor
+        if: always()
+        run: |
+          docker logs voracious || true
+          docker rm -f voracious || true
+
+  sanitizers:
+    # M2: la extensión C de pymrcd con ASan y UBSan; cualquier aviso aborta (-fno-sanitize-recover).
+    # Las opciones obligatorias de setup.py (-O2 -std=c11 -ffp-contract=off ...) van al final de la
+    # línea de compilación, después de estas CFLAGS, y por tanto prevalecen.
+    name: pymrcd con ASan/UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CC: gcc
+      CFLAGS: -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all
+      LDFLAGS: -fsanitize=address,undefined
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          # Caché aparte: aquí pymrcd se compila con sanitizadores.
+          cache-suffix: sanitizers
+      - name: Python
+        run: uv python install "${PYTHON_VERSION}"
+      - name: Compilar pymrcd con sanitizadores
+        # Sin packages/pymrcd/build: setuptools reutiliza los .o si las fuentes no cambiaron, aunque
+        # cambien las CFLAGS.
+        run: |
+          uv sync --locked
+          rm -rf packages/pymrcd/build
+          uv sync --locked --reinstall-package pymrcd
+      - name: Tests de Qn y barrido poison bajo ASan/UBSan
+        # La extensión instrumentada exige el runtime de ASan cargado antes que nada (LD_PRELOAD).
+        # Se excluye test_import_without_extension_fails_explicitly: lanza un intérprete hijo y con
+        # LD_PRELOAD de ASan el hijo muere con SIGILL antes de ejecutar nada (visto en Linux aarch64
+        # con gcc 14); no ejercita el C y ya corre en el trabajo gate.
+        run: |
+          export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          export ASAN_OPTIONS=detect_leaks=0
+          export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+          so=$(uv run --no-sync python -c "import pymrcd._qn_ext as m; print(m.__file__)")
+          ldd "${so}" | grep -E 'libasan|libubsan'
+          uv run --no-sync pytest -c packages/pymrcd/pyproject.toml --rootdir packages/pymrcd \
+            -p no:cacheprovider packages/pymrcd/tests/test_qn_ext.py packages/pymrcd/tests/test_qn.py \
+            -k "not test_import_without_extension_fails_explicitly"
+          uv run --no-sync python scripts/pymrcd_poison_sweep.py 2000
+
+  fma-strict:
+    # M3: con -march=x86-64-v3 el compilador tiene FMA a mano; el binario debe seguir sin ninguna
+    # (las opciones de setup.py van después de estas CFLAGS) y los tests de Qn deben dar los mismos bits.
+    name: pymrcd sin FMA con -march=x86-64-v3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CFLAGS: -march=x86-64-v3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+          cache-suffix: fma-strict
+      - name: Python
+        run: uv python install "${PYTHON_VERSION}"
+      - name: La CPU del runner ejecuta x86-64-v3 (AVX2 y FMA)
+        run: grep -qw avx2 /proc/cpuinfo && grep -qw fma /proc/cpuinfo
+      - name: Compilar pymrcd con -march=x86-64-v3
+        run: |
+          uv sync --locked
+          rm -rf packages/pymrcd/build
+          uv sync --locked --reinstall-package pymrcd
+      - name: Cero FMA en el binario
+        run: scripts/check_pymrcd_fma.sh
+      - name: Tests de Qn con el binario x86-64-v3
+        run: |
+          uv run --no-sync pytest -c packages/pymrcd/pyproject.toml --rootdir packages/pymrcd \
+            -p no:cacheprovider packages/pymrcd/tests/test_qn_ext.py packages/pymrcd/tests/test_qn.py
+      - name: La comprobación muerde (con -ffp-contract=fast debe dar rojo)
+        # Prueba negativa en una copia del árbol del runner (nada se versiona): si el binario
+        # contraído pasara la comprobación, la comprobación no serviría.
+        run: |
+          sed -i 's/"-ffp-contract=off"/"-ffp-contract=fast"/' packages/pymrcd/setup.py
+          grep -q '"-ffp-contract=fast"' packages/pymrcd/setup.py
+          rm -rf packages/pymrcd/build
+          uv sync --locked --reinstall-package pymrcd
+          if scripts/check_pymrcd_fma.sh; then
+            echo "check_pymrcd_fma.sh no detectó las FMA de un binario contraído"
+            exit 1
+          fi
+          echo "rojo esperado: la comprobación detecta las FMA"

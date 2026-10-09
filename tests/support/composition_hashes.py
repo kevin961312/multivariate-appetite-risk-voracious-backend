@@ -38,7 +38,7 @@ def fingerprint(value: object) -> str:
 
 
 def compute_hashes() -> dict[str, str]:
-    """Huellas de los 5 casos de Fase I y de los casos de recalibración."""
+    """Huellas de los 4 casos de Fase I y de los 5 de recalibración."""
     chart, mapper = T2MRCDChart(), SerialTaskMapper()
     out: dict[str, str] = {}
     for name, case in sorted(phase1_cases().items()):

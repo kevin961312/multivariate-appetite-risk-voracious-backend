@@ -1,8 +1,8 @@
 """Puerto de los pasos encadenables de la recalibración de una carta (vuelta 3.4 del Paso 3).
 
-La recalibración se puede pedir paso a paso, encadenando por id los pasos de la Fase I (ajuste,
-límites y depuración de las filas nuevas) con dos pasos propios: la **comparación** de la base
-vigente con las filas nuevas depuradas (``/comparisons``) y la **propuesta** de versión
+La recalibración se puede pedir paso a paso, encadenando por id los pasos de la Fase I (exclusión
+humana, ajuste y límites de las filas nuevas) con dos pasos propios: la **comparación** de la base
+vigente con las filas nuevas conservadas (``/comparisons``) y la **propuesta** de versión
 (``/versions``). Los casos de uso son comunes a todas las cartas y solo pasan datos (parámetros
 codificados) y valores opacos (ajuste, límites, comparación, modelo e informe); la carta concreta
 los interpreta a través de este puerto, cuyo adaptador vive en ``infrastructure``
@@ -57,14 +57,14 @@ class RecalibrationSteps(Protocol):
         """
         ...
 
-    def depuration_bounds(self, recalibration_params: Mapping[str, object]) -> tuple[int, int]:
-        """Rondas máximas y mínimo de filas de la depuración de las filas nuevas.
+    def min_observations(self, recalibration_params: Mapping[str, object]) -> int:
+        """Mínimo de filas nuevas conservadas tras la exclusión humana para recalibrar.
 
         Args:
             recalibration_params: Parámetros de la recalibración.
 
         Returns:
-            ``(max_rounds, min_rows)``.
+            El mínimo (por debajo, ``insufficient``).
         """
         ...
 
@@ -78,13 +78,13 @@ class RecalibrationSteps(Protocol):
         *,
         mapper: TaskMapper,
     ) -> object:
-        """Compara la base vigente con las filas nuevas depuradas.
+        """Compara la base vigente con las filas nuevas conservadas.
 
         Args:
             active_model: Modelo de la versión base.
             base: Base de la versión base.
-            new_kept: Filas nuevas conservadas (las de la ronda final).
-            fit: Ajuste de la ronda final.
+            new_kept: Filas nuevas conservadas tras la exclusión humana.
+            fit: Ajuste de esas filas.
             recalibration_params: Parámetros de la recalibración.
             mapper: Reparto de los remuestreos.
 
@@ -124,7 +124,7 @@ class RecalibrationSteps(Protocol):
         fit: object,
         calibration: Calibration,
     ) -> object:
-        """Modelo recalibrado sobre su base, sin volver a depurarla.
+        """Modelo recalibrado sobre su base.
 
         Args:
             x: Base de la versión nueva ``n x p``.
@@ -146,8 +146,6 @@ class RecalibrationSteps(Protocol):
         n_base: int,
         new_dispositions: Sequence[RowDisposition],
         recalibration_params: Mapping[str, object],
-        depuration_rounds: int,
-        depuration_converged: bool | None,
         comparison: object | None,
         model: object | None,
     ) -> object:
@@ -160,8 +158,6 @@ class RecalibrationSteps(Protocol):
             n_base: Filas de la base vigente.
             new_dispositions: Destino de cada fila nueva.
             recalibration_params: Parámetros de la recalibración.
-            depuration_rounds: Rondas de la depuración de las filas nuevas.
-            depuration_converged: Su convergencia (``None`` si no hubo ronda final).
             comparison: Comparación, o ``None``.
             model: Modelo nuevo, o ``None`` (``insufficient``).
 

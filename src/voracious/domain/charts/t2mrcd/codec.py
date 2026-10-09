@@ -50,11 +50,20 @@ __all__ = [
     "encode_report",
 ]
 
-MODEL_FORMAT_VERSION: Final = 1
-"""Versión del formato del modelo codificado (se comprueba al decodificar)."""
+MODEL_FORMAT_VERSION: Final = 2
+"""Versión del formato del modelo codificado (se comprueba al decodificar, antes que los campos).
 
-REPORT_FORMAT_VERSION: Final = 1
-"""Versión del formato del informe codificado (se comprueba al decodificar)."""
+La 2 quita ``depuration_rounds``, ``depuration_converged`` y ``final_depuration_skipped`` (sin
+depuración automática iterativa, decisión del dueño 2026-10-09): un modelo de la 1 se rechaza con
+``unknown_format_version``.
+"""
+
+REPORT_FORMAT_VERSION: Final = 2
+"""Versión del formato del informe codificado (se comprueba al decodificar, antes que los campos).
+
+La 2 quita ``n_excluded_automatic``, ``depuration_rounds`` y ``depuration_converged``: un informe
+de la 1 se rechaza con ``unknown_format_version``.
+"""
 
 _LIMITS_FIELDS: Final = frozenset(
     {
@@ -87,9 +96,6 @@ _MODEL_FIELDS: Final = frozenset(
         "limit_regime",
         "historical_t2",
         "historical_outlier",
-        "depuration_rounds",
-        "depuration_converged",
-        "final_depuration_skipped",
         "pymrcd_version",
         "seed",
         "statistic_reference",
@@ -129,11 +135,8 @@ _REPORT_FIELDS: Final = frozenset(
         "n_base",
         "n_new",
         "n_excluded_assignable_cause",
-        "n_excluded_automatic",
         "n_kept_new",
         "min_observations",
-        "depuration_rounds",
-        "depuration_converged",
         "comparison",
         "before",
         "after",
@@ -186,18 +189,24 @@ def _list(value: object, field: str) -> list[object]:
     return list(value)
 
 
-def _format_version(raw: Mapping[str, object], expected: int, field: str) -> None:
-    """Comprueba la versión del formato.
+def _format_version(data: object, expected: int, field: str) -> None:
+    """Comprueba la versión del formato antes que los campos.
+
+    Así un registro de un formato anterior (con campos que ya no existen) se rechaza por su
+    versión y no por sus campos. Si ``data`` no es un diccionario o no trae la versión, no hace
+    nada: lo informa después ``read_mapping``.
 
     Args:
-        raw: Diccionario leído.
+        data: Valor leído.
         expected: Versión que entiende este módulo.
         field: Campo, para el mensaje.
 
     Raises:
-        InvalidInputError: Si la versión no coincide.
+        InvalidInputError: Si la versión no es un entero o no coincide.
     """
-    version = read_int(raw["format_version"], f"{field}.format_version")
+    if not isinstance(data, Mapping) or "format_version" not in data:
+        return
+    version = read_int(data["format_version"], f"{field}.format_version")
     if version != expected:
         raise InvalidInputError(
             f"'{field}' tiene un formato desconocido: {version}",
@@ -306,9 +315,6 @@ def encode_model(
         "limit_regime": model.limit_regime.value,
         "historical_t2": encode_array(model.historical_t2),
         "historical_outlier": encode_array(model.historical_outlier),
-        "depuration_rounds": model.depuration_rounds,
-        "depuration_converged": model.depuration_converged,
-        "final_depuration_skipped": model.final_depuration_skipped,
         "pymrcd_version": model.pymrcd_version,
         "seed": model.seed,
         "statistic_reference": model.statistic_reference,
@@ -331,8 +337,8 @@ def decode_model(
         InvalidInputError: Campo desconocido, ausente o inválido, formato desconocido o
             estrategia desconocida.
     """
+    _format_version(data, MODEL_FORMAT_VERSION, "model")
     raw = read_mapping(data, "model", _MODEL_FIELDS)
-    _format_version(raw, MODEL_FORMAT_VERSION, "model")
     params = raw["params"]
     if not isinstance(params, Mapping):
         raise InvalidInputError(
@@ -350,13 +356,6 @@ def decode_model(
         limit_regime=_enum(LimitRegime, raw["limit_regime"], "model.limit_regime"),
         historical_t2=decode_float_array(raw["historical_t2"], "model.historical_t2"),
         historical_outlier=decode_bool_array(raw["historical_outlier"], "model.historical_outlier"),
-        depuration_rounds=read_int(raw["depuration_rounds"], "model.depuration_rounds"),
-        depuration_converged=read_optional_bool(
-            raw["depuration_converged"], "model.depuration_converged"
-        ),
-        final_depuration_skipped=read_bool(
-            raw["final_depuration_skipped"], "model.final_depuration_skipped"
-        ),
         pymrcd_version=read_str(raw["pymrcd_version"], "model.pymrcd_version"),
         seed=read_int(raw["seed"], "model.seed"),
         statistic_reference=read_str(raw["statistic_reference"], "model.statistic_reference"),
@@ -555,11 +554,8 @@ def encode_report(report: T2MRCDRecalibrationReport) -> dict[str, object]:
         "n_base": report.n_base,
         "n_new": report.n_new,
         "n_excluded_assignable_cause": report.n_excluded_assignable_cause,
-        "n_excluded_automatic": report.n_excluded_automatic,
         "n_kept_new": report.n_kept_new,
         "min_observations": report.min_observations,
-        "depuration_rounds": report.depuration_rounds,
-        "depuration_converged": report.depuration_converged,
         "comparison": _encode_comparison(report.comparison),
         "before": _encode_snapshot(report.before),
         "after": _encode_optional_snapshot(report.after),
@@ -579,8 +575,8 @@ def decode_report(data: Mapping[str, object]) -> T2MRCDRecalibrationReport:
     Raises:
         InvalidInputError: Campo desconocido, ausente o inválido, o formato desconocido.
     """
+    _format_version(data, REPORT_FORMAT_VERSION, "report")
     raw = read_mapping(data, "report", _REPORT_FIELDS)
-    _format_version(raw, REPORT_FORMAT_VERSION, "report")
     after = raw["after"]
     return T2MRCDRecalibrationReport(
         decision=_enum(RecalibrationDecision, raw["decision"], "report.decision"),
@@ -591,13 +587,8 @@ def decode_report(data: Mapping[str, object]) -> T2MRCDRecalibrationReport:
         n_excluded_assignable_cause=read_int(
             raw["n_excluded_assignable_cause"], "report.n_excluded_assignable_cause"
         ),
-        n_excluded_automatic=read_int(raw["n_excluded_automatic"], "report.n_excluded_automatic"),
         n_kept_new=read_int(raw["n_kept_new"], "report.n_kept_new"),
         min_observations=read_int(raw["min_observations"], "report.min_observations"),
-        depuration_rounds=read_int(raw["depuration_rounds"], "report.depuration_rounds"),
-        depuration_converged=read_optional_bool(
-            raw["depuration_converged"], "report.depuration_converged"
-        ),
         comparison=_decode_comparison(raw["comparison"], "report.comparison"),
         before=_decode_snapshot(raw["before"], "report.before"),
         after=None if after is None else _decode_snapshot(after, "report.after"),

@@ -24,9 +24,9 @@ class Settings(BaseSettings):
             Parámetro de **rendimiento**, no estadístico: el ajuste es idéntico bit a bit con
             cualquier valor (``docs/metodos/mrcd-especificacion.md`` §3.12.9 e) y no se guarda en
             las versiones de la carta. ``None`` ⇒ ``pymrcd`` decide (``PYMRCD_NUM_THREADS`` o
-            todos los CPU visibles). Con réplicas en procesos conviene fijarlo (procesos por hilos).
-            Con réplicas en procesos se fija en cada proceso (``PYMRCD_NUM_THREADS``); el
-            cableado a la carta llega en la vuelta 3.2.
+            todos los CPU visibles). Con réplicas en procesos conviene fijarlo (procesos por hilos):
+            ``container`` lo pasa a la carta (cada ajuste MRCD) y el reparto en procesos lo fija
+            en cada proceso (``PYMRCD_NUM_THREADS``).
         job_backend: Adaptador de la cola de trabajos (hoy solo ``inline``).
         repository: Adaptador de los repositorios (hoy solo ``memory``).
         storage: Almacenamiento de datasets: ``memory`` (en el proceso) o ``local`` (``.npy`` en

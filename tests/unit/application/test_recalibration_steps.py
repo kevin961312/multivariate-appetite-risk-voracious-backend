@@ -59,24 +59,16 @@ def _open(app: App, model_id: str, **kwargs: object) -> RecalibrationRecord:
     return app.get_recalibration().execute(TENANT, CHART, model_id, rid)
 
 
-def _final_round(app: App, session: RecalibrationRecord) -> tuple[str, str, str]:
-    """Ajusta, calibra y depura las candidatas hasta la ronda final: ``(fit, limits, dep)``."""
+def _new_rows(app: App, session: RecalibrationRecord) -> tuple[str, str]:
+    """Ajusta y calibra las candidatas (sin anotaciones, sin exclusión): ``(fit, limits)``."""
     assert session.candidates_dataset_id is not None
-    dataset = session.candidates_dataset_id
-    while True:
-        fit_id = app.request_fit().execute(TENANT, CHART, dataset, None)
-        app.run_all()
-        limits_id = app.request_limits().execute(
-            TENANT, CHART, fit_id, None, recalibration_id=session.recalibration_id
-        )
-        app.run_all()
-        dep_id = app.request_depuration().execute(TENANT, CHART, fit_id=fit_id, limits_id=limits_id)
-        app.run_all()
-        dep = app.get_depuration().execute(TENANT, CHART, dep_id)
-        if dep.final:
-            return fit_id, limits_id, dep_id
-        assert dep.output_dataset_id is not None
-        dataset = dep.output_dataset_id
+    fit_id = app.request_fit().execute(TENANT, CHART, session.candidates_dataset_id, None)
+    app.run_all()
+    limits_id = app.request_limits().execute(
+        TENANT, CHART, fit_id, None, recalibration_id=session.recalibration_id
+    )
+    app.run_all()
+    return fit_id, limits_id
 
 
 def test_stepwise_session_freezes_candidates_and_enqueues_nothing() -> None:
@@ -127,8 +119,10 @@ def test_comparison_not_ready_and_failed_comparison() -> None:
     app, model_id = _scored_app()
     session = _open(app, model_id)
     rid = session.recalibration_id
-    fit_id, limits_id, dep_id = _final_round(app, session)
-    comparison_id = app.request_comparison().execute(TENANT, CHART, model_id, rid, dep_id)
+    fit_id, limits_id = _new_rows(app, session)
+    comparison_id = app.request_comparison().execute(
+        TENANT, CHART, model_id, rid, fit_id=fit_id, limits_id=limits_id
+    )
     with pytest.raises(ComparisonNotReadyError):
         app.request_version_proposal().execute(
             TENANT,
@@ -161,13 +155,15 @@ def app_fit(app: App, session: RecalibrationRecord) -> str:
     return fit_id
 
 
-def test_replace_by_detected_change_reuses_the_last_new_rows_round() -> None:
+def test_replace_by_detected_change_reuses_the_new_rows_fit() -> None:
     app, model_id = _scored_app()
     params = fixed_tests_recalibration(min_observations=10, changed=True)
     session = _open(app, model_id, params=params)
-    fit_id, limits_id, dep_id = _final_round(app, session)
+    fit_id, limits_id = _new_rows(app, session)
     rid = session.recalibration_id
-    comparison_id = app.request_comparison().execute(TENANT, CHART, model_id, rid, dep_id)
+    comparison_id = app.request_comparison().execute(
+        TENANT, CHART, model_id, rid, fit_id=fit_id, limits_id=limits_id
+    )
     app.run_all()
     comparison = app.get_comparison().execute(TENANT, CHART, model_id, comparison_id)
     assert comparison.decision is RecalibrationDecision.REPLACE
@@ -198,7 +194,7 @@ def test_replace_by_detected_change_reuses_the_last_new_rows_round() -> None:
 def test_proposal_job_fails_if_a_proposal_appeared_and_concurrent_request_loses() -> None:
     app, model_id = _scored_app()
     session = _open(app, model_id, force_replace=True)
-    fit_id, limits_id, _ = _final_round(app, session)
+    fit_id, limits_id = _new_rows(app, session)
     rid = session.recalibration_id
     app.request_version_proposal().execute(
         TENANT, CHART, model_id, rid, fit_id=fit_id, limits_id=limits_id
@@ -227,7 +223,7 @@ def test_proposal_job_fails_if_a_proposal_appeared_and_concurrent_request_loses(
     busy = App(charts={CHART: solo_test_chart()}, recalibrations=_Busy())
     busy, other = _scored_app(busy)
     opened = _open(busy, other, force_replace=True)
-    fit_id, limits_id, _ = _final_round(busy, opened)
+    fit_id, limits_id = _new_rows(busy, opened)
     with pytest.raises(RecalibrationNotInProgressError) as info:
         busy.request_version_proposal().execute(
             TENANT, CHART, other, opened.recalibration_id, fit_id=fit_id, limits_id=limits_id
@@ -274,7 +270,6 @@ def test_recalibration_datasets_need_the_links() -> None:
         app.datasets,
         app.fits,
         app.limits,
-        app.depurations,
         app.queue,
         app.ids,
         app.clock,

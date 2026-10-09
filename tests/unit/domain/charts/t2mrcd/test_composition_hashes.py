@@ -1,7 +1,8 @@
 """Regresión en bits: ``fit_phase1``/``recalibrate`` siguen dando las huellas versionadas.
 
-Las huellas (``tests/fixtures/t2mrcd_composition_hashes.json``) se generaron con el código de la
-vuelta 3.2 en la plataforma de referencia; los bytes de un ajuste pueden variar con otra
+Las huellas (``tests/fixtures/t2mrcd_composition_hashes.json``) se regeneraron al quitar la
+depuración automática iterativa (decisión del dueño, 2026-10-09: cambian el modelo, el informe y
+los casos) en la plataforma de referencia; los bytes de un ajuste pueden variar con otra
 BLAS/LAPACK o CPU, así que fuera de ella el test se salta (con motivo).
 """
 
@@ -27,5 +28,5 @@ def test_fit_phase1_and_recalibrate_keep_their_versioned_hashes() -> None:
 
 def test_fixture_covers_every_composition_case() -> None:
     stored = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    assert len(stored["hashes"]) == 10
+    assert len(stored["hashes"]) == 9
     assert all(len(h) == 64 for h in stored["hashes"].values())
