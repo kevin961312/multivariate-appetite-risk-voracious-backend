@@ -19,9 +19,11 @@ class ReadyResponse(BaseModel):
     """Respuesta de disponibilidad para recibir tráfico.
 
     Attributes:
-        status: ``"ready"`` cuando todas las dependencias están disponibles.
-        checks: Resultado por dependencia externa; vacío mientras no haya ninguna.
+        status: ``"ready"`` cuando todas las dependencias están disponibles; ``"not_ready"``
+            (con ``503``) si alguna falla.
+        checks: Resultado por dependencia externa (``database`` con Postgres, ``storage`` con
+            almacenamiento local); vacío si no hay ninguna.
     """
 
-    status: Literal["ready"]
+    status: Literal["ready", "not_ready"]
     checks: dict[str, Literal["ok", "fail"]]

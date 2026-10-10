@@ -6,7 +6,10 @@
 # La imagen no se publica en ningún registro (pymrcd es GPL-3.0-or-later): se construye donde se usa.
 #
 #   docker build --target runtime -t voracious:local .
-#   docker build --target gate -t voracious-gate:local . && docker run --rm voracious-gate:local
+#   docker build --target gate -t voracious-gate:local .
+#   docker run --rm -e VORACIOUS_TEST_DATABASE_URL=postgresql://... voracious-gate:local
+# (la compuerta exige Postgres, Paso 4.2: dentro de la imagen no hay Docker para levantarlo, así que
+# hay que pasarle la URL de un Postgres de prueba alcanzable desde el contenedor).
 
 # Base y uv fijados por versión y digest (M5); Dependabot propone las subidas (.github/dependabot.yml).
 FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 AS uv
@@ -77,7 +80,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import sys, urllib.request; r = urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4); sys.exit(0 if r.status == 200 else 1)"]
 
-# Un solo worker de uvicorn: la cola de trabajos (InlineJobQueue) y los repositorios en memoria viven
-# en el proceso; con varios workers cada uno tendría su propio estado y un GET podría no ver el
-# trabajo que creó el POST. Se escala cuando lleguen Postgres y la cola distribuida.
+# Un solo worker de uvicorn: la cola de trabajos (InlineJobQueue) vive en el proceso. Con Postgres
+# (Paso 4.2) el estado ya es compartido, pero cada worker tendría su propia cola y, al arrancar,
+# cerraría como interrumpidos (JOB_INTERRUPTED) los trabajos en curso de los demás. Se escala
+# cuando llegue la cola distribuida.
 CMD ["uvicorn", "voracious.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

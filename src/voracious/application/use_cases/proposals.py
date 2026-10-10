@@ -16,6 +16,7 @@ estructural son las de la recalibración en una sola llamada (ADR 0008).
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from datetime import datetime
 
 import numpy as np
 
@@ -164,6 +165,7 @@ def new_base(
     data: FloatMatrix,
     session: RecalibrationRecord,
     outcome: CandidateOutcome,
+    candidate_dates: Sequence[datetime] | None = None,
 ) -> NewBase:
     """Base de la versión nueva: ``data`` (la del modelo) con el origen de cada fila.
 
@@ -177,6 +179,8 @@ def new_base(
         data: Base con la que se ajustó el modelo nuevo.
         session: Recalibración (candidatas y ya presentes).
         outcome: Destino de las candidatas.
+        candidate_dates: Fecha de cada candidata (en orden), o ``None``; las filas nuevas de la
+            base y las excluidas la llevan (trazabilidad).
 
     Returns:
         La base nueva.
@@ -185,8 +189,12 @@ def new_base(
         TypeError: Si la decisión no es ``EXTEND`` ni ``REPLACE`` o las filas no cuadran con
             ``data`` (error de integración).
     """
+
+    def date(row: int) -> datetime | None:
+        return None if candidate_dates is None else candidate_dates[row]
+
     kept_refs = tuple(
-        BaseRowRef(BaseRowSource.OBSERVATION, session.candidate_ids[i])
+        BaseRowRef(BaseRowSource.OBSERVATION, session.candidate_ids[i], date(i))
         for i, d in enumerate(outcome.dispositions)
         if d is RowDisposition.KEPT
     )
@@ -212,7 +220,7 @@ def new_base(
             continue
         exclusions.append(
             Exclusion(
-                ref=BaseRowRef(BaseRowSource.OBSERVATION, session.candidate_ids[row]),
+                ref=BaseRowRef(BaseRowSource.OBSERVATION, session.candidate_ids[row], date(row)),
                 reason=reason,
                 annotation_id=outcome.annotation_ids.get(row)
                 if reason is ExclusionReason.ASSIGNABLE_CAUSE
@@ -554,7 +562,19 @@ class RunVersionProposalJob:
             comparison=inputs.comparison,
             model=model,
         )
-        base = new_base(active, inputs.decision, dataset.data, session, inputs.outcome)
+        candidates = (
+            None
+            if session.candidates_dataset_id is None
+            else self.datasets.get(session.tenant_id, session.candidates_dataset_id)
+        )
+        base = new_base(
+            active,
+            inputs.decision,
+            dataset.data,
+            session,
+            inputs.outcome,
+            None if candidates is None else candidates.observed_at,
+        )
         if as_versioned_model(model).base_mask.shape != (base.data.shape[0],):
             msg = "la base del modelo nuevo no coincide con la reconstruida"
             raise TypeError(msg)

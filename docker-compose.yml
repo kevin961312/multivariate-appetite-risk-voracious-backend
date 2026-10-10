@@ -1,34 +1,93 @@
-# Voracious con Docker Compose (Paso 4.1): hoy solo la API, con el estado en el proceso.
+# Voracious con Docker Compose (Paso 4.2): API + Postgres 17 + migraciones + copia de seguridad.
 #   docker compose up -d --build
-#   docker compose ps          # salud del servicio
+#   docker compose ps          # salud de los servicios (migrate termina con «exited (0)»)
+# El .env del servidor (plantilla en .env.example, nunca versionado) da POSTGRES_PASSWORD y
+# VORACIOUS_DATABASE_URL; sin POSTGRES_PASSWORD el arranque falla.
 # La API escucha solo en 127.0.0.1 del anfitrión: no se expone a la red. Para usarla desde otra
-# máquina, túnel SSH (ssh -L 8000:127.0.0.1:8000 usuario@servidor).
+# máquina, túnel SSH (ssh -L 8000:127.0.0.1:8000 usuario@servidor). Postgres no publica ningún
+# puerto: solo lo ven los servicios de esta red.
 # La imagen se construye en local y no se publica en ningún registro (pymrcd es GPL-3.0-or-later).
 
 name: voracious
 
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-voracious-image: &voracious-image
+  build:
+    context: .
+    target: runtime
+  image: voracious:local
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp
+  # .env opcional para la imagen (VORACIOUS_DATABASE_URL y ajustes de rendimiento).
+  env_file:
+    - path: .env
+      required: false
+
 services:
-  api:
-    build:
-      context: .
-      target: runtime
-    image: voracious:local
-    init: true
+  postgres:
+    # Postgres 17 (sin TimescaleDB por ahora), fijado por digest (M5; Dependabot lo sube).
+    image: postgres:17-trixie@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
     restart: unless-stopped
-    read_only: true
-    tmpfs:
-      - /tmp
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-voracious}
+      POSTGRES_DB: ${POSTGRES_DB:-voracious}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env del servidor}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sin «ports»: solo accesible desde la red interna de compose.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      start_period: 20s
+      retries: 20
+    shm_size: 128m
+    logging: *logging
+    # M7: límites para el servidor de 2 vCPU y 3.7 GiB (la API se queda con la mayor parte).
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 0.75
+    pids_limit: 256
+
+  # Aplica las migraciones SQL pendientes y termina; la API espera a que acabe bien.
+  migrate:
+    <<: *voracious-image
+    command: ["python", "-m", "voracious.cli", "migrate"]
+    restart: "no"
+    environment:
+      VORACIOUS_REPOSITORY: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+
+  api:
+    <<: *voracious-image
+    restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
-    # .env opcional (plantilla en .env.example); sin él valen los valores de abajo y los de config.py.
-    env_file:
-      - path: .env
-        required: false
     environment:
+      VORACIOUS_REPOSITORY: postgres
       VORACIOUS_STORAGE: local
       VORACIOUS_STORAGE_DIR: /data/datasets
     volumes:
       - datasets:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -39,11 +98,7 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
+    logging: *logging
     # M7: límites modestos para un servidor de 2 vCPU y 3.7 GiB (perfil en .env.example). Con la cola
     # en el proceso, la memoria crece con los trabajos en curso y los datasets en memoria.
     mem_limit: 2g
@@ -51,15 +106,52 @@ services:
     cpus: 1.5
     pids_limit: 512
 
-  # --- Llegan en 4.2 / después (ADR 0001: un adaptador nuevo + una variable de configuración) ------
-  # postgres:      # 4.2: ModelRepository y demás repositorios en Postgres (TimescaleDB), con backup.
-  #   image: timescale/timescaledb:<versión fijada por digest>
-  #   ports: no se publica; solo red interna de compose.
-  #   volumes: [pgdata:/var/lib/postgresql/data]
-  # redis:         # después: broker de la cola distribuida (CeleryJobQueue).
+  # M6: pg_dump diario (formato custom) al volumen pgbackups, con rotación de 7 días. Restaurar:
+  #   docker compose exec backup pg_restore --clean --if-exists -d "$PGDATABASE" /backups/<fichero>
+  backup:
+    image: postgres:17-trixie@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-voracious}
+      PGDATABASE: ${POSTGRES_DB:-voracious}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en el .env del servidor}
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_EVERY_SECONDS: "86400"
+    volumes:
+      - pgbackups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -u
+        while true; do
+          stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+          if pg_dump --format=custom --file="/backups/voracious-$${stamp}.dump.part"; then
+            mv "/backups/voracious-$${stamp}.dump.part" "/backups/voracious-$${stamp}.dump"
+            echo "backup: voracious-$${stamp}.dump"
+          else
+            rm -f "/backups/voracious-$${stamp}.dump.part"
+            echo "backup: pg_dump falló" >&2
+          fi
+          find /backups -name 'voracious-*.dump' -mtime +$$((BACKUP_KEEP_DAYS - 1)) -delete
+          sleep "$${BACKUP_EVERY_SECONDS}"
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpus: 0.25
+    pids_limit: 64
+
+  # --- Después (ADR 0001: un adaptador nuevo + una variable de configuración) ---------------
+  # redis:         # broker de la cola distribuida (CeleryJobQueue).
   #   image: redis:<versión fijada por digest>
-  # worker:        # después: workers de Celery con la misma imagen runtime.
+  # worker:        # workers de Celery con la misma imagen runtime.
   #   command: [celery, ...]
 
 volumes:
   datasets:
+  pgdata:
+  pgbackups:

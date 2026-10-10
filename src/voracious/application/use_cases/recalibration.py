@@ -37,6 +37,7 @@ from voracious.application.errors import (
     RecalibrationInProgressError,
     RecalibrationInsufficientObservationsError,
     RecalibrationNotInProgressError,
+    VariablesMismatchError,
 )
 from voracious.application.lifecycle import (
     base_content_hash,
@@ -235,10 +236,12 @@ class RequestRecalibration:
             RangeBeforeStructuralEventError: Rango con datos anteriores al evento sin resolver.
             RecalibrationInsufficientObservationsError: Menos candidatas que el mínimo.
             RecalibrationDecisionPendingError: Decisiones de la carta pendientes sin forzar.
+            VariablesMismatchError: Si alguna candidata no tiene el número de variables de la
+                base vigente (los nombres ya se comprobaron al puntuarla).
         """
         chart = resolve_chart(self.charts, chart_id)
         steps = resolve_recalibration_steps(self.recalibration_steps, chart_id)
-        ready_model(self.models, tenant_id, chart_id, model_id)
+        model = ready_model(self.models, tenant_id, chart_id, model_id)
         versions = self.versions.list(tenant_id, chart_id, model_id)
         active = require_active_version(versions, model_id)
         proposal = pending_proposal(versions)
@@ -281,6 +284,13 @@ class RequestRecalibration:
         fresh, already = _candidates(
             self.observations, (tenant_id, chart_id, model_id), start, end, active
         )
+        p = int(active.base_data.shape[1])
+        odd = [r.observation_id for r in fresh if r.values.shape != (p,)]
+        if odd:
+            raise VariablesMismatchError(
+                "hay observaciones candidatas con otro número de variables que el modelo",
+                details={"input": "recalibration", "columns": p, "observations": odd[:20]},
+            )
         if len(fresh) < view.min_observations:
             raise RecalibrationInsufficientObservationsError(
                 "no hay suficientes observaciones candidatas en el rango",
@@ -322,20 +332,27 @@ class RequestRecalibration:
             raise RecalibrationInProgressError(
                 "ya hay una recalibración en curso", details={"reason": "concurrent_request"}
             )
-        self.datasets.add(self._candidates_dataset(record, fresh, active.base_data.shape[1]))
+        self.datasets.add(self._candidates_dataset(record, fresh, p, model.variables))
         if record.pipeline_id is not None:
             self._start_pipeline(record)
         return record.recalibration_id
 
     def _candidates_dataset(
-        self, record: RecalibrationRecord, fresh: Sequence[ObservationRecord], p: int
+        self,
+        record: RecalibrationRecord,
+        fresh: Sequence[ObservationRecord],
+        p: int,
+        variables: tuple[str, ...] | None,
     ) -> DatasetRecord:
         """Dataset ``recalibration_candidates``: los valores de las candidatas en orden.
+
+        Lleva los nombres de variables del modelo y la fecha de cada candidata (trazabilidad).
 
         Args:
             record: Recalibración.
             fresh: Candidatas.
             p: Número de variables.
+            variables: Nombres de las variables del modelo, o ``None``.
 
         Returns:
             El dataset (raíz del linaje ``NEW_ROWS``).
@@ -350,6 +367,8 @@ class RequestRecalibration:
             source=DatasetSource.RECALIBRATION_CANDIDATES,
             created_at=record.created_at,
             origin_ref=record.recalibration_id,
+            variables=variables,
+            observed_at=tuple(r.observed_at for r in fresh),
         )
 
     def _start_pipeline(self, record: RecalibrationRecord) -> None:

@@ -8,12 +8,12 @@ from voracious.application.records import ModelVersion, VersionStatus
 from voracious.infrastructure.memory.codec import PassthroughCodec, RecordCodec
 from voracious.infrastructure.memory.store import KeyedStore
 
-__all__ = ["InMemoryModelVersionRepository"]
+__all__ = ["InMemoryModelVersionRepository", "decided"]
 
 VersionKey = tuple[str, str, str, int]
 
 
-def _decided(version: ModelVersion, change: VersionStatusChange) -> ModelVersion:
+def decided(version: ModelVersion, change: VersionStatusChange) -> ModelVersion:
     """Versión con el estado nuevo y los datos de la decisión del cambio.
 
     Args:
@@ -140,5 +140,5 @@ class InMemoryModelVersionRepository:
                     return False
             for key, version, change in zip(keys, current, changes, strict=True):
                 if version is not None:
-                    self._store.put(key, _decided(version, change))
+                    self._store.put(key, decided(version, change))
             return True

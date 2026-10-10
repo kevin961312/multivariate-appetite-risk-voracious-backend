@@ -7,13 +7,21 @@ informe de una carta se guardan codificados como datos (``codec.py``).
 
 from voracious.infrastructure.memory.codec import (
     ComparisonRecordCodec,
+    ExclusionRecordCodec,
     FitRecordCodec,
     LimitsRecordCodec,
     ModelRecordCodec,
     ModelVersionCodec,
+    MonitoringRecordCodec,
+    ObservationRecordCodec,
     PassthroughCodec,
+    PipelineRecordCodec,
     RecalibrationRecordCodec,
     RecordCodec,
+    SignalAnnotationCodec,
+    StructuralEventCodec,
+    decode_dataset_meta,
+    encode_dataset_meta,
 )
 from voracious.infrastructure.memory.jobs import (
     InMemoryComparisonRepository,
@@ -38,6 +46,7 @@ from voracious.infrastructure.memory.versions import InMemoryModelVersionReposit
 
 __all__ = [
     "ComparisonRecordCodec",
+    "ExclusionRecordCodec",
     "FitRecordCodec",
     "InMemoryComparisonRepository",
     "InMemoryDatasetStorage",
@@ -56,7 +65,14 @@ __all__ = [
     "LimitsRecordCodec",
     "ModelRecordCodec",
     "ModelVersionCodec",
+    "MonitoringRecordCodec",
+    "ObservationRecordCodec",
     "PassthroughCodec",
+    "PipelineRecordCodec",
     "RecalibrationRecordCodec",
     "RecordCodec",
+    "SignalAnnotationCodec",
+    "StructuralEventCodec",
+    "decode_dataset_meta",
+    "encode_dataset_meta",
 ]

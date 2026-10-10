@@ -67,7 +67,8 @@ def initial_version(record: ModelRecord, model: object, now: datetime) -> ModelV
     """Versión 0 de un modelo recién ajustado: vigente desde el origen.
 
     La base son las filas del histórico marcadas en ``base_mask``; las excluidas por la
-    exclusión humana quedan en ``exclusions``.
+    exclusión humana quedan en ``exclusions``. Si el histórico trae fechas, cada fila de la base
+    lleva la suya (trazabilidad).
 
     Args:
         record: Modelo (con su histórico).
@@ -88,9 +89,16 @@ def initial_version(record: ModelRecord, model: object, now: datetime) -> ModelV
         msg = "la máscara de la base no tiene la longitud del histórico"
         raise TypeError(msg)
     base = np.ascontiguousarray(record.training_data[mask])
-    refs = tuple(BaseRowRef(BaseRowSource.TRAINING, str(i)) for i in np.flatnonzero(mask))
+    dates = record.observed_at
+    refs = tuple(
+        BaseRowRef(BaseRowSource.TRAINING, str(i), None if dates is None else dates[i])
+        for i in np.flatnonzero(mask)
+    )
     exclusions = tuple(
-        Exclusion(ref=BaseRowRef(BaseRowSource.TRAINING, str(i)), reason=reason)
+        Exclusion(
+            ref=BaseRowRef(BaseRowSource.TRAINING, str(i), None if dates is None else dates[i]),
+            reason=reason,
+        )
         for i, disposition in enumerate(view.row_disposition)
         if (reason := exclusion_reason(disposition)) is not None
     )

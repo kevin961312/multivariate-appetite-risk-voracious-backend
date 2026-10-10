@@ -45,6 +45,7 @@ from voracious.application.records import (
 )
 from voracious.application.use_cases.common import (
     INTERNAL_ERROR,
+    check_variables,
     ready_model,
     require_active_version,
 )
@@ -110,6 +111,7 @@ class MonitorObservations:
         observations: npt.ArrayLike,
         observed_at: Sequence[datetime],
         batch_label: str | None = None,
+        variables: Sequence[str] | None = None,
     ) -> str:
         """Encola la Fase II tras validar la entrada de forma síncrona.
 
@@ -120,6 +122,8 @@ class MonitorObservations:
             observations: Observaciones nuevas ``m x p``.
             observed_at: Fecha de cada fila, con zona horaria (longitud ``m``).
             batch_label: Etiqueta opcional del lote.
+            variables: Nombres de las columnas, o ``None``; si el modelo tiene nombres, deben
+                ser los suyos en el mismo orden.
 
         Returns:
             El ``monitoring_id``.
@@ -131,10 +135,12 @@ class MonitorObservations:
             InvalidInputError: Si las observaciones no son compatibles con el modelo o las fechas
                 no son válidas.
             ObservationBeforeFirstVersionError: Si una fecha es anterior a la primera versión.
+            VariablesMismatchError: Si las variables no son las del modelo.
         """
         chart = resolve_chart(self.charts, chart_id)
-        ready_model(self.models, tenant_id, chart_id, model_id)
+        model = ready_model(self.models, tenant_id, chart_id, model_id)
         x_new = as_matrix(observations, name="x_new")
+        check_variables(model, int(x_new.shape[1]), variables, source="scores")
         dates = tuple(utc(when, "observed_at") for when in observed_at)
         if len(dates) != x_new.shape[0]:
             raise InvalidInputError(

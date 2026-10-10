@@ -248,3 +248,36 @@ def test_model_record_codec_keeps_provenance() -> None:
     plain = replace(record, model_id="n", provenance=None, pipeline_id=None)
     repo.add(plain)
     assert canonical(repo.get("t", "t2mrcd", "n")) == canonical(plain)
+
+
+def test_local_dataset_storage_reads_v2_metadata_and_rejects_bad_v3(tmp_path: Path) -> None:
+    storage = LocalDatasetStorage(tmp_path)
+    record = _dataset()
+    storage.add(record)
+    meta = tmp_path / "t" / "d.json"
+    v3 = json.loads(meta.read_text())
+    assert v3["format_version"] == 3
+    legacy = {
+        "format_version": 2,
+        "tenant_id": "t",
+        "dataset_id": "d",
+        "content_hash": record.content_hash,
+        "source": "upload",
+        "created_at": record.created_at.isoformat(),
+        "parent_id": None,
+        "rows": [0, 1],
+        "origin_ref": None,
+    }
+    meta.write_text(json.dumps(legacy))
+    loaded = storage.get("t", "d")
+    assert loaded is not None
+    assert loaded.variables is None
+    assert loaded.observed_at is None
+    assert loaded.rows is not None
+    assert loaded.rows.tolist() == [0, 1]
+    meta.write_text(json.dumps({**v3, "variables": 7}))
+    with pytest.raises(DatasetIntegrityError, match="no son válidos"):
+        storage.get("t", "d")
+    (tmp_path / "t" / "d.npy").unlink()
+    meta.write_text(json.dumps(v3))
+    assert storage.get("t", "d") is None

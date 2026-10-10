@@ -1,6 +1,6 @@
 # ADR 0003 — API asíncrona desde el día uno
 
-- **Estado:** Aceptado — ampliado por [0005](0005-api-fase-i-fase-ii.md) y [0009](0009-api-por-pasos-encadenables.md)
+- **Estado:** Aceptado — ampliado por [0005](0005-api-fase-i-fase-ii.md), [0009](0009-api-por-pasos-encadenables.md) y [0011](0011-persistencia-en-postgres.md)
 - **Fecha:** 2026-10-06
 
 ## Contexto
@@ -56,3 +56,10 @@ el contrato (`202` + polling, estados, tenant que oculta lo ajeno) se mantiene.
 - **Límites conocidos:** los hilos de la cola comparten el GIL: el paralelismo real de un ajuste viene de los hilos de la
   extensión C de `pymrcd` y del reparto de réplicas en procesos (no medido de extremo a extremo; deuda). El reparto de réplicas en procesos es del `TaskMapper`, no de la cola. Los
   trabajos viven en el proceso: reiniciarlo pierde la cola y los repositorios en memoria (Paso 4+: Celery y Postgres).
+
+## Enmienda 2026-10-09 (Paso 4.2): los registros sobreviven, la cola no
+
+Con Postgres ([ADR 0011](0011-persistencia-en-postgres.md)) reiniciar el servicio ya no pierde los repositorios,
+pero la cola sigue en el proceso: lo que estaba `queued` o `running` queda `failed / JOB_INTERRUPTED` al arrancar y
+se vuelve a pedir. Por eso sigue habiendo un solo worker de uvicorn. La frase de «Límites conocidos» sobre perder
+«los repositorios en memoria» vale ahora solo con `VORACIOUS_REPOSITORY=memory`.

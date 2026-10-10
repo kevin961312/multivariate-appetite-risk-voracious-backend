@@ -4,6 +4,7 @@ Todo ``get`` y todo ``list`` exigen ``tenant_id``: un recurso de otro tenant es 
 uno inexistente (devuelve ``None`` o no aparece).
 """
 
+import builtins
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -149,6 +150,17 @@ class FitRepository(Protocol):
         """
         ...
 
+    def list_unfinished(self) -> list[FitRecord]:
+        """Ajustes ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
+        """
+        ...
+
 
 class LimitsRepository(Protocol):
     """Calibraciones de límites (``/limits``)."""
@@ -204,6 +216,17 @@ class LimitsRepository(Protocol):
         """
         ...
 
+    def list_unfinished(self) -> list[LimitsRecord]:
+        """Calibraciones ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
+        """
+        ...
+
 
 class ExclusionRepository(Protocol):
     """Exclusiones humanas (``/exclusions``)."""
@@ -256,6 +279,17 @@ class ExclusionRepository(Protocol):
 
         Returns:
             El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def list_unfinished(self) -> list[ExclusionRecord]:
+        """Exclusiones ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
         """
         ...
 
@@ -338,6 +372,17 @@ class PipelineRepository(Protocol):
         """
         ...
 
+    def list_unfinished(self) -> list[PipelineRecord]:
+        """Tuberías ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
+        """
+        ...
+
 
 class ModelRepository(Protocol):
     """Persistencia de modelos de Fase I."""
@@ -389,6 +434,17 @@ class ModelRepository(Protocol):
 
         Returns:
             El registro ya en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def list_unfinished(self) -> list[ModelRecord]:
+        """Modelos ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
         """
         ...
 
@@ -450,6 +506,17 @@ class MonitoringRepository(Protocol):
 
         Returns:
             El registro ya en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def list_unfinished(self) -> list[MonitoringRecord]:
+        """Monitoreos ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
         """
         ...
 
@@ -897,6 +964,17 @@ class RecalibrationRepository(Protocol):
         """
         ...
 
+    def list_unfinished(self) -> builtins.list[RecalibrationRecord]:
+        """Recalibraciones ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
+        """
+        ...
+
 
 class ComparisonRepository(Protocol):
     """Comparaciones de bases (``/comparisons``), hijas de un modelo."""
@@ -958,6 +1036,17 @@ class ComparisonRepository(Protocol):
 
         Returns:
             El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
+        """
+        ...
+
+    def list_unfinished(self) -> list[ComparisonRecord]:
+        """Comparaciones ``queued`` o ``running`` de todos los tenants.
+
+        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
+        al reiniciar no lo va a terminar nadie.
+
+        Returns:
+            Los registros, en orden de creación.
         """
         ...
 

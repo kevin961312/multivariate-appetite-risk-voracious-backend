@@ -48,7 +48,7 @@ from voracious.application.errors import (
     LimitsNotReadyError,
     RecalibrationMismatchError,
 )
-from voracious.application.lifecycle import base_content_hash, frozen_base
+from voracious.application.lifecycle import base_content_hash, frozen_base, utc
 from voracious.application.phase1_steps import (
     Calibration,
     Phase1Steps,
@@ -97,6 +97,8 @@ from voracious.domain.common import (
 )
 
 __all__ = [
+    "DEFAULT_DATE_COLUMN",
+    "CsvTable",
     "DatasetLineage",
     "GetDataset",
     "GetExclusion",
@@ -121,11 +123,13 @@ __all__ = [
     "human_mask",
     "notify_pipeline",
     "parse_csv",
+    "parse_csv_table",
     "ready_fit",
     "ready_limits",
     "recalibration_session",
     "root_indices",
     "stage_kind",
+    "validated_variables",
 ]
 
 MAX_REPORTED_CELLS = 20
@@ -543,42 +547,110 @@ def _validated_upload(data: npt.ArrayLike) -> FloatMatrix:
     return frozen_base(np.ascontiguousarray(arr))
 
 
+DEFAULT_DATE_COLUMN = "observed_at"
+"""Columna de fecha por defecto de un CSV con cabecera (``?date_column=`` la cambia)."""
+
+
+@dataclass(frozen=True)
+class CsvTable:
+    """Contenido de un CSV subido.
+
+    Attributes:
+        rows: Filas numéricas (sin la columna de fecha).
+        variables: Nombres de las columnas numéricas si había cabecera; si no, ``None``.
+        observed_at: Fecha de cada fila si la cabecera tenía la columna de fecha; si no, ``None``.
+    """
+
+    rows: list[list[float]]
+    variables: tuple[str, ...] | None
+    observed_at: tuple[datetime, ...] | None
+
+
 def parse_csv(text: str) -> list[list[float]]:
     """Lee una matriz numérica de un CSV (coma como separador; cabecera opcional).
 
-    Si alguna celda de la primera fila no es un número, la fila se toma como cabecera y se
-    descarta. Las líneas vacías se ignoran.
+    Equivale a ``parse_csv_table(text).rows`` con la columna de fecha por defecto.
 
     Args:
         text: Contenido del CSV.
 
     Returns:
         Las filas como listas de ``float``.
+    """
+    return parse_csv_table(text).rows
+
+
+def _csv_date(cell: str) -> datetime | None:
+    """Fecha ISO 8601 con zona horaria de una celda, o ``None`` si no lo es.
+
+    Args:
+        cell: Celda.
+
+    Returns:
+        La fecha, o ``None``.
+    """
+    try:
+        when = datetime.fromisoformat(cell.strip())
+    except ValueError:
+        return None
+    return when if when.utcoffset() is not None else None
+
+
+def parse_csv_table(text: str, date_column: str = DEFAULT_DATE_COLUMN) -> CsvTable:
+    """Lee un CSV (coma como separador): cabecera opcional y columna de fecha opcional.
+
+    Si alguna celda de la primera fila no es un número, la fila es la **cabecera**: sus celdas
+    son los nombres de las variables. Si una de ellas es ``date_column``, esa columna es la fecha
+    de cada fila (ISO 8601 con zona horaria) y no es una variable. Las líneas vacías se ignoran.
+
+    Args:
+        text: Contenido del CSV.
+        date_column: Nombre de la columna de fecha en la cabecera.
+
+    Returns:
+        Las filas, los nombres (o ``None``) y las fechas (o ``None``).
 
     Raises:
-        InvalidInputError: Si una celda no es numérica (fuera de la cabecera) o no hay filas.
+        InvalidInputError: Si una celda no es numérica (fuera de la cabecera), una fecha no es
+            válida o no hay filas.
     """
     rows = [row for row in csv.reader(io.StringIO(text)) if any(c.strip() for c in row)]
+    header: list[str] | None = None
     if rows and not all(_is_number(c) for c in rows[0]):
+        header = [c.strip() for c in rows[0]]
         rows = rows[1:]
+    date_at = header.index(date_column) if header is not None and date_column in header else None
     bad: list[dict[str, object]] = []
     out: list[list[float]] = []
+    dates: list[datetime] = []
     for i, row in enumerate(rows):
         values: list[float] = []
         for j, cell in enumerate(row):
-            if _is_number(cell):
+            if j == date_at:
+                when = _csv_date(cell)
+                if when is None:
+                    bad.append({"row": i, "column": j, "reason": "invalid_date"})
+                else:
+                    dates.append(when)
+            elif _is_number(cell):
                 values.append(float(cell))
             else:
                 bad.append({"row": i, "column": j})
         out.append(values)
     if bad:
         raise InvalidInputError(
-            "el CSV tiene celdas no numéricas",
+            "el CSV tiene celdas no válidas",
             details={"input": "csv", "cells": bad[:MAX_REPORTED_CELLS], "n_bad": len(bad)},
         )
     if not out:
         raise InvalidInputError("el CSV no tiene filas", details={"input": "csv"})
-    return out
+    variables = None if header is None else tuple(n for j, n in enumerate(header) if j != date_at)
+    if date_at is not None and len(dates) != len(out):
+        raise InvalidInputError(
+            "falta la fecha de alguna fila",
+            details={"input": "csv", "column": date_column, "rows": len(out), "dates": len(dates)},
+        )
+    return CsvTable(out, variables, None if date_at is None else tuple(dates))
 
 
 def _is_number(cell: str) -> bool:
@@ -614,20 +686,31 @@ class UploadDataset:
     ids: IdGenerator
     clock: Clock
 
-    def execute(self, tenant_id: str, data: npt.ArrayLike) -> DatasetRecord:
-        """Valida y guarda la matriz.
+    def execute(
+        self,
+        tenant_id: str,
+        data: npt.ArrayLike,
+        *,
+        variables: Sequence[str] | None = None,
+        observed_at: Sequence[datetime] | None = None,
+    ) -> DatasetRecord:
+        """Valida y guarda la matriz con sus nombres de variables y sus fechas (opcionales).
 
         Args:
             tenant_id: Tenant.
             data: Matriz ``n x p``.
+            variables: Nombre de cada columna (``p``, distintos y no vacíos), o ``None``.
+            observed_at: Fecha de cada fila con zona horaria (``n``), o ``None``.
 
         Returns:
             El dataset guardado.
 
         Raises:
-            InvalidInputError: Si no es una matriz numérica no vacía y finita.
+            InvalidInputError: Si no es una matriz numérica no vacía y finita, o los nombres o las
+                fechas no cuadran con ella.
         """
         arr = _validated_upload(data)
+        n, p = arr.shape
         record = DatasetRecord(
             tenant_id=tenant_id,
             dataset_id=self.ids.new_id(),
@@ -635,24 +718,86 @@ class UploadDataset:
             content_hash=base_content_hash(arr),
             source=DatasetSource.UPLOAD,
             created_at=self.clock.now(),
+            variables=None if variables is None else validated_variables(variables, p),
+            observed_at=None if observed_at is None else _validated_dates(observed_at, n),
         )
         self.datasets.add(record)
         return record
 
-    def execute_csv(self, tenant_id: str, text: str) -> DatasetRecord:
-        """Lee un CSV (``parse_csv``) y lo guarda como ``execute``.
+    def execute_csv(
+        self, tenant_id: str, text: str, *, date_column: str = DEFAULT_DATE_COLUMN
+    ) -> DatasetRecord:
+        """Lee un CSV (``parse_csv_table``) y lo guarda como ``execute``.
 
         Args:
             tenant_id: Tenant.
             text: Contenido del CSV.
+            date_column: Columna de fecha de la cabecera.
 
         Returns:
             El dataset guardado.
 
         Raises:
-            InvalidInputError: Si el CSV no es una matriz numérica finita.
+            InvalidInputError: Si el CSV no es una matriz numérica finita o sus fechas no valen.
         """
-        return self.execute(tenant_id, parse_csv(text))
+        table = parse_csv_table(text, date_column)
+        return self.execute(
+            tenant_id, table.rows, variables=table.variables, observed_at=table.observed_at
+        )
+
+
+def validated_variables(variables: Sequence[str], p: int) -> tuple[str, ...]:
+    """Nombres de variables válidos para ``p`` columnas: ``p`` textos distintos y no vacíos.
+
+    Args:
+        variables: Nombres.
+        p: Número de columnas.
+
+    Returns:
+        Los nombres (sin espacios alrededor).
+
+    Raises:
+        InvalidInputError: Si no hay uno por columna, alguno está vacío o se repite.
+    """
+    names = tuple(str(v).strip() for v in variables)
+    if len(names) != p:
+        raise InvalidInputError(
+            "'variables' debe tener un nombre por columna",
+            details={"input": "variables", "columns": p, "names": len(names)},
+        )
+    if any(not name for name in names):
+        raise InvalidInputError(
+            "'variables' no admite nombres vacíos", details={"input": "variables"}
+        )
+    if len(set(names)) != len(names):
+        repeated = sorted({n for n in names if names.count(n) > 1})
+        raise InvalidInputError(
+            "'variables' tiene nombres repetidos",
+            details={"input": "variables", "repeated": repeated[:MAX_REPORTED_CELLS]},
+        )
+    return names
+
+
+def _validated_dates(observed_at: Sequence[datetime], n: int) -> tuple[datetime, ...]:
+    """Fechas de las filas: una por fila, con zona horaria, normalizadas a UTC.
+
+    Args:
+        observed_at: Fechas.
+        n: Número de filas.
+
+    Returns:
+        Las fechas en UTC.
+
+    Raises:
+        InvalidInputError: Si no hay una por fila o alguna no tiene zona horaria.
+    """
+    dates = tuple(utc(when, "observed_at") for when in observed_at)
+    if len(dates) != n:
+        raise InvalidInputError(
+            "'observed_at' debe tener una fecha por fila",
+            details={"input": "observed_at", "rows": n, "dates": len(dates)},
+        )
+    return dates
 
 
 @dataclass(frozen=True)
@@ -1471,6 +1616,10 @@ class RunExclusionJob:
             parent_id=dataset.dataset_id,
             rows=rows,
             origin_ref=record.exclusion_id,
+            variables=dataset.variables,
+            observed_at=None
+            if dataset.observed_at is None
+            else tuple(dataset.observed_at[i] for i in rows),
         )
         self.datasets.add(derived)
         return derived.dataset_id
@@ -1582,6 +1731,8 @@ class RequestModel:
                 exclusion_id=chain[-1].origin_ref if len(chain) > 1 else None,
             ),
             pipeline_id=pipeline_id,
+            variables=chain[0].variables,
+            observed_at=chain[0].observed_at,
         )
         self.models.add(record)
         self.queue.enqueue(JobRequest(JobKind.MODEL_ASSEMBLY, tenant_id, chart_id, record.model_id))

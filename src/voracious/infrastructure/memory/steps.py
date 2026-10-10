@@ -33,6 +33,8 @@ __all__ = [
 
 StepKey = tuple[str, str, str]
 
+_IN_PROGRESS = frozenset({JobStatus.QUEUED, JobStatus.RUNNING})
+
 
 class _StepRecord(Protocol):
     """Lo que el almacén genérico lee de un registro de trabajo."""
@@ -124,6 +126,14 @@ class _StepStore[R: _StepRecord]:
             if not self.store.contains(key):
                 raise RecordNotFoundError(str(key))
             self.store.put(key, record)
+
+    def unfinished(self) -> list[R]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self.store.where(lambda r: r.status in _IN_PROGRESS)
 
     def claim(self, key: StepKey, started_at: datetime) -> R | None:
         """Pasa un registro de ``queued`` a ``running`` de forma atómica.
@@ -246,6 +256,14 @@ class InMemoryFitRepository:
         """
         return self._steps.claim((tenant_id, chart_id, fit_id), started_at)
 
+    def list_unfinished(self) -> list[FitRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._steps.unfinished()
+
 
 class InMemoryLimitsRepository:
     """``LimitsRepository`` en memoria."""
@@ -306,6 +324,14 @@ class InMemoryLimitsRepository:
             El registro en ``running`` o ``None``.
         """
         return self._steps.claim((tenant_id, chart_id, limits_id), started_at)
+
+    def list_unfinished(self) -> list[LimitsRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._steps.unfinished()
 
 
 class InMemoryExclusionRepository:
@@ -368,6 +394,14 @@ class InMemoryExclusionRepository:
         """
         return self._steps.claim((tenant_id, chart_id, exclusion_id), started_at)
 
+    def list_unfinished(self) -> list[ExclusionRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._steps.unfinished()
+
 
 class InMemoryPipelineRepository:
     """``PipelineRepository`` en memoria (registros sin objetos de carta: tal cual)."""
@@ -428,6 +462,14 @@ class InMemoryPipelineRepository:
             El registro en ``running`` o ``None``.
         """
         return self._steps.claim((tenant_id, chart_id, pipeline_id), started_at)
+
+    def list_unfinished(self) -> list[PipelineRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._steps.unfinished()
 
     def append_step(
         self,

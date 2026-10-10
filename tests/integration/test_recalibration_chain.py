@@ -24,7 +24,7 @@ va por HTTP.
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import numpy as np
@@ -209,6 +209,11 @@ def _reference(
     )
 
 
+def _when(i: int) -> datetime:
+    """Fecha con la que se puntuó la observación ``i`` del escenario (va en su ``BaseRowRef``)."""
+    return T0 + timedelta(hours=i)
+
+
 def _expected_base(
     container: Container, scenario: Scenario, outcome: RecalibrationOutcome[Any, Any]
 ) -> tuple[str, tuple[BaseRowRef, ...], tuple[Exclusion, ...]]:
@@ -218,7 +223,7 @@ def _expected_base(
     new = outcome.report.row_disposition[n_base:]
     kept = [i for i, d in enumerate(new) if d is RowDisposition.KEPT]
     kept_refs = tuple(
-        BaseRowRef(BaseRowSource.OBSERVATION, scenario.observation_ids[i]) for i in kept
+        BaseRowRef(BaseRowSource.OBSERVATION, scenario.observation_ids[i], _when(i)) for i in kept
     )
     if outcome.decision is RecalibrationDecision.EXTEND:
         data = np.vstack([v0.base_data, scenario.x[kept]])
@@ -227,7 +232,7 @@ def _expected_base(
         data, refs = scenario.x[kept], kept_refs
     exclusions = tuple(
         Exclusion(
-            ref=BaseRowRef(BaseRowSource.OBSERVATION, scenario.observation_ids[i]),
+            ref=BaseRowRef(BaseRowSource.OBSERVATION, scenario.observation_ids[i], _when(i)),
             reason=ExclusionReason.ASSIGNABLE_CAUSE,
             annotation_id=scenario.annotation_ids.get(i),
         )

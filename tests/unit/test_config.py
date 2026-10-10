@@ -74,7 +74,8 @@ def test_paso3_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
     ("name", "value"),
     [
         ("JOB_BACKEND", "celery"),
-        ("REPOSITORY", "postgres"),
+        ("REPOSITORY", "mongo"),
+        ("DATABASE_POOL_SIZE", "0"),
         ("STORAGE", "s3"),
         ("REPLICATE_PROCESSES", "0"),
         ("QUEUE_WORKERS_LIGHT", "0"),
@@ -98,3 +99,17 @@ def test_storage_dir_is_read_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path:
     s = Settings()
     assert (s.storage, s.storage_dir) == ("local", tmp_path)
     assert Settings.model_construct().storage_dir is None
+
+
+def test_database_url_is_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    url = "postgresql://usuario:clave-muy-secreta@db:5432/voracious"
+    monkeypatch.setenv("VORACIOUS_REPOSITORY", "postgres")
+    monkeypatch.setenv("VORACIOUS_DATABASE_URL", url)
+    monkeypatch.setenv("VORACIOUS_DATABASE_POOL_SIZE", "3")
+    settings = Settings()
+    assert settings.repository == "postgres"
+    assert settings.database_pool_size == 3
+    assert settings.database_url is not None
+    assert settings.database_url.get_secret_value() == url
+    assert "clave-muy-secreta" not in repr(settings)
+    assert "clave-muy-secreta" not in str(settings)

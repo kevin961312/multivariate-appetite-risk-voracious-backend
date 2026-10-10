@@ -4,6 +4,7 @@ Cada uno implementa ``claim`` (``queued → running`` atómico) para que una ent
 la cola no ejecute dos veces el mismo trabajo.
 """
 
+import builtins
 from dataclasses import replace
 from datetime import datetime
 
@@ -45,6 +46,14 @@ class InMemoryModelRepository:
         self._store: KeyedStore[ModelKey, ModelRecord] = KeyedStore(
             codec if codec is not None else PassthroughCodec(ModelRecord)
         )
+
+    def list_unfinished(self) -> list[ModelRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._store.where(lambda r: r.status in _IN_PROGRESS)
 
     @staticmethod
     def _key(record: ModelRecord) -> ModelKey:
@@ -129,6 +138,14 @@ class InMemoryMonitoringRepository:
         self._store: KeyedStore[ChildKey, MonitoringRecord] = KeyedStore(
             codec if codec is not None else PassthroughCodec(MonitoringRecord)
         )
+
+    def list_unfinished(self) -> list[MonitoringRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._store.where(lambda r: r.status in _IN_PROGRESS)
 
     @staticmethod
     def _key(record: MonitoringRecord) -> ChildKey:
@@ -222,6 +239,14 @@ class InMemoryRecalibrationRepository:
         self._store: KeyedStore[ChildKey, RecalibrationRecord] = KeyedStore(
             codec if codec is not None else PassthroughCodec(RecalibrationRecord)
         )
+
+    def list_unfinished(self) -> builtins.list[RecalibrationRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._store.where(lambda r: r.status in _IN_PROGRESS)
 
     @staticmethod
     def _key(record: RecalibrationRecord) -> ChildKey:
@@ -460,6 +485,14 @@ class InMemoryComparisonRepository:
         self._store: KeyedStore[ChildKey, ComparisonRecord] = KeyedStore(
             codec if codec is not None else PassthroughCodec(ComparisonRecord)
         )
+
+    def list_unfinished(self) -> list[ComparisonRecord]:
+        """Registros ``queued`` o ``running`` de todos los tenants.
+
+        Returns:
+            Los registros, en orden de inserción.
+        """
+        return self._store.where(lambda r: r.status in _IN_PROGRESS)
 
     @staticmethod
     def _key(record: ComparisonRecord) -> ChildKey:

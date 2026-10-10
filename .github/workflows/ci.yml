@@ -1,5 +1,5 @@
-# CI de Voracious (Paso 4.1). La compuerta es la misma que en local y en el pre-commit
-# (scripts/gate.sh), aquí en Linux x86-64 con gcc. Ningún trabajo publica imágenes ni artefactos
+# CI de Voracious (Paso 4.1; Postgres en 4.2). La compuerta es la misma que en local y en el
+# pre-commit (scripts/gate.sh), aquí en Linux x86-64 con gcc y Postgres 17 como servicio. Ningún trabajo publica imágenes ni artefactos
 # fuera de GitHub (pymrcd es GPL-3.0-or-later; la imagen se construye donde se usa).
 # Acciones fijadas por SHA (M5); Dependabot propone las subidas (.github/dependabot.yml).
 name: ci
@@ -25,6 +25,24 @@ jobs:
     name: compuerta (scripts/gate.sh)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    # Paso 4.2: la compuerta exige Postgres; aquí lo da el servicio (gate.sh usa la URL y no
+    # levanta otro). Credenciales de PRUEBA, no secretas: la base vive lo que dura el trabajo.
+    services:
+      postgres:
+        image: postgres:17-trixie@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+        env:
+          POSTGRES_USER: voracious_test
+          POSTGRES_PASSWORD: voracious_test
+          POSTGRES_DB: voracious_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U voracious_test -d voracious_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      VORACIOUS_TEST_DATABASE_URL: postgresql://voracious_test:voracious_test@127.0.0.1:5432/voracious_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -61,8 +79,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: docker-compose.yml válido
-        run: docker compose config --quiet
+      - name: docker-compose.yml y compose.test.yaml válidos
+        # Valor de relleno solo para interpolar: el real está en el .env del servidor.
+        env:
+          POSTGRES_PASSWORD: solo-para-validar
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.test.yaml config --quiet
       - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
         # Hasta 3 intentos: un 504 pasajero de Docker Hub se reintenta; un fallo real del build
         # (p. ej. FMA en el binario) falla los 3 y el job sale en rojo igual.

@@ -339,3 +339,17 @@ def test_human_exclusion_only_at_start() -> None:
         app.request_exclusion().execute(
             TENANT, CHART, root, [AssignableCause(i) for i in range(40)]
         )
+
+
+def test_parse_csv_table_names_and_dates() -> None:
+    from voracious.application.use_cases import parse_csv_table
+
+    table = parse_csv_table("a,observed_at,b\n1,2025-01-01T00:00:00Z,2\n")
+    assert table.rows == [[1.0, 2.0]]
+    assert table.variables == ("a", "b")
+    assert table.observed_at is not None
+    assert table.observed_at[0].utcoffset() is not None
+    assert parse_csv_table("1,2\n").variables is None
+    with pytest.raises(InvalidInputError) as info:
+        parse_csv_table("observed_at,a\nx,1\n")
+    assert info.value.details["cells"][0]["reason"] == "invalid_date"

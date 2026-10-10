@@ -4,6 +4,10 @@ Mejora M2: ``POST /v1/datasets`` admite ``application/json`` (``{"data": [[...]]
 ``text/csv`` (cuerpo CSV) y ``multipart/form-data`` (un fichero CSV en la parte ``file``). El
 cuerpo se limita a ``VORACIOUS_MAX_UPLOAD_MB`` (``413 PAYLOAD_TOO_LARGE``). Un dataset no
 pertenece a ninguna carta: se referencia por su id desde los pasos de cada carta.
+
+Paso 4.2: nombres de variables y fecha de cada fila, opcionales. En JSON, ``variables`` y
+``observed_at``; en CSV, la cabecera da los nombres y la columna ``?date_column=`` (por defecto
+``observed_at``) la fecha de cada fila. Se guardan con el dataset y pasan al modelo.
 """
 
 from email.message import Message
@@ -25,6 +29,7 @@ from voracious.api.schemas.datasets import (
     DatasetUploadIn,
 )
 from voracious.api.tenant import tenant_id
+from voracious.application.use_cases import DEFAULT_DATE_COLUMN
 from voracious.container import Container
 
 __all__ = ["MULTIPART_FIELD", "router"]
@@ -151,13 +156,19 @@ def _multipart_csv(content_type: str, payload: bytes) -> str:
     response_model=DatasetCreated,
     openapi_extra=_UPLOAD_BODY,
 )
-async def upload_dataset(request: Request, tenant: TenantDep, c: ContainerDep) -> DatasetCreated:
+async def upload_dataset(
+    request: Request,
+    tenant: TenantDep,
+    c: ContainerDep,
+    date_column: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_DATE_COLUMN,
+) -> DatasetCreated:
     """Sube un dataset ``n x p`` (JSON, CSV o multipart) y devuelve su id y su huella.
 
     Args:
         request: Petición (el cuerpo se lee según su ``Content-Type``).
         tenant: Tenant.
         c: Contenedor.
+        date_column: Columna de fecha de la cabecera de un CSV (se ignora en JSON).
 
     Returns:
         ``{dataset_id, n, p, content_hash}``.
@@ -175,11 +186,18 @@ async def upload_dataset(request: Request, tenant: TenantDep, c: ContainerDep) -
             body = DatasetUploadIn.model_validate_json(payload)
         except ValidationError as exc:
             raise RequestValidationError(exc.errors()) from exc
-        return DatasetCreated.of(upload.execute(tenant, body.data))
+        return DatasetCreated.of(
+            upload.execute(
+                tenant, body.data, variables=body.variables, observed_at=body.observed_at
+            )
+        )
     if media == "text/csv":
-        return DatasetCreated.of(upload.execute_csv(tenant, _text(payload)))
+        return DatasetCreated.of(
+            upload.execute_csv(tenant, _text(payload), date_column=date_column)
+        )
     if media == "multipart/form-data":
-        return DatasetCreated.of(upload.execute_csv(tenant, _multipart_csv(content_type, payload)))
+        text = _multipart_csv(content_type, payload)
+        return DatasetCreated.of(upload.execute_csv(tenant, text, date_column=date_column))
     raise ApiError(
         "UNSUPPORTED_MEDIA_TYPE",
         "tipo de contenido no admitido (application/json, text/csv o multipart/form-data)",
@@ -194,7 +212,7 @@ def get_dataset(
     c: ContainerDep,
     include: Annotated[list[DatasetInclude] | None, Query()] = None,
 ) -> DatasetResponse:
-    """Dataset con su linaje (M3: ``data`` y ``rows`` con ``include``).
+    """Dataset con su linaje (M3: ``data``, ``rows`` y ``observed_at`` con ``include``).
 
     Args:
         dataset_id: Dataset.

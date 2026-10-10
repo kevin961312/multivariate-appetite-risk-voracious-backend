@@ -77,6 +77,18 @@ class KeyedStore[K: Hashable, R]:
         with self.lock:
             return [self.codec.decode(v) for k, v in self.rows.items() if keep(k)]
 
+    def where(self, keep: Callable[[R], bool]) -> list[R]:
+        """Registros que cumplen ``keep``, en orden de inserción.
+
+        Args:
+            keep: Filtro sobre el registro decodificado.
+
+        Returns:
+            Los registros.
+        """
+        with self.lock:
+            return [r for r in (self.codec.decode(v) for v in self.rows.values()) if keep(r)]
+
     def items(self) -> Iterator[tuple[K, R]]:
         """Copia de los pares ``(clave, registro)`` en orden de inserción.
 

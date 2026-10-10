@@ -121,6 +121,7 @@ def score(model_id: str, body: ScoreRequest, tenant: TenantDep, c: ContainerDep)
         [o.values for o in body.observations],
         [o.observed_at for o in body.observations],
         body.batch_label,
+        body.variables,
     )
     return AcceptedJob(id=score_id)
 

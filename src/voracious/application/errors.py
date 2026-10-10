@@ -30,6 +30,7 @@ __all__ = [
     "RecalibrationNotFoundError",
     "RecalibrationNotInProgressError",
     "UnknownChartError",
+    "VariablesMismatchError",
     "VersionInputsMismatchError",
     "VersionNotFoundError",
     "VersionNotProposedError",
@@ -263,3 +264,13 @@ class VersionInputsMismatchError(ApplicationError):
     """
 
     code = "VERSION_INPUTS_MISMATCH"
+
+
+class VariablesMismatchError(ApplicationError):
+    """Las variables de la entrada no son las del modelo (número o nombres; Paso 4.2).
+
+    ``VARIABLES_MISMATCH`` (422): una puntuación o una recalibración con otras columnas que las
+    del dataset raíz del modelo.
+    """
+
+    code = "VARIABLES_MISMATCH"

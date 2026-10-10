@@ -214,3 +214,25 @@ recursos y códigos. Sustituye lo anterior en lo que choque.
   `EXCLUSION_NOT_FOUND`.
 - Pasos de tubería: `exclusion, fit, limits, model, comparison, version`. Formatos de modelo, informe y
   metadatos de dataset: 2; el 1 se rechaza (`unknown_format_version`), sin migración.
+
+## Enmienda 2026-10-09 (Paso 4.2): variables, fechas, `/ready` y reinicios
+
+Por qué: con datos reales hay que reconocer las columnas y fechar las filas, y con estado persistente hay que
+decir qué pasa con un trabajo cuando el servicio se reinicia. Decisiones en el
+[ADR 0011](0011-persistencia-en-postgres.md). Sustituye lo anterior en lo que choque.
+
+- `POST /v1/datasets` admite, opcionales, el nombre de cada variable y la fecha de cada fila: JSON `variables` y
+  `observed_at` (con zona horaria); CSV con cabecera y `?date_column=` (por defecto `observed_at`). `GET
+  /v1/datasets/{id}` los resume (`has_observed_at`) y `?include=observed_at` devuelve las fechas.
+- `POST …/scores` admite `variables`; si el modelo tiene nombres, deben coincidir en número y orden.
+- **Códigos nuevos:**
+
+| Código | HTTP | Cuándo |
+| --- | --- | --- |
+| `VARIABLES_MISMATCH` | 422 | Una puntuación o recalibración con otras columnas que las del dataset raíz del modelo (número o nombres) |
+| `JOB_INTERRUPTED` | 503 | Solo en el cuerpo de un trabajo `failed`: el servicio se reinició con el trabajo `queued` o `running`; se vuelve a pedir (el `GET` responde `200`) |
+
+- **`/ready`** deja de ir vacío: `database` (`SELECT 1`, 2 s) con Postgres y `storage` con `storage=local`; si falla
+  alguno, **`503`** con `status: not_ready`. Cierra la decisión abierta del código HTTP.
+- Estados de job: se acepta `cancelled` en la base (ya lo producía `cancel` de la recalibración); la API sigue
+  exponiendo `queued | running | succeeded | failed` para los trabajos y `cancelled` donde ya existía.

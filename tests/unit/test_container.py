@@ -76,7 +76,7 @@ def _mapper_of(container: Container) -> object:
     ("field", "value", "match"),
     [
         ("job_backend", "celery", "JOB_BACKEND"),
-        ("repository", "postgres", "REPOSITORY"),
+        ("repository", "mongo", "REPOSITORY"),
         ("storage", "s3", "STORAGE"),
     ],
 )
@@ -144,3 +144,37 @@ def test_memory_storage_by_default() -> None:
         assert isinstance(container.use_cases.upload_dataset.datasets, InMemoryDatasetStorage)
     finally:
         container.shutdown()
+
+
+def test_postgres_needs_url_and_local_storage(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError, match="DATABASE_URL"):
+        build_container(Settings(repository="postgres"))
+    with pytest.raises(ConfigurationError, match="DATABASE_URL"):
+        build_container(Settings(repository="postgres", database_url=""))
+    with pytest.raises(ConfigurationError, match="STORAGE=local"):
+        build_container(Settings(repository="postgres", database_url="postgresql://x@h/db"))
+
+
+def test_memory_container_has_no_database_check(tmp_path: Path) -> None:
+    memory = build_container(Settings())
+    local = build_container(Settings(storage="local", storage_dir=tmp_path))
+    try:
+        assert memory.check_readiness() == {}
+        assert local.check_readiness() == {"storage": True}
+        assert memory.startup() == dict.fromkeys(
+            (
+                "fits",
+                "limits",
+                "exclusions",
+                "pipelines",
+                "models",
+                "scores",
+                "recalibrations",
+                "comparisons",
+                "versions",
+            ),
+            0,
+        )
+    finally:
+        memory.shutdown()
+        local.shutdown()

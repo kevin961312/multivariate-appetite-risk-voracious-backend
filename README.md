@@ -13,10 +13,11 @@ referencia, su documento, sus golden tests y su API, sin tocar las demás
 
 ## Estado
 
-**Pasos 0–3 hechos; Paso 4 en curso (Docker y CI hechos; Postgres pendiente).** Existen el port de MRCD (`pymrcd`, con
+**Pasos 0–4 hechos (Docker, CI y Postgres); siguiente: despliegue en el servidor de demo.** Existen el port de MRCD (`pymrcd`, con
 `Qn` y los pares de OGK en C), la carta T²MRCD (Fase I con límites por bootstrap, Fase II y ciclo de
-vida con recalibración) y la API por pasos encadenables. Los repositorios y la cola viven aún en el proceso
-(reiniciar pierde el estado) y la Fase I termina en `failed / T2MRCD_DECISION_PENDING` si un campo decisivo
+vida con recalibración) y la API por pasos encadenables. Los repositorios
+persisten en Postgres (con `VORACIOUS_REPOSITORY=postgres`; por defecto siguen en memoria), la cola vive en el
+proceso (reiniciar cierra los trabajos en curso como `JOB_INTERRUPTED`) y la Fase I termina en `failed / T2MRCD_DECISION_PENDING` si un campo decisivo
 queda pendiente. El avance por paso y la deuda están en [`docs/ESTADO.md`](docs/ESTADO.md).
 
 ## Cómo levantarlo
@@ -40,26 +41,50 @@ Compuerta de calidad (la misma que CI y el pre-commit; cada etapa deja su log en
 scripts/gate.sh; echo "EXIT=$?"
 ```
 
-### Con Docker
+### Con Docker y Postgres
+
+Compose levanta `postgres` (17), `migrate` (aplica las migraciones y termina), `api` y `backup` (`pg_dump`
+diario, 7 días). Los secretos van **solo** en un `.env` del servidor (no versionado; plantilla en `.env.example`):
 
 ```bash
-docker compose up -d --build              # construye la imagen runtime y levanta la API
-docker compose ps                         # salud del servicio
+# .env del servidor (valores reales, nunca en el repo)
+POSTGRES_PASSWORD=<contraseña>
+VORACIOUS_DATABASE_URL=postgresql://voracious:<contraseña-codificada-como-URL>@postgres:5432/voracious
+
+docker compose up -d --build              # construye la imagen runtime y levanta todo (migrate corre solo)
+docker compose ps                         # migrate termina «exited (0)»; el resto, healthy
+docker compose run --rm migrate           # opcional: aplicar migraciones a mano (python -m voracious.cli migrate)
+```
+
+Sin `POSTGRES_PASSWORD` Compose no arranca. La contraseña en la URL lleva codificación URL si tiene caracteres
+como `@ : / ? # %`. La base de datos **no publica ningún puerto**. Restaurar un volcado:
+`docker compose exec backup pg_restore --clean --if-exists -d "$PGDATABASE" /backups/<fichero>`.
+
+Demo con datos **simulados** (150 × 8 con fechas desde 2026-01-01; Fase I, 20 puntuaciones y una anotación):
+
+```bash
+uv run python scripts/demo_seed.py --base-url http://127.0.0.1:8000 --tenant demo
 ```
 
 La API escucha solo en `127.0.0.1:8000` del anfitrión. Para usarla desde otra máquina, túnel SSH:
 `ssh -L 8000:127.0.0.1:8000 kevin@<servidor>`. La imagen se construye donde se usa y no se publica
 (`pymrcd` es GPL-3.0-or-later; [ADR 0010](docs/adr/0010-empaquetado-docker-y-ci.md)).
 
-La compuerta también corre en Linux dentro de un contenedor:
+La compuerta **exige Postgres**: usa `VORACIOUS_TEST_DATABASE_URL` si está definida y, si no, levanta uno desechable
+con Docker (`compose.test.yaml`); sin ninguno, sale en rojo. También corre en Linux dentro de un contenedor, al que
+hay que darle la URL de un Postgres de prueba alcanzable:
 
 ```bash
-docker build --target gate -t voracious:gate . && docker run --rm voracious:gate
+docker build --target gate -t voracious:gate . \
+  && docker run --rm -e VORACIOUS_TEST_DATABASE_URL=postgresql://… voracious:gate
 ```
+
+Con `VORACIOUS_REPOSITORY=postgres` hace falta `VORACIOUS_STORAGE=local`, y las migraciones se aplican con
+`uv run python -m voracious.cli migrate`.
 
 ## Documentación
 
 - [Arquitectura](docs/arquitectura.md)
-- [Decisiones (ADR)](docs/adr/)
+- [Decisiones (ADR)](docs/adr/) (persistencia: [ADR 0011](docs/adr/0011-persistencia-en-postgres.md))
 - [Documentos de método](docs/metodos/README.md): [MRCD](docs/metodos/mrcd.md) y [T²MRCD](docs/metodos/t2mrcd.md)
 - [Reglas para el equipo y agentes](CLAUDE.md)

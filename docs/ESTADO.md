@@ -1,8 +1,27 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-09 (Paso 4: 4.0 y 4.1 hechas; eliminada la depuración automática y medidos los tiempos de Fase I en el servidor).
+Última actualización: 2026-10-09 (Paso 4 hecho: 4.0, 4.1 y 4.2 — Docker, CI y Postgres; eliminada la depuración automática y medidos los tiempos de Fase I en el servidor).
 
-**Siguiente hito:** 4.2 (Postgres/TimescaleDB, demo y backup), y a continuación el Paso 5 (golden por método).
+**Siguiente hito:** despliegue en el servidor de demo (Compose con Postgres, `.env` del servidor, `migrate`, `scripts/demo_seed.py`).
+
+**Siguientes pasos acordados por el dueño (en este orden):**
+
+1. **Paso de seguridad, antes de vender:** login OIDC/SSO del banco, roles (analista, aprobador, administrador),
+   Row-Level Security en Postgres, HTTPS, auditoría y tablas `users`/`memberships`; decidir **instalación dedicada por
+   banco vs. SaaS compartido**. Hoy el tenant es una cabecera sin autenticar: no es apto para exponerse. La base de
+   datos nunca se expone.
+2. **Cartas nuevas** (MEWMA, CUSUM…) como cartas propias, cada una con su API, reutilizando lo común (ADR 0004). Las
+   cartas con memoria necesitan estado y orden temporal: se diseñará con la primera de ellas.
+3. **Paso 5:** golden por método.
+
+**Mejora candidata (anotada a petición del dueño, 2026-10-09): diagnóstico de señales con la descomposición MYT**
+(Mason, R. L., Tracy, N. D. y Young, J. C. (1995), «Decomposition of T² for multivariate control chart
+interpretation», *Journal of Quality Technology* 27(2), 99–108). Cuando la carta da señal, partir el T² en términos
+incondicionales (una variable sola) y condicionales (una variable dada otras) para decir qué variables o qué
+relaciones entre variables la causan; p. ej. LCR y fondeo minorista en verde por separado pero con su relación rota.
+Pendiente antes de implementarla: (a) formalizarla con la covarianza regularizada de MRCD y p > n; (b) controlar la
+explosión combinatoria (p! órdenes) con los atajos de la literatura; (c) validarla; (d) exponerla en la API junto a
+cada señal. Sin fecha.
 
 | Paso | Descripción | Estado |
 | --- | --- | --- |
@@ -12,7 +31,7 @@
 | 2b | Fase II y recalibración de T²MRCD ([ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md)). **2b.1 dominio:** dos límites (Fase I y Fase II por OOB), pool, error Monte Carlo, comparación S/μ (la depuración automática se eliminó el 2026-10-09). **2b.2 aplicación:** puertos y casos de uso del ciclo de vida, estrategias persistidas por nombre (M1) | **hecho.** 2b.1 commiteado (`c44f86d`); 2b.2 hecho y commiteado (2026-10-07). Validador: APROBADO CON OBSERVACIONES, ya aplicadas |
 | M5 | Optimizar `pymrcd`: `Qn` y pares de OGK en C ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07; [especificación §3.12.9](metodos/mrcd-especificacion.md)) | **hecho.** Validador: APROBADO CON OBSERVACIONES. Criterio «≥ 10× con 1 hilo» **no cumplido** (4.1×); ver abajo |
 | 3 | Adaptadores, `container.py`, tenant, errores uniformes y API por pasos independientes encadenables por id ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); 3.1 infraestructura, 3.2 dominio en piezas, 3.3 Fase I por API, 3.4 Fase II y recalibración por API | **hecho** (14 contratos de import-linter). Validador: APROBADO CON OBSERVACIONES en 3.2 y 3.4, ya aplicadas. Ver «Paso 3» abajo |
-| 4 | Docker, CI y Postgres. 4.0 y 4.1 hechas (Dockerfile, compose, CI, validación en Linux; [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)); 4.2 (Postgres, demo, backup) pendiente | **en curso** |
+| 4 | Docker, CI y Postgres. 4.0 y 4.1 (Dockerfile, compose, CI, validación en Linux; [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)); 4.2 (Postgres 17, migraciones, recuperación tras reinicio, `/ready`, backup, fechas y nombres de variables, demo; [ADR 0011](adr/0011-persistencia-en-postgres.md)) | **hecho** |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
 
 ## Paso 4: Docker, CI y validación en Linux (2026-10-09)
@@ -36,9 +55,31 @@ tolerancias D1–D3 en la enmienda del [ADR 0006](adr/0006-libreria-pymrcd.md) y
   se copia con `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`.
 - **Deudas cerradas:** validación de gcc/objdump en Linux, sanitizers en CI, aviso de `httpx`, empaquetado de
   `pymrcd` en la imagen.
-- **Abiertas:** 4.2 (Postgres/TimescaleDB, demo, backup); huellas de composición solo en Darwin arm64; `/ready` sin
-  checks hasta 4.2; consecuencia de producto con p ≥ n en Linux (D1–D3); tiempos de recalibración completa y caso
-  p > n sin medir (Fase I 200×300 medida: ver «Sin depuración automática»).
+- **Abiertas:** huellas de composición solo en Darwin arm64; consecuencia de producto con p ≥ n en Linux (D1–D3);
+  tiempos de recalibración completa y caso p > n sin medir (Fase I 200×300 medida: ver «Sin depuración automática»).
+
+### 4.2: Postgres (2026-10-09) — hecho
+
+Por qué: sin persistencia, reiniciar perdía modelos, versiones y observaciones, y la demo con datos reales y la
+recalibración (que recalcula con la base más lo observado) no tenían sentido. Decisiones y alternativas en el
+[ADR 0011](adr/0011-persistencia-en-postgres.md) (propuesto); esquema tabla por tabla y diagrama en
+[`arquitectura.md`](arquitectura.md) («Persistencia»).
+
+- **Persistencia:** Postgres 17 sin TimescaleDB; `payload TEXT` con el JSON exacto del codec (no JSONB: `NaN`, `±Inf`,
+  `-0`); atomicidad en la base (`claim`, D6 con índices únicos parciales, CAS con `FOR UPDATE`); migraciones SQL con
+  ejecutor propio y checksum; `repository=postgres` exige `storage=local`. Los repositorios de memoria y Postgres
+  pasan la misma suite de contrato.
+- **Operación:** recuperación al arrancar (`failed / JOB_INTERRUPTED`, sesiones stepwise abiertas respetadas),
+  `/ready` con checks reales y `503`, backup diario con `pg_dump` (7 días), la base sin puertos publicados, secretos
+  solo en el `.env` del servidor.
+- **Fechas y nombres de variables** (pedido del dueño): JSON y CSV; heredan modelo, versión 0, exclusión, candidatas y
+  extensión; `422 VARIABLES_MISMATCH`; no tocan ninguna estadística (test en bits); `external_ref` reservada.
+- **Compuerta:** exige Postgres (etapa `postgres-up`; `VORACIOUS_TEST_DATABASE_URL` o Docker; si no, rojo). 16
+  contratos de import-linter. CI con `services: postgres:17`.
+- **Demo:** `scripts/demo_seed.py` (datos simulados, solo API).
+- **Deuda de 4.2:** TimescaleDB (sin volumen que lo pida), cola distribuida (Celery; hasta entonces un solo worker),
+  backup que corre como root y vive en el mismo servidor, `dataset_rows.external_ref` sin uso, y toda la seguridad
+  (paso siguiente 1). Sin medir: coste de la Fase I extremo a extremo con Postgres.
 
 ## Sin depuración automática y tiempos medidos (2026-10-09)
 
@@ -90,15 +131,15 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
 
 ### Deuda del Paso 3
 
-- **Postgres/TimescaleDB, Celery y S3:** adaptadores reales (Paso 4+). Hoy los repositorios y la cola viven en el
-  proceso: reiniciar pierde el estado.
+- **Postgres/TimescaleDB, Celery y S3:** (Postgres hecho en 4.2) quedan TimescaleDB, Celery y S3. La cola sigue en el
+  proceso: reiniciar cierra los trabajos en curso como `JOB_INTERRUPTED`.
 - **M4** (`Idempotency-Key`), **M5** (progreso de los trabajos) y **M7** (webhooks): después.
 - **Sesiones stepwise sin expiración automática:** una recalibración paso a paso queda abierta hasta `cancel`,
   aprobación o rechazo.
 - **Pool de procesos por llamada** en `ProcessPoolTaskMapper`: el coste del `spawn` se paga en cada calibración.
 - **Huellas de composición solo en Darwin arm64** (el C de `pymrcd` ya se validó en Linux en el Paso 4.1).
-- **`/ready` sin checks** y su código HTTP cuando falle (decisión abierta).
-- **Autenticación real** (JWT/OIDC) y roles (M4 antiguo); hoy solo `X-Tenant-ID`.
+- (Cerrado en 4.2) `/ready` con checks de base y almacenamiento y `503` cuando falle; sigue sin check de cola.
+- **Autenticación real** (OIDC/SSO), roles, Row-Level Security, HTTPS y auditoría (M4 antiguo; ver «Siguientes pasos acordados»); hoy solo `X-Tenant-ID`.
 - **Coste no medido de extremo a extremo** de la Fase I con réplicas en procesos sobre la API.
 
 ## Ajuste de plan aprobado: ADR 0004 y 0005
@@ -275,8 +316,8 @@ correrlo en un servidor con más núcleos.
 - Cita del umbral 0.10 y de la revalidación de 6 meses (hoy documento del dueño, orientativos).
 - Cita del bootstrap de límites T² y de `alpha_limit = 0.005` (hoy decisiones del dueño).
 - Fuente de los golden de la carta T²MRCD.
-- Código de HTTP de `/ready` cuando un check falle (hoy `checks` va vacío): ver
-  [`arquitectura.md`](arquitectura.md).
+- (Cerrada en 4.2) Código de HTTP de `/ready` cuando un check falle: `503` ([ADR 0011](adr/0011-persistencia-en-postgres.md)).
+- **Instalación dedicada por banco vs. SaaS compartido:** decisión del paso de seguridad, aún sin tomar.
 
 ## Deuda técnica
 

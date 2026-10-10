@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from voracious.application.errors import ApplicationError
-from voracious.application.use_cases import INTERNAL_ERROR
+from voracious.application.use_cases import INTERNAL_ERROR, JOB_INTERRUPTED
 from voracious.domain.common import DomainError, InvalidInputError
 
 __all__ = [
@@ -74,8 +74,12 @@ CODE_TO_STATUS: Mapping[str, int] = {
     "LIMITS_FIT_MISMATCH": 422,
     "RECALIBRATION_MISMATCH": 422,
     "VERSION_INPUTS_MISMATCH": 422,
+    "VARIABLES_MISMATCH": 422,
     # 500: fallo inesperado (el detalle va al log, nunca al cuerpo).
     INTERNAL_ERROR: 500,
+    # 503: el servicio se reinició con el trabajo en curso (Paso 4.2). Solo aparece en el cuerpo
+    # de un trabajo ``failed`` (``GET`` con 200); se vuelve a pedir.
+    JOB_INTERRUPTED: 503,
 }
 """Estado HTTP de cada código síncrono del catálogo."""
 

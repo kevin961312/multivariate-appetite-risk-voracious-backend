@@ -1,0 +1,25 @@
+# Postgres desechable para la compuerta (scripts/gate.sh, etapa postgres-up). No es producción.
+#   docker compose -f compose.test.yaml -p <proyecto> up -d --wait
+#   docker compose -f compose.test.yaml -p <proyecto> port postgres 5432   # puerto efímero
+#   docker compose -f compose.test.yaml -p <proyecto> down -v
+# Credenciales de PRUEBA, NO SECRETAS: solo valen para este contenedor efímero, que escucha en un
+# puerto aleatorio de 127.0.0.1 y se destruye (con su volumen) al terminar la compuerta.
+
+services:
+  postgres:
+    image: postgres:17-trixie@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+    environment:
+      POSTGRES_USER: voracious_test       # credencial de prueba, no secreta
+      POSTGRES_PASSWORD: voracious_test   # credencial de prueba, no secreta
+      POSTGRES_DB: voracious_test
+    # Puerto efímero solo en el bucle local: nunca se expone a la red.
+    ports:
+      - "127.0.0.1::5432"
+    # Datos en memoria: más rápido y nada queda en disco al bajarlo.
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voracious_test -d voracious_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 60

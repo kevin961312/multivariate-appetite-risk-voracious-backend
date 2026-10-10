@@ -48,7 +48,8 @@ def create_app(container: Container | None = None) -> FastAPI:
     """Crea la aplicación FastAPI.
 
     Se puede invocar sin argumentos para ``uvicorn voracious.api.app:create_app --factory``. Al
-    cerrarse (``lifespan``) apaga la cola de trabajos esperando a los que estén en curso.
+    arrancar (``lifespan``) cierra ``failed / JOB_INTERRUPTED`` los trabajos que un reinicio dejó
+    en curso; al cerrarse apaga la cola esperando a los que estén en curso y cierra el pool.
 
     Args:
         container: Dependencias ya cableadas; si es ``None`` se construyen desde el entorno.
@@ -60,6 +61,7 @@ def create_app(container: Container | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        resolved.startup()
         yield
         resolved.shutdown(wait=True)
 

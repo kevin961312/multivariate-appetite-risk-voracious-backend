@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -28,7 +28,8 @@ class Settings(BaseSettings):
             ``container`` lo pasa a la carta (cada ajuste MRCD) y el reparto en procesos lo fija
             en cada proceso (``PYMRCD_NUM_THREADS``).
         job_backend: Adaptador de la cola de trabajos (hoy solo ``inline``).
-        repository: Adaptador de los repositorios (hoy solo ``memory``).
+        repository: Adaptador de los repositorios: ``memory`` (en el proceso) o ``postgres``
+            (Paso 4.2; exige ``database_url`` y ``storage=local``).
         storage: Almacenamiento de datasets: ``memory`` (en el proceso) o ``local`` (``.npy`` en
             disco con huella, mejora M6).
         storage_dir: Directorio base de ``storage=local`` (``VORACIOUS_STORAGE_DIR``);
@@ -41,6 +42,11 @@ class Settings(BaseSettings):
         queue_workers_orchestration: Hilos del carril ``orchestration``.
         max_upload_mb: Tamaño máximo del cuerpo de una subida de dataset (``POST /v1/datasets``)
             en MiB; por encima, ``413 PAYLOAD_TOO_LARGE``.
+        database_url: Cadena de conexión de Postgres (``VORACIOUS_DATABASE_URL``, formato
+            ``postgresql://usuario:contraseña@host:5432/base``). Secreto: ``SecretStr`` no la
+            muestra en ``repr`` ni en logs. Obligatoria con ``repository=postgres``.
+        database_pool_size: Conexiones máximas del pool (``VORACIOUS_DATABASE_POOL_SIZE``).
+            Rendimiento, no estadístico: cubre los hilos de la cola y los de la API.
     """
 
     model_config = SettingsConfigDict(
@@ -50,7 +56,7 @@ class Settings(BaseSettings):
     log_level: LogLevel = "INFO"
     mrcd_threads: int | None = Field(default=None, ge=1)
     job_backend: Literal["inline"] = "inline"
-    repository: Literal["memory"] = "memory"
+    repository: Literal["memory", "postgres"] = "memory"
     storage: Literal["memory", "local"] = "memory"
     storage_dir: Path | None = None
     replicate_processes: int | None = Field(default=None, ge=1)
@@ -59,3 +65,5 @@ class Settings(BaseSettings):
     queue_workers_light: int = Field(default=4, ge=1)
     queue_workers_orchestration: int = Field(default=2, ge=1)
     max_upload_mb: int = Field(default=50, ge=1)
+    database_url: SecretStr | None = None
+    database_pool_size: int = Field(default=10, ge=1)

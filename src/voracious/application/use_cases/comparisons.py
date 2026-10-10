@@ -13,6 +13,7 @@ sin resolver) la comparación no se hace: se salta a ``/versions``.
 """
 
 from dataclasses import dataclass, replace
+from datetime import datetime
 
 import numpy as np
 
@@ -48,6 +49,7 @@ from voracious.application.records import (
     DatasetSource,
     ErrorInfo,
     JobStatus,
+    ModelVersion,
 )
 from voracious.application.use_cases.common import INTERNAL_ERROR, get_version
 from voracious.application.use_cases.recalibration_chain import get_recalibration, open_session
@@ -61,7 +63,6 @@ from voracious.application.use_cases.steps import (
 )
 from voracious.domain.common import (
     DomainError,
-    FloatMatrix,
     InvalidInputError,
     RecalibrationDecision,
     TaskMapper,
@@ -338,7 +339,8 @@ class RunComparisonJob:
         session = get_recalibration(self.recalibrations, *key, record.recalibration_id)
         active = get_version(self.versions, *key, session.base_version_number)
         fit = ready_fit(self.fits, record.tenant_id, record.chart_id, record.fit_id)
-        new_kept = get_dataset(self.datasets, record.tenant_id, fit.dataset_id).data
+        kept_dataset = get_dataset(self.datasets, record.tenant_id, fit.dataset_id)
+        new_kept = kept_dataset.data
         result = steps.compare(
             active.model, active.base_data, new_kept, fit.result, session.params, mapper=self.mapper
         )
@@ -350,21 +352,36 @@ class RunComparisonJob:
         )
         extension_id = None
         if decision is RecalibrationDecision.EXTEND:
-            extension_id = self._extension(record, active.base_data, new_kept)
+            extension_id = self._extension(record, active, kept_dataset)
         return replace(record, result=result, decision=decision, extension_dataset_id=extension_id)
 
-    def _extension(self, record: ComparisonRecord, base: FloatMatrix, new_kept: FloatMatrix) -> str:
+    def _extension(
+        self, record: ComparisonRecord, active: ModelVersion, kept: DatasetRecord
+    ) -> str:
         """Crea el dataset ``recalibration_extension`` = ``vstack(base, nuevas conservadas)``.
+
+        Hereda los nombres de variables de las conservadas y, solo si se conocen **todas**, las
+        fechas de la base (``base_refs``) seguidas de las de las conservadas; si falta alguna, el
+        dataset va sin fechas (las de cada fila siguen en los ``base_refs`` de la versión).
 
         Args:
             record: Comparación.
-            base: Base de la versión base.
-            new_kept: Filas nuevas conservadas.
+            active: Versión base.
+            kept: Dataset de las filas nuevas conservadas.
 
         Returns:
             El id del dataset.
         """
-        data = frozen_base(np.ascontiguousarray(np.vstack([base, new_kept]), dtype=np.float64))
+        stacked = np.vstack([active.base_data, kept.data])
+        data = frozen_base(np.ascontiguousarray(stacked, dtype=np.float64))
+        base_dates = tuple(r.observed_at for r in active.base_refs)
+        # ``DatasetRecord.observed_at`` es todo o nada (una fecha por fila, o ``None``): si alguna
+        # fila de la base no tiene fecha (histórico sin fechas), el dataset de extensión va sin
+        # fechas. No se pierde trazabilidad: la versión propuesta toma las fechas por fila de
+        # ``active.base_refs`` (``new_base``), no de este dataset.
+        dates: tuple[datetime, ...] | None = None
+        if kept.observed_at is not None and all(d is not None for d in base_dates):
+            dates = tuple(d for d in base_dates if d is not None) + kept.observed_at
         dataset = DatasetRecord(
             tenant_id=record.tenant_id,
             dataset_id=self.ids.new_id(),
@@ -373,6 +390,8 @@ class RunComparisonJob:
             source=DatasetSource.RECALIBRATION_EXTENSION,
             created_at=self.clock.now(),
             origin_ref=record.recalibration_id,
+            variables=kept.variables,
+            observed_at=dates,
         )
         self.datasets.add(dataset)
         return dataset.dataset_id

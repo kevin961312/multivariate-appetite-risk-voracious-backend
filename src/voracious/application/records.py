@@ -148,6 +148,10 @@ class ModelRecord:
         provenance: Recursos de los que se ensambló (vuelta 3.3): dataset raíz, exclusión humana,
             ajuste y límites; ``None`` en un modelo sin cadena de pasos.
         pipeline_id: Tubería que lo pidió, si la hay (al terminar se la avisa).
+        variables: Nombres de las ``p`` variables (los del dataset raíz), o ``None`` si el
+            dataset no los traía; Fase II y la recalibración los exigen iguales si los hay.
+        observed_at: Fecha de cada fila del histórico (las del dataset raíz, UTC), o ``None``.
+            Solo trazabilidad: no entra en ninguna estadística.
     """
 
     tenant_id: str
@@ -164,6 +168,8 @@ class ModelRecord:
     lifecycle_policy: LifecyclePolicy = field(default_factory=LifecyclePolicy)
     provenance: "ModelProvenance | None" = None
     pipeline_id: str | None = None
+    variables: tuple[str, ...] | None = None
+    observed_at: tuple[datetime, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -215,6 +221,9 @@ class DatasetRecord:
         rows: Índices de sus filas en ``parent_id`` (``data == parent.data[rows]``); ``None`` en
             una raíz.
         origin_ref: Recurso que lo creó (la exclusión o la recalibración), si lo hay.
+        variables: Nombres de las ``p`` columnas, o ``None`` si no se dieron (Paso 4.2).
+        observed_at: Fecha de cada fila (UTC), o ``None`` si no se dieron. Solo trazabilidad:
+            ningún cálculo la usa.
     """
 
     tenant_id: str
@@ -226,6 +235,8 @@ class DatasetRecord:
     parent_id: str | None = None
     rows: IndexVector | None = None
     origin_ref: str | None = None
+    variables: tuple[str, ...] | None = None
+    observed_at: tuple[datetime, ...] | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -517,10 +528,13 @@ class BaseRowRef:
     Attributes:
         source: Origen de la fila.
         ref: Índice del histórico (como texto) u ``observation_id``.
+        observed_at: Fecha de la fila (UTC) si se conoce: la del dataset raíz para el histórico
+            o la de la observación. Solo trazabilidad.
     """
 
     source: BaseRowSource
     ref: str
+    observed_at: datetime | None = None
 
 
 class ExclusionReason(StrEnum):

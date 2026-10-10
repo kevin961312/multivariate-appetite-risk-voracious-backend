@@ -12,7 +12,7 @@ y los vectores por fila solo se devuelven si se piden con ``?include=``.
 from collections.abc import Collection
 from dataclasses import replace
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 import numpy as np
 from pydantic import Field, FiniteFloat
@@ -80,7 +80,7 @@ __all__ = [
     "matrix",
 ]
 
-ModelInclude = Literal["training_data", "covariance", "historical"]
+ModelInclude = Literal["training_data", "observed_at", "covariance", "historical"]
 """Partes grandes opcionales de ``GET …/models/{id}``."""
 
 VersionInclude = Literal["base_data", "base_refs", "covariance", "historical"]
@@ -203,10 +203,16 @@ class ScoreRequest(RequestModel):
     Attributes:
         observations: Observaciones.
         batch_label: Etiqueta del lote.
+        variables: Nombre de cada columna de ``values``, opcional; si el modelo tiene nombres
+            (los de su dataset raíz) deben ser los mismos y en el mismo orden
+            (``422 VARIABLES_MISMATCH``).
     """
 
     observations: list[ObservationIn] = Field(min_length=1)
     batch_label: str | None = Field(default=None, max_length=200)
+    variables: list[Annotated[str, Field(min_length=1, max_length=200)]] | None = Field(
+        default=None, min_length=1
+    )
 
 
 class AnnotationRequest(RequestModel):
@@ -505,10 +511,13 @@ class ModelResponse(ResponseModel):
     lifecycle_policy: LifecyclePolicyOut
     n_rows: int
     n_features: int
+    variables: list[str] | None = None
+    has_observed_at: bool = False
     provenance: ProvenanceOut | None = None
     result: T2MRCDModelOut | None = None
     error: ErrorBody | None = None
     training_data: list[list[float]] | None = None
+    observed_at: list[datetime] | None = None
 
     @classmethod
     def of(cls, record: ModelRecord, include: Collection[str]) -> "ModelResponse":
@@ -536,6 +545,8 @@ class ModelResponse(ResponseModel):
             ),
             n_rows=int(n_rows),
             n_features=int(n_features),
+            variables=None if record.variables is None else list(record.variables),
+            has_observed_at=record.observed_at is not None,
             provenance=None
             if record.provenance is None
             else ProvenanceOut(
@@ -547,6 +558,9 @@ class ModelResponse(ResponseModel):
             result=None if record.model is None else T2MRCDModelOut.of(record.model, include),
             error=error_body(record.error),
             training_data=matrix(record.training_data) if "training_data" in include else None,
+            observed_at=None
+            if "observed_at" not in include or record.observed_at is None
+            else list(record.observed_at),
         )
 
 
@@ -843,10 +857,11 @@ class RecalibrationReportOut(ResponseModel):
 
 
 class BaseRowOut(ResponseModel):
-    """Origen de una fila de la base."""
+    """Origen de una fila de la base y su fecha, si se conoce (trazabilidad)."""
 
     source: str
     ref: str
+    observed_at: datetime | None = None
 
 
 class ExclusionOut(ResponseModel):
@@ -856,6 +871,7 @@ class ExclusionOut(ResponseModel):
     ref: str
     reason: str
     annotation_id: str | None
+    observed_at: datetime | None = None
 
 
 class VersionSummary(ResponseModel):
@@ -954,13 +970,15 @@ class VersionDetail(VersionSummary):
                         ref=e.ref.ref,
                         reason=str(e.reason),
                         annotation_id=e.annotation_id,
+                        observed_at=e.ref.observed_at,
                     )
                     for e in version.exclusions
                 ]
                 if with_refs
                 else None,
                 "base_refs": [
-                    BaseRowOut(source=str(r.source), ref=r.ref) for r in version.base_refs
+                    BaseRowOut(source=str(r.source), ref=r.ref, observed_at=r.observed_at)
+                    for r in version.base_refs
                 ]
                 if with_refs
                 else None,

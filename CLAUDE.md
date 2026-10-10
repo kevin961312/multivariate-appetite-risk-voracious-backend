@@ -6,7 +6,7 @@ otra fuente, manda este archivo; si está desactualizado, se corrige aquí prime
 ## Qué es
 
 Backend SaaS para monitorear el **apetito de riesgo multivariado** de portafolios financieros con la carta
-de control robusta **T²MRCD**. Hoy tiene el núcleo (`pymrcd`), la carta T²MRCD con su ciclo de vida, la API por pasos, Docker y CI; el estado vive en el proceso (Postgres y la cola distribuida llegan después).
+de control robusta **T²MRCD**. Hoy tiene el núcleo (`pymrcd`), la carta T²MRCD con su ciclo de vida, la API por pasos, Docker y CI; el estado persiste en Postgres (Paso 4.2, [ADR 0011](docs/adr/0011-persistencia-en-postgres.md)); la cola sigue en el proceso (la cola distribuida llega después).
 Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio ni los casos de uso**.
 
 ## 1. Lo que no se negocia (producto)
@@ -63,16 +63,16 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
 | Ejecución de los pasos | `JobQueue` | `InlineJobQueue` (un hilo-pool por carril: estimation, calibration, light, orchestration) | `CeleryJobQueue` |
-| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | en memoria (seguros entre hilos, con `claim`) | Postgres (TimescaleDB) |
+| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | `memory` (seguros entre hilos, con `claim`) o **Postgres 17** (`VORACIOUS_REPOSITORY=postgres`; sin TimescaleDB por ahora) | Postgres con TimescaleDB |
 | Datos de entrada | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash) | `S3DatasetStorage` |
-| Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | en memoria (altas atómicas) | Postgres (TimescaleDB) |
+| Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | `memory` (altas atómicas) o Postgres (índices únicos parciales) | Postgres con TimescaleDB |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta |
 | Reparto de réplicas | `TaskMapper` | `SerialTaskMapper` o `ProcessPoolTaskMapper` | Celery/Dask |
 | Tenant | `TenantContext` | cabecera `X-Tenant-ID` (`400 TENANT_REQUIRED`) | JWT/OIDC |
 
 Puertos auxiliares: `IdGenerator` y `Clock` (`UuidIdGenerator`, `SystemClock`). El `JobQueue` recibe un
 `JobRequest` con solo identificadores. Variables: `VORACIOUS_LOG_LEVEL`, `_MRCD_THREADS`, `_JOB_BACKEND`,
-`_REPOSITORY`, `_STORAGE` (`memory|local`), `_STORAGE_DIR`, `_REPLICATE_PROCESSES`,
+`_REPOSITORY` (`memory|postgres`), `_DATABASE_URL` (secreto) y `_DATABASE_POOL_SIZE`, `_STORAGE` (`memory|local`; `postgres` exige `local`), `_STORAGE_DIR`, `_REPLICATE_PROCESSES`,
 `_QUEUE_WORKERS_{ESTIMATION,CALIBRATION,LIGHT,ORCHESTRATION}` y `_MAX_UPLOAD_MB` (tabla en
 [`docs/arquitectura.md`](docs/arquitectura.md)).
 
@@ -92,15 +92,15 @@ Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md
 
 | Capa (de arriba abajo) | Puede importar | No puede importar |
 | --- | --- | --- |
-| `voracious.api`, `voracious.workers` | `application`, `domain`, `container` | `infrastructure` y `config` directos (solo vía `container`); `api` ↛ `workers` y viceversa |
+| `voracious.api`, `voracious.workers`, `voracious.cli` | `application`, `domain`, `container` | `infrastructure` y `config` directos (solo vía `container`); `api` ↛ `workers` y viceversa; `api` ↛ `psycopg` |
 | `voracious.container` | todo (es el cableado) | — |
 | `voracious.infrastructure` | `application`, `domain` | `api`, `workers`, `container` |
 | `voracious.application` | `domain` | `api`, `infrastructure`, `workers`, `config`, `container`, frameworks web/logging |
 | `voracious.domain` | stdlib, `numpy`, `scipy`, `pymrcd` (solo en `domain/estimators/mrcd/`) | **nada del proyecto**; ni FastAPI, Pydantic, IO, red, config, logging |
 | `voracious.config` | stdlib, `pydantic-settings` | cualquier capa del proyecto |
 
-Orden real de capas (contrato `layers`): `api | workers` → `container` → `infrastructure` → `application`
-→ `domain`; `config` queda fuera del orden. Hay **14 contratos vigentes** en `pyproject.toml`
+Orden real de capas (contrato `layers`): `api | workers | cli` → `container` → `infrastructure` → `application`
+→ `domain`; `config` queda fuera del orden. Hay **16 contratos vigentes** en `pyproject.toml`
 (`[tool.importlinter]`):
 
 1. capas;
@@ -117,16 +117,20 @@ Orden real de capas (contrato `layers`): `api | workers` → `container` → `in
 11. `estimators ↛ charts`;
 12. `common ↛ charts|estimators`;
 13. solo `domain.estimators.mrcd` importa `pymrcd`;
-14. `workers ↛ infrastructure|config` (solo vía `container`).
+14. `workers ↛ infrastructure|config` (solo vía `container`);
+15. `api ↛ psycopg|psycopg_pool` (el driver solo vive en `infrastructure/postgres`);
+16. `cli ↛ infrastructure|config` (solo vía `container`).
 
-Los contratos 5, 6, 13 y 14 usan `allow_indirect_imports` porque `api|workers → container → config|infrastructure` y
+Además `psycopg` y `psycopg_pool` están prohibidos en `domain` (2), `application` (3) y `pymrcd` (8).
+Los contratos 5, 6, 13, 14, 15 y 16 usan `allow_indirect_imports` porque `api|workers|cli → container → config|infrastructure`,
+`api → container → infrastructure.postgres → psycopg` y
 `charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos.
 
 Estructura de dominio: `domain/charts/<carta>/`, `domain/estimators/<estimador>/`, `domain/common/`
 (`ControlChart` en `common/chart.py`, `TaskMapper` en `common/parallel.py`). Los contratos `independence` ya
 existen y los verifica `import-linter`.
 
-Flujo: `api|workers → container → infrastructure → application → domain`.
+Flujo: `api|workers|cli → container → infrastructure → application → domain`.
 
 ## 3. Qué documento abrir para cada carpeta
 
@@ -139,6 +143,8 @@ Flujo: `api|workers → container → infrastructure → application → domain`
 | `src/voracious/infrastructure/` | [`docs/arquitectura.md`](docs/arquitectura.md) (tabla de puertos), [ADR 0001](docs/adr/0001-hexagonal.md) |
 | `src/voracious/api/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md), [`docs/arquitectura.md`](docs/arquitectura.md) |
 | `src/voracious/workers/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md) |
+| `src/voracious/infrastructure/postgres/`, migraciones | [ADR 0011](docs/adr/0011-persistencia-en-postgres.md), [`docs/arquitectura.md`](docs/arquitectura.md) (sección «Persistencia»); una migración aplicada no se edita |
+| `src/voracious/cli.py` | [ADR 0011](docs/adr/0011-persistencia-en-postgres.md) |
 | `src/voracious/config.py`, `container.py` | [`docs/arquitectura.md`](docs/arquitectura.md) (variables `VORACIOUS_*`) |
 | `tests/golden/`, `tools/r/` | `docs/metodos/<método>.md` del método probado ([índice](docs/metodos/README.md)) |
 | `docs/` | [`docs/README.md`](docs/README.md) |
@@ -156,12 +162,16 @@ Compuerta local (= CI = pre-commit):
 scripts/gate.sh; echo "EXIT=$?"
 ```
 
-`scripts/gate.sh` corre todas las etapas (`build-pymrcd`, `fma-pymrcd`, ruff, format, mypy, import-linter, pytest
+`scripts/gate.sh` corre todas las etapas (`postgres-up`, `build-pymrcd`, `fma-pymrcd`, ruff, format, mypy, import-linter, pytest
 con cobertura ≥ 80 %, `mypy-pymrcd` y `pytest-pymrcd`) aunque falle alguna y deja cada salida en `.gates/<etapa>.log`; el `EXIT` final es 0 solo si todas pasan.
 Las dos primeras etapas compilan y comprueban la extensión C de `pymrcd` ([ADR 0006](docs/adr/0006-libreria-pymrcd.md),
 enmienda 2026-10-07): `build-pymrcd` (`uv sync --reinstall-package pymrcd`) y `fma-pymrcd`
 (`scripts/check_pymrcd_fma.sh`: cero instrucciones FMA en el binario); `mypy-pymrcd` cubre también `setup.py`.
 **Hace falta un compilador de C con pthreads** (Xcode Command Line Tools en macOS, `build-essential` en Linux).
+**La compuerta exige Postgres** (Paso 4.2): la etapa `postgres-up` usa `VORACIOUS_TEST_DATABASE_URL` si está
+definida (CI: `services: postgres:17`) y, si no, levanta uno desechable con Docker (`compose.test.yaml`, puerto
+aleatorio de `127.0.0.1`, se destruye al terminar). Sin la variable ni Docker, `postgres-up` sale en rojo y los
+tests de Postgres fallan: no se saltan.
 Variable de rendimiento `VORACIOUS_MRCD_THREADS` (hilos de `pymrcd`; vacío = no definida; no cambia resultados).
 Por clon hay que activar el hook: `git config core.hooksPath .githooks`. Siempre `uv run …` para ejecutar
 Python o herramientas sueltas (el `python` del PATH es de pyenv, no el del proyecto).

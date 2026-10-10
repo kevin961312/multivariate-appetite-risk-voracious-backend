@@ -102,3 +102,23 @@ atrapan.
 - Siguen siendo deuda (en `ESTADO.md`): las huellas de composición de T²MRCD solo existen para Darwin arm64, y
   la consecuencia de producto con p ≥ n en Linux (tolerancias D1–D3 de la enmienda del ADR 0006) queda por decidir.
 - Las pruebas de rendimiento en el servidor y el perfil 2 vCPU (`docs/arquitectura.md`) son orientativos.
+
+## Enmienda 2026-10-09 (Paso 4.2): Compose con Postgres y compuerta que lo exige
+
+Decisiones de fondo en el [ADR 0011](0011-persistencia-en-postgres.md); aquí solo lo que cambia el empaquetado.
+
+- **Compose** pasa de un servicio a cuatro: `postgres`, `migrate`, `api` y `backup`. Sigue habiendo **un solo
+  worker de uvicorn**, ahora por la cola en el proceso y la recuperación `JOB_INTERRUPTED` (punto 2 de este ADR
+  queda acotado a ese motivo, no a que el estado esté en memoria).
+- **La compuerta exige Postgres.** `scripts/gate.sh` tiene una etapa `postgres-up`: usa `VORACIOUS_TEST_DATABASE_URL`
+  si existe y, si no, levanta un contenedor desechable con `compose.test.yaml` (puerto efímero en `127.0.0.1`, datos
+  en `tmpfs`, se baja con su volumen al salir). Sin la variable ni Docker, la etapa sale en rojo y los tests de
+  Postgres fallan: **no se saltan**, para que «verde» signifique que se probó el adaptador real.
+- **Target `gate` de la imagen:** dentro del contenedor no hay Docker, así que necesita
+  `-e VORACIOUS_TEST_DATABASE_URL=postgresql://…` apuntando a un Postgres de prueba alcanzable. Por eso el comando
+  `docker run --rm voracious:gate` del Paso 4.1 ya no basta solo.
+- **CI:** el trabajo `gate` declara `services: postgres:17` (mismo digest que Compose) con credenciales de prueba, no
+  secretas; el trabajo `image` valida también `compose.test.yaml` y usa un valor de relleno de `POSTGRES_PASSWORD`
+  solo para interpolar.
+- **Credenciales de prueba** en `compose.test.yaml` y en `ci.yml`: no son secretos (contenedor efímero). Las reales
+  están únicamente en el `.env` del servidor.

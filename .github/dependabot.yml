@@ -16,6 +16,12 @@ updates:
     schedule:
       interval: weekly
 
+  # Paso 4.2: postgres en docker-compose.yml y compose.test.yaml (también fijado en ci.yml).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+
   - package-ecosystem: uv
     directory: /
     schedule:

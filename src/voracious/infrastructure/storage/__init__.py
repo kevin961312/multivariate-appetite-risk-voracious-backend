@@ -1,5 +1,9 @@
-"""Adaptadores de ``DatasetStorage`` en disco (``VORACIOUS_STORAGE=local``)."""
+"""Almacenamiento de datasets en disco (``VORACIOUS_STORAGE=local``)."""
 
-from voracious.infrastructure.storage.local import DatasetIntegrityError, LocalDatasetStorage
+from voracious.infrastructure.storage.local import (
+    DatasetIntegrityError,
+    LocalDatasetStorage,
+    LocalMatrixStore,
+)
 
-__all__ = ["DatasetIntegrityError", "LocalDatasetStorage"]
+__all__ = ["DatasetIntegrityError", "LocalDatasetStorage", "LocalMatrixStore"]
