@@ -157,3 +157,14 @@ del cliente a su registro; no tiene uso hoy.
 - Cambiar el esquema obliga a una migración nueva; los formatos de payload se versionan con `format_version`.
 - Deuda: TimescaleDB, cola distribuida, backup fuera del servidor y sin root, `external_ref`, y todo lo de
   seguridad del punto 9.
+
+## Enmienda 2026-10-14: migración `0002_drop_comparisons.sql`
+
+Por qué: se elimina la comparación de bases (ADR 0008, enmienda 2026-10-14), así que desaparece la tabla
+`comparisons` y el `ComparisonRepository`, y cambian los formatos de informe (3) y de sesión de recalibración (sin
+el id de comparación; con `kept_dataset_id` y `extension_dataset_id`). Por la regla del punto 4 no se edita
+`0001`: va una migración nueva, `0002`, que hace `DROP TABLE comparisons`.
+
+**Guarda:** antes de borrar, `0002` aborta sin aplicar nada si existe cualquier fila en `comparisons` o
+`recalibrations`, o en `model_versions` con `number > 0`. Decisión del dueño: no se escribe lector del formato
+viejo; si la demo tuviera datos viejos se recrea su base. Una base solo con Fase I migra sin pérdida.

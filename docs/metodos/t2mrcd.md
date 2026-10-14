@@ -10,7 +10,7 @@ Estado: el dominio (Paso 2) existe y **con los defaults decididos la Fase I se e
 P5 y P6 cerradas el 2026-10-07). El mecanismo `failed / T2MRCD_DECISION_PENDING` se conserva: si alguien pasa
 explícitamente un campo decisivo como `None`, la Fase I se detiene antes de ajustar nada. La API HTTP es del Paso 3.
 **Paso 2b.1 (dominio, commit `c44f86d`):** dos límites (Fase I y Fase II por OOB), agregación pool,
-comparación y recalibración como funciones del dominio. **Paso 2b.2 (aplicación, implementada el
+recalibración (la comparación de bases se eliminó el 2026-10-14) como funciones del dominio. **Paso 2b.2 (aplicación, implementada el
 2026-10-07):** versiones persistidas, registro de observaciones, anotaciones, eventos y
 aprobación, con los parámetros guardados como datos (ver «Parámetros como datos (M1)»). Rutas HTTP y adaptadores
 reales: Paso 3 (hecho). **Sin depuración automática (decisión del dueño, 2026-10-09):** ver «Sin depuración
@@ -18,14 +18,15 @@ automática».
 
 - **Estimador declarado:** MRCD, siempre. Sin *fallbacks* ni «modos rápidos» (ADR 0004, punto 5): si MRCD
   falla, la Fase I termina en `failed / MRCD_FIT_FAILED`.
-- **Artículo de referencia:** «Artículo T²MRCD del dueño (en proceso de publicación)» (P6). No bloquea; la
-  cita final (autores, año, revista) se incorpora cuando se publique (**deuda**).
+- **Referencia de la estadística (P6, cerrada 2026-10-14):** Pineda Jaramillo, K. S. (2026). *Carta de control robusta para observaciones individuales en fase I para procesos de alta dimensionalidad*. Tesis de maestría, Universidad Nacional de Colombia. https://repositorio.unal.edu.co/handle/unal/90389. El artículo derivado sigue en proceso; la
+  cita se cambiará al publicarse. La tesis trata la Fase I y deja la Fase II como trabajo futuro; no trae pruebas de
+  igualdad de S ni de μ.
 
 ## Estadística
 
 | Elemento | Definición | Fuente | Estado |
 | --- | --- | --- | --- |
-| Estadística T² por observación | Distancia de Mahalanobis al cuadrado respecto a la ubicación y dispersión MRCD, calculada con `pymrcd.mahalanobis` (la rutina de `CovMrcd.R:46`, `rrcov` 1.7-7) | Artículo T²MRCD del dueño (en proceso de publicación; sección/ecuación por citar al publicarse) | cálculo coincide bit a bit con `mah` de `CovMrcd`; cita final pendiente |
+| Estadística T² por observación | Distancia de Mahalanobis al cuadrado respecto a la ubicación y dispersión MRCD, calculada con `pymrcd.mahalanobis` (la rutina de `CovMrcd.R:46`, `rrcov` 1.7-7) | Tesis de Pineda Jaramillo (2026), UNAL, https://repositorio.unal.edu.co/handle/unal/90389 (sección/ecuación por precisar) | cálculo coincide bit a bit con `mah` de `CovMrcd` |
 
 ## Decisiones P1–P6 (dueño, 2026-10-07)
 
@@ -35,10 +36,10 @@ Los identificadores son los que citan `params.py`, `chart.py`, `bootstrap.py` y 
 | --- | --- | --- | --- |
 | P1 | MRCD se ajusta con `pymrcd`. Si un campo decisivo se pasa como `None`, la Fase I termina en `failed / T2MRCD_DECISION_PENDING` con `details.pending`, comprobado **antes** de ajustar. Valores «SOLO TEST» solo en `tests/support/` | `chart.py` (`fit_phase1`) | decidido |
 | P2 | Filas limpias = subconjunto `best` del ajuste MRCD del histórico con `alpha = 0.75` (default **de la carta**; `MRCDParams` conserva el 0.5 de `rrcov`). `h = ceiling(0.75·n)` (`rrcov` `detmrcd.R:397`): n = 100 → 75, n = 41 → 31 | `bootstrap.clean_criterion` (`best_subset_criterion`), `T2MRCD_MRCD_ALPHA` | **cerrada** |
-| P3 | B = `n_replicates` configurable, **100 por defecto**. Cita: Q. Heng, H. Shen y K. Lange (2026), «A stability framework for parameter selection in the minimum covariance determinant problem», *Journal of Computational and Graphical Statistics*, 35(1):27–39, doi:10.1080/10618600.2025.2495780 | `bootstrap.n_replicates` (`DEFAULT_N_REPLICATES`) | **cerrada**, con cita |
+| P3 | B = `n_replicates` configurable, **100 por defecto**. Respaldo por analogía y decisión del dueño (matiz 2026-10-14: en la tesis, Heng, Shen y Lange (2026) se usa para estimar `h` con `bootstrap_robpca`, 100 parejas bootstrap, ω = 0.75…0.9, no para calibrar límites). Cita: Q. Heng, H. Shen y K. Lange (2026), «A stability framework for parameter selection in the minimum covariance determinant problem», *Journal of Computational and Graphical Statistics*, 35(1):27–39, doi:10.1080/10618600.2025.2495780 | `bootstrap.n_replicates` (`DEFAULT_N_REPLICATES`) | **cerrada**, con cita |
 | P4 | `alpha_limit` es parámetro, default **0.005** (proporción, no porcentaje) → cuantil de probabilidad **0.995**. **Agregación (actualizada 2026-10-07, Paso 2b, Q1: pool)**: se juntan los T² de todas las réplicas y se toma un único cuantil 1−α. Sustituye al «promedio de cuantiles por réplica» (la «opción b» original de P4; no confundir con la etiqueta «Q1») porque con m valores por réplica y m·α < 1 el cuantil queda acotado por el máximo y el α efectivo sube (≈ 0.018 en Fase I con m = 75, ≈ 0.035 en Fase II con m ≈ 28, frente a 0.005). Regla de cuantil: tipo 7 (`numpy method="linear"` = default de `stats::quantile` de R), **elección técnica reversible no fijada por el dueño** | `bootstrap.alpha_limit` (`DEFAULT_ALPHA_LIMIT`), `bootstrap.aggregation` y `bootstrap.phase2_aggregation` (`pooled_quantile`; `mean_of_replicate_quantiles` fue eliminada), `QUANTILE_METHOD` | **cerrada** (regla de cuantil: ver «Decisiones abiertas») |
 | P5 | Remuestreo con reemplazo de tamaño `h` (las filas limpias); en cada réplica se reajusta MRCD. **Actualizada en 2b:** dos límites. Fase I: T² de la muestra (atípico histórico: `T² > límite`). Fase II: T² de las filas **OOB** con ese ajuste (señal: `T² > límite`, estricta). Revierte la anulación OOB del 2026-10-07 anterior (ADR 0007, enmienda) | `bootstrap.py` (`run_replicate`, `calibrate_limits`), `chart.py` | **cerrada**; implementada en 2b.1 |
-| P6 | `statistic_reference` = «Artículo T²MRCD del dueño (en proceso de publicación)» | `T2MRCDChart.statistic_reference` (`STATISTIC_REFERENCE`) | **cerrada**; cita final al publicarse (deuda) |
+| P6 | `statistic_reference` = Pineda Jaramillo, K. S. (2026). *Carta de control robusta para observaciones individuales en fase I para procesos de alta dimensionalidad*. Tesis de maestría, Universidad Nacional de Colombia. https://repositorio.unal.edu.co/handle/unal/90389 (decisión del dueño, 2026-10-14). El artículo derivado sigue en proceso; se cambiará al publicarse | `T2MRCDChart.statistic_reference` (`STATISTIC_REFERENCE`) | **cerrada** |
 
 `alpha` de MRCD (0.75, tamaño del subconjunto `h`) y `alpha_limit` (0.005, nivel del límite) son **parámetros
 distintos** y no deben confundirse.
@@ -49,23 +50,22 @@ distintos** y no deben confundirse.
 | --- | --- | --- |
 | `params.mrcd.alpha` | 0.75 (la carta) | Decisión del dueño 2026-10-07 (P2); el default de `MRCDParams` sigue siendo 0.5 (`rrcov` 1.7-7, ver [`mrcd.md`](mrcd.md)) |
 | `h` | `ceiling(0.75·n)` | `rrcov` `detmrcd.R:397` |
-| `params.bootstrap.n_replicates` | 100 | Heng, Shen y Lange (2026), doi:10.1080/10618600.2025.2495780 (P3) |
+| `params.bootstrap.n_replicates` | 100 | Por analogía con Heng, Shen y Lange (2026), doi:10.1080/10618600.2025.2495780, y decisión del dueño (P3; ver matiz) |
 | `params.bootstrap.alpha_limit` | 0.005 (cuantil 0.995) | Decisión del dueño 2026-10-07 (P4); sin cita bibliográfica |
 | `params.bootstrap.aggregation` | pool de los T² de todas las réplicas, un cuantil 1−α | Decisión del dueño 2026-10-07 (Paso 2b, Q1: pool); sustituye al promedio de cuantiles (ver motivo en P4) |
 | `params.bootstrap.phase2_alpha_limit` | 0.005 | Decisión del dueño 2026-10-07; sin cita bibliográfica |
 | regla de cuantil | tipo 7 (`method="linear"`) | `stats::quantile` de R (default); elección técnica reversible |
 | `params.bootstrap.clean_criterion` | subconjunto `best` de MRCD | Decisión del dueño 2026-10-07 (P2) |
-| `T2MRCDChart.statistic_reference` | «Artículo T²MRCD del dueño (en proceso de publicación)» | Decisión del dueño 2026-10-07 (P6) |
+| `T2MRCDChart.statistic_reference` | Tesis de Pineda Jaramillo (2026), UNAL (cita completa en P6) | Decisión del dueño 2026-10-14 (P6) |
 
 ### Mecanismo `details.pending`
 
 Con los defaults la Fase I no tiene nada pendiente. Si `bootstrap.aggregation` o `bootstrap.phase2_aggregation`
 se pasan explícitamente como `None`, la Fase I termina en `failed / T2MRCD_DECISION_PENDING` y
 `details.pending` los lista (comprobado antes de ajustar). La **recalibración** sí tiene pendientes con los
-defaults: `recalibration.covariance_test`, `recalibration.mean_test` y `recalibration.n_test_resamples` (las
-pruebas formales de cambio no tienen cita; ver más abajo). Con alguno en `None` la recalibración responde
-`T2MRCD_DECISION_PENDING` salvo `force_replace`, y también se comprueba antes de ajustar. El mecanismo existe
-para que una decisión futura sin cerrar nunca se rellene con un valor inventado.
+defaults. `T2MRCD_DECISION_PENDING` queda **solo para la Fase I**: desde el 2026-10-14 la recalibración no tiene
+decisiones estadísticas pendientes (se eliminó la comparación de bases; ver «Recalibración a petición»). El
+mecanismo existe para que una decisión futura sin cerrar nunca se rellene con un valor inventado.
 
 ## Límites de control: bootstrap
 
@@ -195,9 +195,8 @@ converge, porque MRCD no es «de composición»: en cada vuelta deja fuera otro 
 calcula siempre sobre el 75 % sobrante. Medido en el servidor (200 × 300, B = 100, 2 vCPU): 200 → 150 → 113 →
 85 → 64 → 48 → 36 filas en 6 rondas, 18,3 min, sin converger. El único filtro de filas es la **exclusión humana**
 por causa asignable. Flujos: **Fase I** = exclusión humana opcional al inicio → ajuste → límites → modelo, una
-sola pasada; **recalibración** = candidatas → exclusión humana desde anotaciones → ajuste → límites (NEW_ROWS) →
-comparación (o versión directa si reemplazo forzado) → si EXTEND, ajuste y límites de la extensión → versión.
-Sin `min_observations`, `insufficient`. La depuración quedó solo como historia en los ADR 0007 y 0008.
+sola pasada; **recalibración** = candidatas → exclusión humana desde anotaciones → (EXTEND) extensión → una sola Fase I
+(ajuste y límites) → versión. Sin `min_observations`, `insufficient`. La depuración quedó solo como historia en los ADR 0007 y 0008.
 
 ## Fase II (puntuación y señales)
 
@@ -217,15 +216,21 @@ inmutable, en estado propuesta**, que solo rige al aprobarse (ADR 0008). Pasos:
 1. **Selección:** base (versión) + rango de fechas. Mínimo de observaciones `min_observations` = 25. Si el rango
    incluye datos anteriores a un evento estructural, se rechaza (`RANGE_BEFORE_STRUCTURAL_EVENT`).
 2. **Exclusión humana:** solo las observaciones con causa asignable confirmada en las anotaciones; no hay
-   depuración automática. Se ajusta y se calibra (hueco `(1, 0)`) sobre las filas que quedan; si no se alcanza
-   `min_observations`, el resultado es `insufficient`.
-3. **Comparación con la base** (o versión directa si el reemplazo es forzado): cambio en S con Frobenius relativa ‖S₁−S₀‖_F/‖S₀‖_F (umbral parametrizable, 0.10) y
-   cambio en μ. **Reemplazar** si cualquiera de las pruebas formales de S o μ (`any_formal_test_change`) detecta
-   cambio, o además si el umbral lo supera **y** `threshold_decides = True`; si no, **ampliar**. Ver «Umbral
-   Frobenius parametrizable».
-4. **Nuevo límite de Fase II** por OOB con pool, heredando B, α y MRCD de la versión vigente (Q8). Si la
-   decisión es EXTEND, se ajusta y se calibra además la base ampliada (hueco `(0, 0)`).
+   depuración automática. Si tras excluir quedan menos de `min_observations`, el resultado es `insufficient`.
+3. **Regla de decisión (decisión del dueño, 2026-10-14):** **EXTEND por defecto**: la base más las observaciones
+   nuevas conservadas. **REPLACE** solo con `force_replace` (petición explícita) o si hay un evento estructural.
+   Justificaciones registradas: `default_extend`, `forced_replace`, `structural_event`.
+4. **Una sola Fase I** sobre el conjunto resultante (en EXTEND, la base ampliada; en REPLACE, las filas nuevas
+   conservadas): ajuste MRCD y bootstrap con los parámetros heredados de la versión vigente (Q8), que dan el
+   nuevo límite de Fase II por OOB con pool.
 5. **Propuesta** con reporte antes/después. `effective_from` posterior a la última observación puntuada (Q6).
+
+**Por qué se eliminó la comparación de bases (2026-10-14).** La carta T² ya es la prueba de hipótesis sobre la
+media del proceso; añadir otra prueba sobre μ y S para decidir entre ampliar y reemplazar no tiene sentido
+estadístico, y la tesis de referencia no trae pruebas de igualdad de S ni de μ. Se descartaron por completo (no
+quedan apagadas): pruebas formales, Frobenius relativa, `relative_change_threshold`, `threshold_decides`, la ruta
+`/comparisons` y los códigos asociados. La historia de la decisión anterior (Frobenius, umbral 0.10 informativo,
+pruebas pendientes de cita) está solo en los ADR 0008 y 0005.
 
 Constante técnica `BASE_CONSISTENCY_RTOL = 1e-9` (`chart.py`): al recalibrar se comprueba que la base recibida
 reproduce los T² guardados (`rtol`, redondeo de BLAS). Es una comprobación de consistencia, **no prueba
@@ -241,26 +246,8 @@ observaciones) genera aviso.
 | --- | --- | --- |
 | `min_observations` | 25, configurable, sin regla por variable (MRCD vale en alta y baja dimensión) | Documento de diseño del dueño, 2026-10-07; sin cita bibliográfica |
 | `phase2_alpha_limit` | 0.005 | Decisión del dueño 2026-10-07; sin cita |
-| `relative_change_threshold` | 0.10 sobre Frobenius relativa, configurable | Documento de diseño del dueño; **sin cita** (decisión abierta) |
-| `threshold_decides` | `False`: el umbral es informativo | Decisión del dueño 2026-10-07 (motivo abajo) |
 | revalidación | 6 meses o N observaciones, configurable | Documento de diseño del dueño; **sin cita** |
-| métrica de cambio en S | ‖S₁−S₀‖_F/‖S₀‖_F | Decisión del dueño (Q4); sin cita |
-
-### Umbral Frobenius parametrizable (decisión del dueño, 2026-10-07)
-
-`relative_change_threshold` (0.10) y `threshold_decides` (`False`). Con `False` el umbral solo se informa
-(`exceeds_threshold`) y deciden las pruebas formales de S y μ (`any_formal_test_change`); con `True` también
-reemplaza si el cambio supera el umbral. **Por qué el default `False`:** con datos estables la Frobenius relativa
-de MRCD sale ≈ 0.25–0.5 (n = 200, p = 3; 100 % de 60 pares > 0.10; ejemplo real: dos muestras 200×3 del mismo
-proceso dieron 57 % con MRCD y 28 % con la clásica), así que 0.10 reemplazaría siempre y nunca se ampliaría.
-Mientras las pruebas formales no tengan cita, la recalibración responde `T2MRCD_DECISION_PENDING` salvo
-`force_replace`, **en ambos modos**.
-
-### Pendiente: pruebas formales de cambio
-
-Las pruebas por remuestreo de igualdad de covarianzas y de medias **no tienen cita todavía**. Mientras falten,
-la recalibración termina en `failed / T2MRCD_DECISION_PENDING` (con `details.pending`: `recalibration.covariance_test`,
-`.mean_test`, `.n_test_resamples`) salvo que se fuerce el reemplazo; nunca se sustituyen por otra prueba sin fuente.
+| decisión EXTEND/REPLACE | EXTEND por defecto; REPLACE con `force_replace` o evento estructural | Decisión del dueño 2026-10-14 |
 
 ## Parámetros como datos (M1, Paso 2b.2)
 
@@ -269,13 +256,8 @@ Los registros persistidos (modelo, versión, recalibración) no pueden guardar f
 `nombre → estrategia` (`T2MRCDStrategies`). Es decisión de ingeniería, no estadística; lo estadístico sigue en las
 secciones anteriores.
 
-- **Nombres estables:** `best_subset` (criterio de fila limpia, P2), `pooled_quantile` (agregación, P4/Q1),
-  `frobenius_relative` (medida de cambio en S, Q4) y `any_formal_test_change` (regla de decisión). Cambiar un
+- **Nombres estables:** `best_subset` (criterio de fila limpia, P2) y `pooled_quantile` (agregación, P4/Q1). Cambiar un
   nombre rompe lo ya guardado; no se renombran.
-- **El registro de producción no trae pruebas formales de cambio** (`covariance_test`, `mean_test`): siguen sin
-  cita. Las pruebas «SOLO TEST» se registran únicamente en `tests/support/`, en una copia del registro. Con ellas
-  en `None` la recalibración responde `T2MRCD_DECISION_PENDING` (o `RECALIBRATION_DECISION_PENDING` si se detecta
-  al pedirla) salvo `force_replace`.
 - **Campo ausente al decodificar = el default ya citado** en las tablas de arriba; no se inventa otro valor.
 - **`seed` es obligatoria** al codificar y decodificar (reproducibilidad, ADR 0007); un **campo desconocido es
   error**, no se ignora, para que un dato mal escrito no cambie el método en silencio.
@@ -297,12 +279,14 @@ añaden estadística nueva y no tienen fuente en `rrcov` (son decisiones de dise
 datasets (`stage_lineage` en la aplicación, `stage_spawn_key` en la carta, mapa de huecos en `seeds.py`):
 
 - *Operación* = origen del dataset **raíz**: subida del cliente → `PHASE1` → hueco `(0, 0)`; candidatas de una
-  recalibración → `NEW_ROWS` → `(1, 0)`; base ampliada de una recalibración → `EXTENSION` → `(0, 0)`. REPLACE
-  reutiliza la calibración de las filas nuevas, `(1, 0)`.
+  recalibración forzada (REPLACE) → `NEW_ROWS` → `(1, 0)`; base ampliada de una recalibración (EXTEND) →
+  `EXTENSION` → `(0, 0)`. **Una sesión usa una sola operación** (M3, 2026-10-14): `NEW_ROWS` si es forzada,
+  `EXTENSION` si no; `/fits` y `/limits` lo comprueban. EXTEND ya no calcula la etapa `NEW_ROWS` (una calibración
+  bootstrap menos) y los modelos no cambian en bits (9/9 huellas de composición iguales).
 
 Por qué así: el linaje reconstruye el hueco desde los datos, de modo que el resultado no depende de cómo se
 encadenó ni de qué proceso lo corrió. El 0 del segundo componente (`STAGE_INDEX`) era la ronda de la depuración
-y se conserva para mantener los bits. Los huecos `(2,)` y `(3,)` (pruebas de S y μ) no cambian.
+y se conserva para mantener los bits. Los huecos `(2,)` y `(3,)` (que usaban las pruebas de S y μ) quedan libres.
 
 **Exclusión humana solo al inicio.** `POST/GET /v1/charts/t2mrcd/exclusions`. En Fase I recibe
 `{dataset_id, assignable_cause}` y solo se admite sobre el dataset **subido** (`422 INVALID_INPUT`,
@@ -311,8 +295,17 @@ inicial y una exclusión a mitad de cadena no tendría equivalente allí, lo que
 una recalibración recibe `{dataset_id}` y las filas salen de las anotaciones de las señales con causa asignable
 (P4); debe hacerse antes de cualquier ajuste (`human_exclusion_required`). `/limits` en Fase I exige `params`
 (`422 params_required`), no devuelve ronda y `POST /models` recibe solo `{fit_id, limits_id}`;
-`/comparisons` recibe `{recalibration_id, fit_id, limits_id}` (`RECALIBRATION_MISMATCH`,
+en una recalibración, `/fits` y `/limits` validan la cadena (`RECALIBRATION_MISMATCH`,
 `LIMITS_FIT_MISMATCH`).
+
+**Extensión (2026-10-14).** Paso síncrono `POST /v1/charts/t2mrcd/models/{id}/recalibrations/{rid}/extension`
+con `{dataset_id}` (el dataset de las filas conservadas) → `201 {dataset_id, n_base, n_kept_new}`: crea el dataset
+de la base ampliada (base + nuevas conservadas). Es idempotente. Errores 422 (`details.reason`):
+`forced_replace_has_no_extension`, `human_exclusion_required`, `extension_already_built`,
+`new_rows_require_replace`, `extension_requires_extend`; `RECALIBRATION_MISMATCH` con
+`not_kept_rows_of_recalibration`; `VERSION_INPUTS_MISMATCH` con `extension_required`. `GET …/recalibrations/{rid}`
+expone `kept_dataset_id` y `extension_dataset_id`. Por qué un paso aparte: el dataset ampliado debe existir antes
+del ajuste para que la cadena por pasos reproduzca en bits lo que hace `recalibrate`.
 
 **Herencia de parámetros.** Los parámetros se fijan en el primer ajuste y los hereda toda la cadena: el ajuste exige
 los parámetros de ajuste (`T2MRCD_FIT_PARAMS_MISMATCH`), los límites de un dataset derivado toman los de su
@@ -323,14 +316,14 @@ admitir parámetros distintos entre pasos produciría un modelo que `fit_phase1`
 existe: enviarlo da `422` por campo extra. Los campos decisivos pendientes (`None`) se comprueban de forma síncrona, antes de encolar.
 
 **Formatos.** Modelo, informe y metadatos de dataset pasan al formato 2; el formato 1 se rechaza
-(`unknown_format_version`) y no hay migración. Pasos de las tuberías: `exclusion, fit, limits, model,
-comparison, version`; `JobKind.EXCLUSION` va en el carril light; `provenance.exclusion_id` sustituye al
+(`unknown_format_version`) y no hay migración. `REPORT_FORMAT_VERSION = 3` desde el 2026-10-14 (se quitó
+`report.forced`, M2; el reporte ya no lleva comparación). Pasos de las tuberías: `exclusion, fit, limits, model,
+version` (y `extension` en recalibración EXTEND: `[exclusión] → extension → fit → limits → version`; forzada:
+`[exclusión] → fit → limits → version`); `JobKind.EXCLUSION` va en el carril light; `provenance.exclusion_id` sustituye al
 de la depuración.
 
 **Equivalencia comprobada.** Cadena HTTP = tubería = `fit_phase1` en Fase I; y la recalibración por pasos o por
-tubería = `recalibrate` en EXTEND, REPLACE forzado e INSUFFICIENT (pruebas de integración de cadena). Con
-reemplazo forzado no hay comparación S/μ; sin él, las pruebas formales siguen **sin cita** y la comparación
-responde `422 RECALIBRATION_DECISION_PENDING` (decisión abierta, ver abajo). `mrcd_threads` solo afecta al
+tubería = `recalibrate` en EXTEND, REPLACE forzado e INSUFFICIENT (pruebas de integración de cadena). `mrcd_threads` solo afecta al
 rendimiento.
 
 ## Tests golden
@@ -347,11 +340,12 @@ Referencia de la carta (distinta de la del estimador). Los tests del Paso 2 usan
 
 - **Regla de cuantil** (P4): hoy tipo 7 (`method="linear"`); elección técnica reversible, no fijada por el dueño
   ni por un artículo. Confirmar o cambiar.
-- **Cita final del artículo T²MRCD** (P6): autores, año, revista y sección/ecuación de la estadística, cuando
-  se publique (deuda de la regla dura 3).
+- **Cita del artículo derivado de la tesis** (P6): cambiar `statistic_reference` cuando se publique; precisar
+  sección/ecuación de la estadística T² en la tesis.
 - Cita bibliográfica del bootstrap de límites T² y del valor `alpha_limit = 0.005` (hoy decisiones del dueño).
-- **Pruebas formales de cambio en S y en μ** por remuestreo: pendientes de cita; también el umbral 0.10 y el 6 meses.
+- **Revalidación**: el valor de 6 meses no tiene cita (decisión del dueño).
+- **`h` estimado por `bootstrap_robpca`** (idea futura sin implementar): la tesis lo usa en T²MRCD_BRP, la carta de mejor desempeño; la app usa `h` fijo con `alpha` 0.75.
 - **Reponderado tipo MCD** para el remuestreo (estudio futuro; ver «Remuestreo solo sobre `best`»).
 - Fuente de referencia de los golden de la carta (¿código R existente o cálculo propio verificado contra el artículo?).
 
-**Cerradas el 2026-10-07:** P2, P3 (con cita), P4 (valor; agregación **pool** desde el Paso 2b), P5 (dos límites: Fase I y Fase II por OOB, desde el Paso 2b), P6 (referencia provisional) y la recalibración (versión inmutable propuesta, ADR 0008).
+**Cerradas el 2026-10-07:** P2, P3 (con cita), P4 (valor; agregación **pool** desde el Paso 2b), P5 (dos límites: Fase I y Fase II por OOB, desde el Paso 2b), P6 (referencia provisional; cerrada con la cita de la tesis el 2026-10-14) y la recalibración (versión inmutable propuesta, ADR 0008).

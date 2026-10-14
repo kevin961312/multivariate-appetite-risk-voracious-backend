@@ -172,3 +172,17 @@ se elimina, solo no entra en la estimación ni en el bootstrap.
   conservar los bits.
 - **Tiempos:** una calibración con 200 × 300, B = 100, 2 procesos × 1 hilo: 5,5 min; Fase I ≈ 6 min; memoria pico
   245 MB.
+
+## Enmienda 2026-10-14: P6 cerrada, matiz de P3 y fin de la comparación de bases
+
+- **P6 cerrada con cita real.** `statistic_reference` = Pineda Jaramillo, K. S. (2026). *Carta de control robusta
+  para observaciones individuales en fase I para procesos de alta dimensionalidad*. Tesis de maestría, Universidad
+  Nacional de Colombia. https://repositorio.unal.edu.co/handle/unal/90389. El artículo derivado sigue en proceso;
+  se cambiará al publicarse. La tesis trata la Fase I y deja la Fase II como trabajo futuro.
+- **Matiz de P3 (B = 100).** En la tesis, Heng, Shen y Lange (2026) se usa para estimar `h` (`bootstrap_robpca`, 100
+  parejas bootstrap, ω = 0.75…0.9), no para calibrar límites. Aquí respalda B = 100 por analogía y por decisión del
+  dueño.
+- **Idea futura, sin implementar:** `h` estimado por `bootstrap_robpca` (carta T²MRCD_BRP, la de mejor desempeño en
+  la tesis); la app usa `h` fijo con `alpha` 0.75.
+- La recalibración ya no compara bases (ADR 0008, enmienda 2026-10-14); el límite de Fase II se calcula en la
+  única Fase I de la recalibración.

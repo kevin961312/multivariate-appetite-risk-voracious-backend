@@ -170,7 +170,7 @@ los de la columna «después» son objetivo.
 | --- | --- | --- | --- | --- |
 | Ejecución de trabajos | `JobQueue` (recibe `JobRequest`) | `InlineJobQueue`: un `ThreadPoolExecutor` por carril ([ADR 0003](adr/0003-api-asincrona.md)) | `CeleryJobQueue` | `VORACIOUS_JOB_BACKEND=inline` |
 | Datasets (linaje, huella) | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash, M6; con Postgres, metadatos y fechas en la base) | `S3DatasetStorage` | `VORACIOUS_STORAGE`, `VORACIOUS_STORAGE_DIR` |
-| Ajustes, límites, exclusiones, tuberías, comparaciones | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ComparisonRepository` | `memory` (seguros entre hilos) o **Postgres** (`infrastructure/postgres/`, [ADR 0011](adr/0011-persistencia-en-postgres.md)); ambos con `claim` (CAS `queued → running`) | Postgres con TimescaleDB (sin fecha) | `VORACIOUS_REPOSITORY=memory\|postgres`, `VORACIOUS_DATABASE_URL` |
+| Ajustes, límites, exclusiones, tuberías | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository` | `memory` (seguros entre hilos) o **Postgres** (`infrastructure/postgres/`, [ADR 0011](adr/0011-persistencia-en-postgres.md)); ambos con `claim` (CAS `queued → running`) | Postgres con TimescaleDB (sin fecha) | `VORACIOUS_REPOSITORY=memory\|postgres`, `VORACIOUS_DATABASE_URL` |
 | Modelos y puntuaciones | `ModelRepository`, `MonitoringRepository` | `memory` o Postgres, con `claim` | ídem | ídem |
 | Ciclo de vida | `ModelVersionRepository` (append-only, CAS de estado, `add_proposal_if_none`), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` (`add_if_none_in_progress`) | `memory` o Postgres; altas atómicas (D6) con índices únicos parciales | ídem | ídem |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta nueva | — |
@@ -183,7 +183,7 @@ Decisiones de diseño de los puertos y registros:
 
 - **`JobRequest` solo lleva identificadores** (`kind`, `tenant_id`, `scope` = la carta, `resource_id` y, en los
   hijos de un modelo, `model_id`): los datos están en el repositorio y el mensaje sirve para cualquier cola.
-- **`JobKind` y carriles** (`lane_of`): `mrcd_fit` → `estimation`; `limits`, `comparison` →
+- **`JobKind` y carriles** (`lane_of`): `mrcd_fit` → `estimation`; `limits` →
   `calibration`; `exclusion`, `model_assembly`, `score`, `version_proposal` → `light`; `pipeline` → `orchestration`. Separarlos
   evita que un bootstrap de minutos bloquee una puntuación (ADR 0003, enmienda). `TRAIN`, `MONITOR` y `RECALIBRATE`
   se retiraron: ya no hay trabajos monolíticos (ADR 0009).
@@ -195,7 +195,7 @@ Decisiones de diseño de los puertos y registros:
 - **Atomicidad:** `claim` (CAS `queued → running`), `add_if_none_in_progress` y `add_proposal_if_none` son
   atómicos en el adaptador en memoria (cerrojos) y en el de Postgres (`UPDATE … RETURNING`, índices únicos parciales con
   `ON CONFLICT DO NOTHING`, `SELECT … FOR UPDATE`); ambos pasan la misma suite de contrato.
-- **Casos de uso** (`application/use_cases/`): uno o varios por paso (`steps`, `pipelines`, `comparisons`, `proposals`,
+- **Casos de uso** (`application/use_cases/`): uno o varios por paso (`steps`, `pipelines`, `proposals`,
   `recalibration_chain`, `monitoring`, `observations`, `recalibration`, `training`, `versions`), `dispatch` que lleva un `JobRequest` a su
   manejador, y los que ejecuta el worker (idempotentes por `claim`).
 
@@ -227,7 +227,6 @@ erDiagram
     tenants ||--o{ signal_annotations : "FK"
     tenants ||--o{ structural_events : "FK"
     tenants ||--o{ recalibrations : "FK"
-    tenants ||--o{ comparisons : "FK"
     datasets ||..o{ fits : "dataset_id (lógica)"
     fits ||..o{ limits : "fit_id (lógica)"
     datasets ||..o{ exclusions : "dataset_id (lógica)"
@@ -239,7 +238,6 @@ erDiagram
     observations ||..o{ signal_annotations : "observation_id (lógica)"
     models ||..o{ structural_events : "model_id (lógica)"
     models ||..o{ recalibrations : "model_id (lógica)"
-    recalibrations ||..o{ comparisons : "recalibration_id (lógica)"
     recalibrations ||..o{ model_versions : "recalibration_id (lógica)"
     tenants { text tenant_id PK }
     datasets { text tenant_id PK "PK (tenant_id, dataset_id)" }
@@ -268,7 +266,6 @@ ADR 0009) y así un recurso puede referirse a otro del mismo tenant sin acoplar 
 | `signal_annotations` | `(…, annotation_id)` | `signal_annotations_by_observation (…, observation_id, seq)` | Vale la de mayor `seq` por observación. Append-only. |
 | `structural_events` | `(…, event_id)` | `structural_events_by_date (…, occurred_at, registered_at, seq)` | Eventos que exigen nueva base. Append-only. |
 | `recalibrations` | `(…, recalibration_id)` | **`recalibrations_one_in_progress`**: único parcial `WHERE status IN ('queued','running')` (D6); `recalibrations_by_id` | Una recalibración en curso por modelo. |
-| `comparisons` | `(…, comparison_id)` | `comparisons_unfinished` parcial; `recalibration_id` | Comparación S/μ de la recalibración. |
 | `schema_migrations` | `version` | `checksum` SHA-256, `applied_at` | La crea el ejecutor, no la migración. |
 
 **Fechas y nombres de variables.** Pedido del dueño para trazabilidad y para recalibrar con datos de enero a
@@ -327,7 +324,7 @@ del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
 | Fase I | `POST/GET <c>/fits`, `<c>/limits`, `<c>/exclusions`; `POST <c>/models` (solo referencias) | `202 {id, status:"queued"}` + `GET` |
 | Orquestación | `POST <c>/pipelines/phase1`, `GET <c>/pipelines/{id}` | `202`; encadena los pasos anteriores |
 | Fase II | `POST <c>/models/{id}/scores`, `GET …/scores/{id}` | `202` + `GET` |
-| Ciclo de vida | `…/observations`, `…/annotations` (POST), `…/structural-events`, `…/recalibrations` (+ `cancel`), `…/comparisons`, `…/versions` (+ `approve`, `reject`), `…/status` | ver ADR 0005 |
+| Ciclo de vida | `…/observations`, `…/annotations` (POST), `…/structural-events`, `…/recalibrations` (+ `cancel`, `…/{rid}/extension`), `…/versions` (+ `approve`, `reject`), `…/status` | ver ADR 0005 |
 
 - Estados `queued | running | succeeded | failed`. Un fallo de dominio **de un trabajo** queda en el registro y el
   `GET` responde `200`; los errores **síncronos** usan el formato `{code, message, details}` y los estados de
@@ -379,3 +376,10 @@ la base) y su `justification` (`initial_fit`, `structural_event`, `forced_replac
   {status: ready, checks}`; si algo falla: **`503 {status: not_ready, checks}`** con el check en `fail`. Decisión
   cerrada en el [ADR 0011](adr/0011-persistencia-en-postgres.md). Con todo en memoria `checks` va vacío.
 - La cola no tiene check (vive en el proceso): deuda hasta la cola distribuida (Redis).
+
+## Nota 2026-10-14: sin comparación de bases
+
+Se eliminó la comparación de bases de la recalibración (ADR 0008, enmienda 2026-10-14): ya no hay
+`ComparisonRepository`, tabla `comparisons` (migración `0002_drop_comparisons.sql`, ADR 0011, enmienda), `JobKind`
+de comparación ni ruta `/comparisons`. Se añade el paso síncrono `…/recalibrations/{rid}/extension` (ADR 0005,
+enmienda 2026-10-14) y `GET …/recalibrations/{rid}` expone `kept_dataset_id` y `extension_dataset_id`.

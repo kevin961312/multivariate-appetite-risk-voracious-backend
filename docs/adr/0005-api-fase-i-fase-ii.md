@@ -236,3 +236,22 @@ decir qué pasa con un trabajo cuando el servicio se reinicia. Decisiones en el
   alguno, **`503`** con `status: not_ready`. Cierra la decisión abierta del código HTTP.
 - Estados de job: se acepta `cancelled` en la base (ya lo producía `cancel` de la recalibración); la API sigue
   exponiendo `queued | running | succeeded | failed` para los trabajos y `cancelled` donde ya existía.
+
+## Enmienda 2026-10-14: sin comparación de bases; paso de extensión
+
+Por qué: se elimina la comparación de bases (ADR 0008, enmienda 2026-10-14). Sustituye lo anterior en lo que choque.
+
+- **Rutas:** desaparecen `POST/GET …/comparisons`. Se añade el paso síncrono
+  `POST /v1/charts/t2mrcd/models/{id}/recalibrations/{rid}/extension` con `{dataset_id}` → `201 {dataset_id,
+  n_base, n_kept_new}`: crea el dataset de la base ampliada; es idempotente. `GET …/recalibrations/{rid}` expone
+  `kept_dataset_id` y `extension_dataset_id`.
+- **Códigos eliminados** (los tres desaparecen del catálogo): `RECALIBRATION_DECISION_PENDING`,
+  `COMPARISON_NOT_FOUND`, `COMPARISON_NOT_READY`. `JobKind.COMPARISON` se retira (el carril `calibration` queda con
+  `limits`). `T2MRCD_DECISION_PENDING` queda solo para Fase I.
+- **Códigos 422 nuevos** (`details.reason`): `forced_replace_has_no_extension`, `human_exclusion_required`,
+  `extension_already_built`, `new_rows_require_replace`, `extension_requires_extend`. `RECALIBRATION_MISMATCH` con
+  `not_kept_rows_of_recalibration`; `VERSION_INPUTS_MISMATCH` con `extension_required`.
+- **Cadena de pasos:** EXTEND `[exclusión] → extension → fit → limits → version`; forzada
+  `[exclusión] → fit → limits → version`. Una sesión usa una sola operación (M3): NEW_ROWS si es forzada,
+  EXTENSION si no; `/fits` y `/limits` lo comprueban.
+- **Pasos de tubería:** `exclusion, fit, limits, model, version` (más `extension` en EXTEND). Informe en formato 3.

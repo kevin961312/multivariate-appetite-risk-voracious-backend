@@ -85,3 +85,12 @@ depuración» y el paso `/depurations` del texto original ya no existen. Queda `
 dominio ya no ofrece `depurate_step`. Los límites de Fase I exigen `params` en lugar de heredarlos
 (`LIMITS_PARAMS_MISMATCH` desaparece). Contratos en la enmienda del ADR 0005.
 
+
+## Enmienda 2026-10-14: sin comparación; paso `/extension`
+
+Por qué: la comparación de bases se eliminó (ADR 0008, enmienda 2026-10-14). La recalibración deja de pasar por
+`/comparisons`; el recurso nuevo es `POST …/models/{id}/recalibrations/{rid}/extension {dataset_id}` (síncrono,
+`201`, idempotente), que construye la base ampliada para que la cadena por pasos dé los mismos bits que
+`recalibrate`. Cadena EXTEND: `[exclusión] → extension → fit → limits → version`; forzada: `[exclusión] → fit →
+limits → version`. La equivalencia en bits se conserva (EXTEND, REPLACE forzado e INSUFFICIENT). Contratos y
+códigos en la enmienda del ADR 0005.

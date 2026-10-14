@@ -172,3 +172,27 @@ B = 100, 2 vCPU: 200 → 150 → 113 → 85 → 64 → 48 → 36 filas en 6 rond
   Fase I ≈ 6 min (estimado de la ronda 0 medida); memoria pico 245 MB; con la cascada antigua, 18,3 min.
 - **Campos eliminados:** `max_depuration_rounds`, `depuration_rounds`, `depuration_converged`,
   `final_depuration_skipped`. Modelo, informe y metadatos de dataset pasan al formato 2; el 1 se rechaza.
+
+## Enmienda 2026-10-14: sin comparación de bases; EXTEND por defecto
+
+Supera el punto de la comparación con Frobenius relativa y pruebas formales (texto original), la regla de decisión
+`change_detected`/`no_change_detected`, el pendiente de las pruebas formales y el párrafo «Decisiones pendientes
+síncronas» de la enmienda 2b.2 (el texto original queda como historial). Decisión del dueño, 2026-10-14.
+
+**Por qué:** la carta T² ya es la prueba de hipótesis sobre la media del proceso; otra prueba sobre μ y S para
+decidir entre ampliar y reemplazar no tiene sentido. Además la tesis de referencia (P6) no trae pruebas de
+igualdad de S ni de μ, así que seguían sin fuente. Se elimina por completo (sin código apagado): pruebas
+formales, Frobenius relativa, `relative_change_threshold`, `threshold_decides`, `/comparisons`,
+`ComparisonRepository`, `JobKind.COMPARISON` y los códigos `RECALIBRATION_DECISION_PENDING`,
+`COMPARISON_NOT_FOUND`, `COMPARISON_NOT_READY`.
+
+**Regla nueva:** exclusión humana (causa asignable) → **EXTEND por defecto** (base + nuevas conservadas) → una
+sola Fase I → propuesta. **REPLACE** solo con `force_replace` (petición explícita) o evento estructural.
+`INSUFFICIENT` si quedan menos de `min_observations` (25). `ModelVersion.justification` pasa a `initial_fit`,
+`default_extend`, `forced_replace` o `structural_event` (desaparecen `change_detected` y `no_change_detected`).
+Reporte: `REPORT_FORMAT_VERSION = 3` (sin `report.forced`, M2). Los huecos de semilla `(2,)` y `(3,)` quedan libres.
+`T2MRCD_DECISION_PENDING` queda solo para la Fase I.
+
+Los modelos no cambian en bits (9/9 huellas de composición iguales); EXTEND ya no calcula la etapa `NEW_ROWS`, una
+calibración bootstrap menos. Pendientes que quedan: cita del 6 meses de revalidación y del bootstrap; P6 queda
+cerrada con la tesis (ver [`../metodos/t2mrcd.md`](../metodos/t2mrcd.md)).

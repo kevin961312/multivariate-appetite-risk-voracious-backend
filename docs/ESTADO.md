@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-09 (Paso 4 hecho: 4.0, 4.1 y 4.2 — Docker, CI y Postgres; eliminada la depuración automática y medidos los tiempos de Fase I en el servidor).
+Última actualización: 2026-10-14 (eliminada la comparación de bases de la recalibración: EXTEND por defecto y paso `/extension`; P6 cerrada con la tesis). Antes, 2026-10-09: Paso 4 hecho (4.0, 4.1 y 4.2 — Docker, CI y Postgres; sin depuración automática).
 
 **Siguiente hito:** despliegue en el servidor de demo (Compose con Postgres, `.env` del servidor, `migrate`, `scripts/demo_seed.py`).
 
@@ -117,7 +117,7 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
 - **3.3 Fase I por API:** datasets, `fits`, `limits`, `exclusions`, `models` (solo referencias), `pipelines`.
   Equivalencia en bits cadena HTTP = tubería = `fit_phase1`. Semilla deducida del linaje
   ([`metodos/t2mrcd.md`](metodos/t2mrcd.md)).
-- **3.4 Fase II y recalibración por API:** `scores`, `recalibrations` (stepwise/pipeline, `cancel`), `comparisons`,
+- **3.4 Fase II y recalibración por API:** `scores`, `recalibrations` (stepwise/pipeline, `cancel`; `comparisons` retirada el 2026-10-14),
   `versions`, anotaciones por POST append-only. Equivalencia en bits con `recalibrate`.
 - **Mejoras hechas:** M1 (estado codificado), M2 (CSV), M3 (`?include=`), M6 (`LocalDatasetStorage` con hash).
 
@@ -125,7 +125,7 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
 
 - P1: una sola API de MRCD con `alpha` parametrizable (default 0.75); no hay «MRCD puro».
 - P2: `/models` solo con referencias.
-- P3: la comparación responde `RECALIBRATION_DECISION_PENDING` mientras no haya pruebas formales citadas.
+- P3: ~~la comparación responde `RECALIBRATION_DECISION_PENDING`~~ (superada el 2026-10-14: la comparación se eliminó).
 - P4: anotaciones append-only por `POST`.
 - P5: commit único al final del Paso.
 
@@ -208,8 +208,7 @@ la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [A
 - **Límites:** remuestreo no paramétrico, nunca normal; Fase II por OOB (**revierte** la anulación del Paso 2);
   **Q1 pool** en ambas fases (sustituye el promedio de cuantiles; motivo: α efectivo ≈ 0.018 y ≈ 0.035 frente a 0.005);
   `phase2_alpha_limit` 0.005. Q2: v0 vigila con el límite de Fase I; las recalibradas con el de Fase II.
-- **Recalibración:** Q3 ~~depuración humana + automática~~ (solo humana desde el 2026-10-09); Q4 Frobenius relativa, umbral 0.10 orientativo, reemplazar si
-  cualquier señal de cambio; Q5 ~~máx. 5 vueltas~~ (superada: no hay depuración); Q6 `effective_from` no retroactivo; Q7 con «requiere nueva base» se
+- **Recalibración:** Q3 ~~depuración humana + automática~~ (solo humana desde el 2026-10-09); Q4 ~~Frobenius relativa, umbral 0.10, reemplazar si hay señal de cambio~~ (superada el 2026-10-14: EXTEND por defecto, REPLACE solo forzado o con evento estructural); Q5 ~~máx. 5 vueltas~~ (superada: no hay depuración); Q6 `effective_from` no retroactivo; Q7 con «requiere nueva base» se
   sigue vigilando; Q8 hereda B, α y MRCD; Q9 «Fase II > Fase I» es diagnóstico; Q12 solo se anotan señales.
   Mínimo 25 observaciones.
 - **Mejoras:** aprobadas M1 (estrategias por nombre, en 2b.2) y M6 (error Monte Carlo); M5 (optimizar `pymrcd`) antes de
@@ -227,9 +226,8 @@ la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md) y la del [A
   límite (enmascaramiento). Consecuencia medida: falsa alarma real ≈ 2.0–2.4 % (Fase I) y ≈ 1.6–2.2 % (Fase II)
   frente al 0.5 % nominal (≈ 0.4 % con todas las filas). Re-medida sin depuración: ver «Sin depuración automática».
   Característica del diseño, no error.
-- **Umbral Frobenius parametrizable:** `relative_change_threshold` 0.10 y `threshold_decides = False` (informativo;
-  deciden las pruebas formales de S y μ). Motivo: con datos estables la Frobenius de MRCD sale ≈ 0.25–0.5. Sin
-  pruebas citadas, la recalibración responde `T2MRCD_DECISION_PENDING` salvo `force_replace`, en ambos modos.
+- ~~**Umbral Frobenius parametrizable**~~ (`relative_change_threshold`, `threshold_decides`): **superado el 2026-10-14**,
+  se eliminó junto con toda la comparación de bases (ver «Decisión del dueño 2026-10-14»).
 - **Error MC con B = 1:** `None` (no disponible).
 - **Hash del contenido de la base:** hecho en 2b.2 (`base_hash`, SHA-256).
 
@@ -239,6 +237,22 @@ El dueño propuso calcular el límite con bootstrap de los **valores** de T² de
 (límite ≈ máximo de `best`; falsa alarma con nuevas 34–37 % con n = 200, p = 10 y 100 % con n = 100, p = 250) y
 **el dueño decidió mantener lo implementado** (remuestrear filas y reajustar MRCD). Detalle en
 [`metodos/t2mrcd.md`](metodos/t2mrcd.md) y la enmienda del [ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md).
+
+### Decisión del dueño (2026-10-14): sin comparación de bases
+
+Se elimina por completo la comparación de bases de la recalibración (pruebas de S y μ, Frobenius relativa,
+umbral, `/comparisons`, `ComparisonRepository` y tres códigos de error). **Por qué:** la carta T² ya es la prueba
+de hipótesis sobre la media; otra prueba sobre μ y S no tiene sentido, y la tesis no trae pruebas de igualdad.
+Regla nueva: exclusión humana → **EXTEND por defecto** → una sola Fase I → propuesta; REPLACE solo con
+`force_replace` o evento estructural; INSUFFICIENT si quedan < 25. Nuevo paso síncrono `…/recalibrations/{rid}/extension`.
+Migración `0002_drop_comparisons.sql` con guarda (aborta si hay recalibraciones; la demo vieja se recrea).
+`REPORT_FORMAT_VERSION = 3`; modelos idénticos en bits (9/9 huellas); EXTEND calcula una calibración menos.
+Detalle: [ADR 0008](adr/0008-ciclo-de-vida-de-la-carta.md), [0005](adr/0005-api-fase-i-fase-ii.md),
+[0009](adr/0009-api-por-pasos-encadenables.md), [0011](adr/0011-persistencia-en-postgres.md).
+**P6 resuelta:** Pineda Jaramillo, K. S. (2026), *Carta de control robusta para observaciones individuales en fase I
+para procesos de alta dimensionalidad*, tesis de maestría, UNAL, https://repositorio.unal.edu.co/handle/unal/90389
+(el artículo derivado sigue en proceso). Matiz de P3: en la tesis Heng, Shen y Lange (2026) estima `h`, no límites.
+Idea futura sin implementar: `h` por `bootstrap_robpca` (T²MRCD_BRP).
 
 ## Paso 2: decisiones del dueño (2026-10-07)
 
@@ -251,7 +265,7 @@ El dueño propuso calcular el límite con bootstrap de los **valores** de T² de
 - **P5 (modificada):** remuestreo con reemplazo de tamaño `h`; *un único límite para Fase I y Fase II
   (anulación de la parte out-of-bag), **revertida en el Paso 2b**: dos límites*; señal `t2 > límite` estricta
   ([ADR 0007](adr/0007-limites-t2mrcd-por-bootstrap.md)).
-- **P6 (cerrada):** `statistic_reference` = artículo T²MRCD del dueño, en proceso de publicación.
+- **P6 (cerrada; cita real el 2026-10-14):** `statistic_reference` = tesis de Pineda Jaramillo (2026), UNAL (ver abajo).
 - **Mejoras aplicadas:** M1 (el dominio no importa IO, procesos ni hilos), M2, M4 (`TaskMapper` con contexto
   enviado una vez) y M5. **Aplazadas:** M3 (`DatasetStorage`, al Paso 3) y M6 (optimizar `pymrcd`).
 - **Sin pendientes con los defaults:** la Fase I se ejecuta completa; `T2MRCD_DECISION_PENDING` solo aparece si
@@ -311,9 +325,8 @@ correrlo en un servidor con más núcleos.
 ## Decisiones abiertas
 
 - **Regla de cuantil** tipo 7 (`method="linear"`): elección técnica reversible; confirmar o cambiar.
-- **Pruebas formales de cambio en S y en μ** (remuestreo) de la recalibración: pendientes de cita; sin ellas la
-  recalibración termina en `failed / T2MRCD_DECISION_PENDING` salvo reemplazo forzado.
-- Cita del umbral 0.10 y de la revalidación de 6 meses (hoy documento del dueño, orientativos).
+- Cita de la revalidación de 6 meses (hoy documento del dueño, orientativa).
+- Precisar sección/ecuación de la estadística T² en la tesis (P6) y cambiar la cita al publicarse el artículo derivado.
 - Cita del bootstrap de límites T² y de `alpha_limit = 0.005` (hoy decisiones del dueño).
 - Fuente de los golden de la carta T²MRCD.
 - (Cerrada en 4.2) Código de HTTP de `/ready` cuando un check falle: `503` ([ADR 0011](adr/0011-persistencia-en-postgres.md)).
@@ -323,8 +336,7 @@ correrlo en un servidor con más núcleos.
 
 ### Del Paso 2 que sigue abierto
 
-- **Cita final del artículo T²MRCD** (P6): sustituir `STATISTIC_REFERENCE` cuando se publique (regla dura 3).
-- **Citas de las pruebas formales de cambio en S y μ** (hoy sin cita; bloquean la recalibración sin `force_replace`).
+- **Artículo derivado de la tesis** (P6): sustituir `STATISTIC_REFERENCE` cuando se publique (hoy cita la tesis).
 - **Reponderado tipo MCD** (añadir a `best` las observaciones con distancia robusta no extrema): estudio futuro para
   acercar la falsa alarma real al 0.5 % nominal.
 - **Bootstrap suavizado (kernel sobre el pool de T²)**: estudio futuro de baja prioridad (dueño, 2026-10-07: «no se

@@ -39,20 +39,19 @@ Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio
   0.75)**: con todas las filas una contaminación no detectada inflaría el límite (enmascaramiento). **Sin depuración automática (dueño, 2026-10-09):** quitar el 25 % fuera de `best` y repetir nunca converge con MRCD (200 → 36 filas en 6 rondas, 18,3 min); el único filtro de filas es la exclusión humana por causa asignable y la Fase I es una sola pasada (≈ 6 min con 200×300, B = 100, 2 vCPU). **Falsa
   alarma real conocida (media entre semillas, varía ~1–3.8 %):** frente a observaciones nuevas en control es
   ≈ 2.3 % en Fase I y ≈ 2.1 % en Fase II (n = 200, p = 3, sin depuración; p > n no medido) frente al 0.5 % nominal, porque `best` es el 75 % central; es una característica del diseño, no un error
-  (estudio futuro: reponderado tipo MCD). El umbral Frobenius de la recalibración es parametrizable
-  (`relative_change_threshold` 0.10; `threshold_decides = False`: solo informativo, deciden las pruebas formales
-  de S y μ). El **ciclo de vida** (versiones inmutables
+  (estudio futuro: reponderado tipo MCD). La **recalibración no compara bases** (dueño, 2026-10-14: la carta T² ya es la prueba sobre la media):
+  exclusión humana → **EXTEND por defecto** (base + nuevas conservadas) → una sola Fase I → propuesta; **REPLACE**
+  solo con `force_replace` o evento estructural; `INSUFFICIENT` si quedan < 25. Un paso síncrono `…/recalibrations/{rid}/extension`
+  crea la base ampliada. El **ciclo de vida** (versiones inmutables
   propuestas y aprobadas, registro de observaciones, anotaciones, eventos estructurales, recalibración y
   revalidación) lo posee el backend: [ADR 0008](docs/adr/0008-ciclo-de-vida-de-la-carta.md) (dominio en 2b.1;
-  aplicación en 2b.2). Pendientes: pruebas formales de cambio en S y μ, cita del bootstrap y de los umbrales (0.10, 6 meses),
-  P6 (cita del artículo T²). Detalle en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté
+  aplicación en 2b.2). Pendientes: cita del bootstrap y de la revalidación (6 meses). P6 cerrada: `statistic_reference` es la tesis de Pineda Jaramillo (2026), UNAL. Detalle en [`docs/metodos/t2mrcd.md`](docs/metodos/t2mrcd.md); lo que no esté
   documentado allí queda como **decisión abierta**.
 - **Sin placeholders estadísticos.** MRCD se ajusta con `pymrcd` (el port de `rrcov::CovMrcd`, ADR 0006).
   Con los defaults decididos la Fase I se ejecuta completa; si un campo decisivo se pasa explícitamente como
   `None`, la Fase I de T²MRCD no se ejecuta: el dominio responde `T2MRCD_DECISION_PENDING` con `details.pending` (lista de
   campos pendientes), comprobado **antes** de ajustar nada (la API por pasos lo comprueba de forma síncrona, 422);
-  la recalibración, mientras las pruebas formales de S y μ no tengan cita, responde
-  `422 RECALIBRATION_DECISION_PENDING` salvo `force_replace`. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
+  la recalibración no tiene decisiones pendientes. Los valores «SOLO TEST» que permiten ejecutar la Fase I en pruebas viven únicamente en
   `tests/support/`, nunca en `src/`. Nada de covarianza clásica «mientras tanto».
 
 ## 2. Arquitectura (hexagonal)
@@ -63,7 +62,7 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Pieza | Puerto | Adaptador hoy | Adaptador después |
 | --- | --- | --- | --- |
 | Ejecución de los pasos | `JobQueue` | `InlineJobQueue` (un hilo-pool por carril: estimation, calibration, light, orchestration) | `CeleryJobQueue` |
-| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository`, `ComparisonRepository` | `memory` (seguros entre hilos, con `claim`) o **Postgres 17** (`VORACIOUS_REPOSITORY=postgres`; sin TimescaleDB por ahora) | Postgres con TimescaleDB |
+| Persistencia de pasos y modelos | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository`, `ModelRepository`, `MonitoringRepository` | `memory` (seguros entre hilos, con `claim`) o **Postgres 17** (`VORACIOUS_REPOSITORY=postgres`; sin TimescaleDB por ahora) | Postgres con TimescaleDB |
 | Datos de entrada | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash) | `S3DatasetStorage` |
 | Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | `memory` (altas atómicas) o Postgres (índices únicos parciales) | Postgres con TimescaleDB |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta |
@@ -79,7 +78,7 @@ Puertos auxiliares: `IdGenerator` y `Clock` (`UuidIdGenerator`, `SystemClock`). 
 API **por pasos independientes, encadenables por id** ([ADR 0009](docs/adr/0009-api-por-pasos-encadenables.md);
 rutas y catálogo de códigos en la enmienda del Paso 3 del [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)),
 asíncrona ([ADR 0003](docs/adr/0003-api-asincrona.md)): `/v1/datasets`, `/v1/charts/t2mrcd/{fits,limits,exclusions,models,pipelines}`
-y, bajo `…/models/{id}`, `scores`, `observations`, `structural-events`, `recalibrations`, `comparisons` y `versions`.
+y, bajo `…/models/{id}`, `scores`, `observations`, `structural-events`, `recalibrations` (con `…/{rid}/extension`) y `versions`.
 Cada `POST` de cómputo responde `202 {id, status:"queued"}`. Estados `queued | running | succeeded | failed`.
 Encadenar los pasos, la tubería y `fit_phase1`/`recalibrate` dan el mismo modelo **en bits**; no se rompe esa
 equivalencia al tocar un paso. MRCD se expone bajo la carta con `alpha` parametrizable (default 0.75); no hay «MRCD puro».
