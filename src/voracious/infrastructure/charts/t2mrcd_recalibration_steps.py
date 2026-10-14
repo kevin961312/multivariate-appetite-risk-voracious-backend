@@ -1,7 +1,7 @@
 """Adaptador ``RecalibrationSteps`` de T²MRCD: traduce datos a las piezas de la recalibración.
 
 Sin lógica estadística: decodifica parámetros con el codec de la carta (M1) y llama a
-``compare``, ``decide`` y ``assemble_model`` de la carta, y construye el informe con los mismos
+``decide`` y ``assemble_model`` de la carta, y construye el informe con los mismos
 campos que ``T2MRCDChart.recalibrate`` (``tests/integration/test_recalibration_chain.py``
 comprueba la equivalencia en bits).
 """
@@ -16,7 +16,6 @@ from voracious.application.phase1_steps import Calibration
 from voracious.application.recalibration_steps import RecalibrationSteps
 from voracious.domain.charts.t2mrcd import (
     BootstrapLimits,
-    ComparisonResult,
     LimitRegime,
     LimitsSnapshot,
     T2MRCDChart,
@@ -24,14 +23,11 @@ from voracious.domain.charts.t2mrcd import (
     T2MRCDRecalibrationParams,
     T2MRCDRecalibrationReport,
     decide,
-    decode_comparison,
-    encode_comparison,
 )
 from voracious.domain.common import (
     FloatMatrix,
     RecalibrationDecision,
     RowDisposition,
-    TaskMapper,
 )
 from voracious.domain.estimators.mrcd import MRCDFit
 
@@ -52,24 +48,6 @@ def _model(value: object) -> T2MRCDModel:
     """
     if not isinstance(value, T2MRCDModel):
         msg = f"se esperaba T2MRCDModel, no {type(value).__name__}"
-        raise TypeError(msg)
-    return value
-
-
-def _comparison(value: object) -> ComparisonResult:
-    """La comparación opaca como ``ComparisonResult``.
-
-    Args:
-        value: Comparación.
-
-    Returns:
-        La comparación.
-
-    Raises:
-        TypeError: Si no es un ``ComparisonResult`` (error de integración).
-    """
-    if not isinstance(value, ComparisonResult):
-        msg = f"se esperaba ComparisonResult, no {type(value).__name__}"
         raise TypeError(msg)
     return value
 
@@ -175,41 +153,8 @@ class T2MRCDRecalibrationSteps:
         """
         return self._recalibration(recalibration_params).min_observations
 
-    def compare(
-        self,
-        active_model: object,
-        base: FloatMatrix,
-        new_kept: FloatMatrix,
-        fit: object,
-        recalibration_params: Mapping[str, object],
-        *,
-        mapper: TaskMapper,
-    ) -> ComparisonResult:
-        """``T2MRCDChart.compare`` con los parámetros decodificados.
-
-        Args:
-            active_model: Modelo vigente.
-            base: Base vigente.
-            new_kept: Filas nuevas conservadas.
-            fit: Ajuste de esas filas.
-            recalibration_params: Parámetros de la recalibración.
-            mapper: Reparto de los remuestreos.
-
-        Returns:
-            La comparación.
-        """
-        return self.chart.compare(
-            _model(active_model),
-            base,
-            new_kept,
-            _fit(fit),
-            self._recalibration(recalibration_params),
-            mapper,
-        )
-
     def decide(
         self,
-        comparison: object | None,
         *,
         n_kept: int,
         recalibration_params: Mapping[str, object],
@@ -218,16 +163,14 @@ class T2MRCDRecalibrationSteps:
         """``revalidation.decide`` (la misma función que usa ``recalibrate``).
 
         Args:
-            comparison: Comparación o ``None``.
             n_kept: Filas nuevas conservadas.
             recalibration_params: Parámetros de la recalibración.
-            force_replace: Reemplazo forzado.
+            force_replace: Reemplazo pedido (evento estructural o petición explícita).
 
         Returns:
             La decisión.
         """
         return decide(
-            None if comparison is None else _comparison(comparison),
             n_kept=n_kept,
             min_observations=self._recalibration(recalibration_params).min_observations,
             force_replace=force_replace,
@@ -266,11 +209,9 @@ class T2MRCDRecalibrationSteps:
         active_model: object,
         *,
         decision: RecalibrationDecision,
-        forced: bool,
         n_base: int,
         new_dispositions: Sequence[RowDisposition],
         recalibration_params: Mapping[str, object],
-        comparison: object | None,
         model: object | None,
     ) -> T2MRCDRecalibrationReport:
         """Informe con los mismos campos que ``T2MRCDChart.recalibrate``.
@@ -278,11 +219,9 @@ class T2MRCDRecalibrationSteps:
         Args:
             active_model: Modelo vigente.
             decision: Decisión.
-            forced: Reemplazo forzado.
             n_base: Filas de la base vigente.
             new_dispositions: Destino de cada fila nueva.
             recalibration_params: Parámetros de la recalibración.
-            comparison: Comparación o ``None``.
             model: Modelo nuevo o ``None``.
 
         Returns:
@@ -292,7 +231,6 @@ class T2MRCDRecalibrationSteps:
         dispositions = tuple(new_dispositions)
         return T2MRCDRecalibrationReport(
             decision=decision,
-            forced=forced,
             row_disposition=(RowDisposition.ALREADY_IN_BASE,) * n_base + dispositions,
             n_base=n_base,
             n_new=len(dispositions),
@@ -301,35 +239,12 @@ class T2MRCDRecalibrationSteps:
             ),
             n_kept_new=dispositions.count(RowDisposition.KEPT),
             min_observations=self._recalibration(recalibration_params).min_observations,
-            comparison=None if comparison is None else _comparison(comparison),
             before=LimitsSnapshot.of(_model(active_model)),
             after=None if new_model is None else LimitsSnapshot.of(new_model),
             phase2_exceeds_phase1=None
             if new_model is None
             else new_model.limits.phase2_exceeds_phase1,
         )
-
-    def encode_comparison(self, comparison: object) -> dict[str, object]:
-        """Codifica la comparación (exacta en bits).
-
-        Args:
-            comparison: Comparación.
-
-        Returns:
-            Diccionario.
-        """
-        return encode_comparison(_comparison(comparison))
-
-    def decode_comparison(self, data: Mapping[str, object]) -> ComparisonResult:
-        """Decodifica la comparación.
-
-        Args:
-            data: Comparación codificada.
-
-        Returns:
-            La comparación.
-        """
-        return decode_comparison(data)
 
 
 if TYPE_CHECKING:

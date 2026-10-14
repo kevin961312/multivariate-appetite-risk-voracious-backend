@@ -83,9 +83,10 @@ def test_explicit_none_phase2_aggregation_blocks_before_fitting(
 
 
 def test_statistic_reference_default() -> None:
-    # P6: artículo en proceso de publicación (decisión del dueño 2026-10-07); no bloquea.
+    # P6: la tesis de maestría del dueño (decisión del dueño 2026-10-14); no bloquea.
     assert T2MRCDChart().statistic_reference == STATISTIC_REFERENCE
-    assert STATISTIC_REFERENCE
+    assert STATISTIC_REFERENCE.startswith("Pineda Jaramillo, K. S. (2026).")
+    assert STATISTIC_REFERENCE.endswith("https://repositorio.unal.edu.co/handle/unal/90389")
 
 
 def test_clean_rows_are_ceiling_of_mrcd_alpha_times_n() -> None:

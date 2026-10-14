@@ -8,12 +8,13 @@ import pytest
 
 from support.app import CHART, T0, TENANT, App, hours, lifecycle_app, score, trained_model
 from support.memory import InMemoryRecalibrationRepository
-from support.solo_test import fixed_tests_recalibration, small_data
+from support.solo_test import small_data
 from voracious.application.errors import RecalibrationInProgressError
 from voracious.application.ports import JobKind, JobLane, JobRequest, lane_of
 from voracious.application.records import JobStatus, RecalibrationRecord, VersionStatus
+from voracious.domain.charts.t2mrcd import T2MRCDRecalibrationParams
 
-REQUIRED = {JobKind.SCORE, JobKind.VERSION_PROPOSAL, JobKind.COMPARISON}
+REQUIRED = {JobKind.SCORE, JobKind.VERSION_PROPOSAL}
 
 
 def test_every_kind_has_a_lane() -> None:
@@ -86,7 +87,7 @@ def test_concurrent_recalibration_requests_one_wins() -> None:
                     model_id,
                     range_from=T0,
                     range_to=T0 + timedelta(hours=29),
-                    params=fixed_tests_recalibration(min_observations=10),
+                    params=T2MRCDRecalibrationParams(seed=11, min_observations=10),
                 )
             )
         except RecalibrationInProgressError as exc:
@@ -111,7 +112,7 @@ def test_recalibration_job_fails_if_a_proposal_appeared() -> None:
         model_id,
         range_from=T0,
         range_to=T0 + timedelta(hours=29),
-        params=fixed_tests_recalibration(min_observations=10),
+        params=T2MRCDRecalibrationParams(seed=11, min_observations=10),
     )
     v0 = app.versions.list(TENANT, CHART, model_id)[0]
     app.versions.add(replace(v0, number=7, status=VersionStatus.PROPOSED))

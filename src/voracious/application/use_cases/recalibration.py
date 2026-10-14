@@ -5,16 +5,17 @@ ADR 0008, punto 4, y vuelta 3.4 del Paso 3. La petición se valida de forma sín
 vigente quedan aparte, ``already_in_base``), los parámetros de la carta heredados de la versión
 base con la semilla de la recalibración (Q8) y crea el dataset ``recalibration_candidates``.
 
-- ``stepwise``: la recalibración queda ``running`` y el cliente encadena por id ``/fits``,
-  ``/exclusions`` (si hay anotaciones con causa asignable), ``/fits``, ``/limits`` (con
-  ``recalibration_id``), ``…/comparisons`` y ``…/versions``.
+- ``stepwise``: la recalibración queda ``running`` y el cliente encadena por id ``/exclusions``
+  (si hay anotaciones con causa asignable), ``…/extension`` (salvo reemplazo), ``/fits``,
+  ``/limits`` (con ``recalibration_id``) y ``…/versions``.
 - ``pipeline``: ``RunRecalibrationJob`` encadena **los mismos casos de uso** (orquestación pura,
   como ``RunPhase1Pipeline``), así que paso a paso, tubería y ``ControlChart.recalibrate`` dan el
   mismo modelo e informe en bits (``tests/integration/test_recalibration_chain.py``).
 
-Tras un evento estructural sin resolver, el recálculo es un **reemplazo forzado** y solo admite
-observaciones posteriores al evento (D5). Como máximo hay una propuesta pendiente y una
-recalibración en curso por carta (D6).
+Sin comparación de bases (decisión del dueño, 2026-10-14): la recalibración amplía la base vigente
+por defecto (``EXTEND``) y la reemplaza (``REPLACE``) solo con ``force_replace`` o tras un evento
+estructural sin resolver, que además solo admite observaciones posteriores al evento (D5). Como
+máximo hay una propuesta pendiente y una recalibración en curso por carta (D6).
 """
 
 from collections.abc import Sequence
@@ -33,7 +34,6 @@ from voracious.application.errors import (
     ApplicationError,
     ProposalPendingError,
     RangeBeforeStructuralEventError,
-    RecalibrationDecisionPendingError,
     RecalibrationInProgressError,
     RecalibrationInsufficientObservationsError,
     RecalibrationNotInProgressError,
@@ -49,7 +49,6 @@ from voracious.application.lifecycle import (
 from voracious.application.phase1_steps import Phase1Steps, Phase1StepsRegistry, resolve_steps
 from voracious.application.ports import (
     Clock,
-    ComparisonRepository,
     DatasetStorage,
     ExclusionRepository,
     FitRepository,
@@ -89,7 +88,7 @@ from voracious.application.use_cases.common import (
     ready_model,
     require_active_version,
 )
-from voracious.application.use_cases.comparisons import RequestComparison, get_comparison
+from voracious.application.use_cases.extension import RequestRecalibrationExtension
 from voracious.application.use_cases.pipelines import get_pipeline
 from voracious.application.use_cases.proposals import RequestVersionProposal
 from voracious.application.use_cases.recalibration_chain import (
@@ -103,11 +102,12 @@ from voracious.application.use_cases.steps import (
     get_exclusion,
     get_fit,
     get_limits,
+    notify_pipeline,
 )
-from voracious.domain.common import DomainError, InvalidInputError, StageKind
+from voracious.domain.common import DomainError, InvalidInputError
 
 __all__ = [
-    "STEP_COMPARISON",
+    "STEP_EXTENSION",
     "STEP_VERSION",
     "CancelRecalibration",
     "GetRecalibration",
@@ -120,7 +120,7 @@ _IN_PROGRESS = frozenset({JobStatus.QUEUED, JobStatus.RUNNING})
 STEP_EXCLUSION = "exclusion"
 STEP_FIT = "fit"
 STEP_LIMITS = "limits"
-STEP_COMPARISON = "comparison"
+STEP_EXTENSION = "extension"
 STEP_VERSION = "version"
 
 
@@ -205,8 +205,7 @@ class RequestRecalibration:
 
         Orden: modelo listo; sin propuesta pendiente ni recalibración en curso; rango válido;
         con un evento estructural sin resolver, rango posterior al evento y reemplazo forzado;
-        al menos ``min_observations`` candidatas; sin decisiones pendientes de la carta salvo
-        reemplazo forzado. Los parámetros se guardan codificados (M1).
+        al menos ``min_observations`` candidatas. Los parámetros se guardan codificados (M1).
 
         ``stepwise`` deja la recalibración ``running`` (sesión abierta, sin trabajo encolado);
         ``pipeline`` la deja ``queued`` y encola su tubería.
@@ -218,7 +217,8 @@ class RequestRecalibration:
             range_from: Inicio del rango de fechas (con zona horaria, inclusivo).
             range_to: Fin del rango (con zona horaria, inclusivo).
             params: Parámetros de recalibración de la carta.
-            force_replace: Reemplazo forzado (decisión humana).
+            force_replace: Reemplazar la base por las filas nuevas (petición explícita); sin él se
+                amplía la base (por defecto), salvo evento estructural sin resolver.
             actor: Quién la pide.
             mode: ``pipeline`` (por defecto) o ``stepwise``.
 
@@ -235,7 +235,6 @@ class RequestRecalibration:
             InvalidInputError: Rango inválido o parámetros no codificables.
             RangeBeforeStructuralEventError: Rango con datos anteriores al evento sin resolver.
             RecalibrationInsufficientObservationsError: Menos candidatas que el mínimo.
-            RecalibrationDecisionPendingError: Decisiones de la carta pendientes sin forzar.
             VariablesMismatchError: Si alguna candidata no tiene el número de variables de la
                 base vigente (los nombres ya se comprobaron al puntuarla).
         """
@@ -295,12 +294,6 @@ class RequestRecalibration:
             raise RecalibrationInsufficientObservationsError(
                 "no hay suficientes observaciones candidatas en el rango",
                 details={"available": len(fresh), "required": view.min_observations},
-            )
-        pending = chart.pending_recalibration_decisions(params)
-        if pending and not force_replace:
-            raise RecalibrationDecisionPendingError(
-                "la recalibración tiene decisiones estadísticas pendientes",
-                details={"pending": list(pending)},
             )
         mode = RecalibrationMode(mode)
         now = self.clock.now()
@@ -439,7 +432,7 @@ class CancelRecalibration:
 
     Solo una recalibración ``stepwise`` ``running`` sin propuesta pedida; la comprobación se
     repite de forma atómica al guardar (``RecalibrationRepository.cancel``). Los recursos ya
-    creados (exclusiones, ajustes, límites, comparaciones) se conservan; los pasos posteriores
+    creados (exclusiones, extensión, ajustes y límites) se conservan; los pasos posteriores
     sobre la sesión responden ``RECALIBRATION_NOT_IN_PROGRESS``.
 
     Attributes:
@@ -498,9 +491,8 @@ class _Next:
 
     kind: str
     target: str
-    """Dataset (``exclusion`` y ``fit``) o ajuste (``limits``, ``comparison`` y ``version``)."""
+    """Dataset (``exclusion``, ``extension`` y ``fit``) o ajuste (``limits`` y ``version``)."""
     limits_id: str | None = None
-    comparison_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -508,10 +500,11 @@ class RunRecalibrationJob:
     """Avanza la tubería de una recalibración (modo ``pipeline``): un paso por aviso.
 
     Orquestación pura con los mismos casos de uso que la API por pasos. Orden: (si hay
-    anotaciones con causa asignable: exclusión humana de las candidatas) → ajuste → límites
-    (``NEW_ROWS``) → comparación (o, con reemplazo forzado, directamente la versión con ese ajuste
-    y esos límites) → si ``extend``: ajuste y límites del dataset de extensión (``EXTENSION``) →
-    versión. Sin depuración automática iterativa (decisión del dueño, 2026-10-09). Si la
+    anotaciones con causa asignable: exclusión humana de las candidatas) → extensión (base
+    vigente + nuevas conservadas) → ajuste → límites (``EXTENSION``) → versión; con reemplazo
+    (evento estructural o petición explícita), sin extensión: ajuste → límites (``NEW_ROWS``) →
+    versión. Sin comparación de bases (decisión del dueño, 2026-10-14) ni depuración automática
+    iterativa (2026-10-09). Si la
     exclusión humana deja menos de ``min_observations`` filas, la recalibración ya terminó
     ``insufficient`` y la tubería termina bien. Si un paso falla, la tubería y la recalibración
     fallan con su error.
@@ -524,14 +517,14 @@ class RunRecalibrationJob:
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
         exclusions: Repositorio de exclusiones.
-        comparisons: Repositorio de comparaciones.
         datasets: Almacenamiento.
         chain: Enlaces con la recalibración (exclusión humana).
         request_exclusion: Caso de uso de la exclusión humana.
         request_fit: Caso de uso del ajuste.
         request_limits: Caso de uso de los límites.
-        request_comparison: Caso de uso de la comparación.
+        request_extension: Caso de uso de la extensión (síncrono).
         request_proposal: Caso de uso de la propuesta de versión.
+        queue: Cola (la extensión, síncrona, avisa a la tubería al terminar).
         ids: Identificadores (reserva el id del paso antes de crearlo).
         clock: Reloj.
     """
@@ -543,14 +536,14 @@ class RunRecalibrationJob:
     fits: FitRepository
     limits: LimitsRepository
     exclusions: ExclusionRepository
-    comparisons: ComparisonRepository
     datasets: DatasetStorage
     chain: RecalibrationChain
     request_exclusion: RequestExclusion
     request_fit: RequestFit
     request_limits: RequestLimits
-    request_comparison: RequestComparison
+    request_extension: RequestRecalibrationExtension
     request_proposal: RequestVersionProposal
+    queue: JobQueue
     ids: IdGenerator
     clock: Clock
 
@@ -623,7 +616,6 @@ class RunRecalibrationJob:
 
         Raises:
             InvalidInputError: Si los parámetros guardados no son válidos.
-            RecalibrationDecisionPendingError: Decisiones pendientes sin reemplazo forzado.
             DomainError: Decisiones pendientes de los parámetros heredados.
         """
         session = self._session(record)
@@ -634,13 +626,7 @@ class RunRecalibrationJob:
             session.recalibration_id,
             self.clock.now(),
         )
-        params = chart.decode_recalibration_params(session.params)
-        pending = chart.pending_recalibration_decisions(params)
-        if pending and not session.force_replace:
-            raise RecalibrationDecisionPendingError(
-                "la recalibración tiene decisiones estadísticas pendientes",
-                details={"pending": list(pending)},
-            )
+        chart.decode_recalibration_params(session.params)
         steps.check_params(record.params)
 
     def _advance(self, steps: Phase1Steps, record: PipelineRecord) -> None:
@@ -652,8 +638,11 @@ class RunRecalibrationJob:
         """
         if not record.steps:
             # Exclusión humana de las candidatas (anotaciones) antes de ajustar nada.
-            human = bool(self.chain.human_causes(self._session(record)))
-            first = _Next(STEP_EXCLUSION if human else STEP_FIT, record.dataset_id)
+            session = self._session(record)
+            if self.chain.human_causes(session):
+                first = _Next(STEP_EXCLUSION, record.dataset_id)
+            else:
+                first = self._kept_next(session, record.dataset_id)
             self._create(steps, record, first)
             return
         last = record.steps[-1]
@@ -693,11 +682,25 @@ class RunRecalibrationJob:
         if step.kind == STEP_EXCLUSION:
             exclusion = get_exclusion(self.exclusions, tenant, chart, rid)
             return exclusion.status, exclusion.error
-        if step.kind == STEP_COMPARISON:
-            comparison = get_comparison(self.comparisons, tenant, chart, record.model_id or "", rid)
-            return comparison.status, comparison.error
         session = self._session(record)
+        if step.kind == STEP_EXTENSION and session.extension_dataset_id == rid:
+            return JobStatus.SUCCEEDED, None
         return session.status, session.error
+
+    @staticmethod
+    def _kept_next(session: RecalibrationRecord, kept_dataset_id: str) -> _Next:
+        """Paso que sigue a tener las filas nuevas conservadas.
+
+        Args:
+            session: Recalibración.
+            kept_dataset_id: Filas nuevas conservadas (candidatas o salida de la exclusión).
+
+        Returns:
+            El ajuste de esas filas si se reemplaza la base; si no, la extensión.
+        """
+        if session.force_replace:
+            return _Next(STEP_FIT, kept_dataset_id)
+        return _Next(STEP_EXTENSION, kept_dataset_id)
 
     def _next(self, record: PipelineRecord, last: PipelineStep) -> _Next | None:
         """Paso que sigue a uno terminado bien (``None``: la tubería terminó).
@@ -715,26 +718,14 @@ class RunRecalibrationJob:
             exclusion = get_exclusion(self.exclusions, tenant, chart, last.resource_id)
             if exclusion.output_dataset_id is None:
                 return None
-            return _Next(STEP_FIT, exclusion.output_dataset_id)
+            return self._kept_next(self._session(record), exclusion.output_dataset_id)
+        if last.kind == STEP_EXTENSION:
+            return _Next(STEP_FIT, last.resource_id)
         if last.kind == STEP_FIT:
             return _Next(STEP_LIMITS, last.resource_id)
         if last.kind == STEP_LIMITS:
             limits = get_limits(self.limits, tenant, chart, last.resource_id)
-            if limits.stage_kind == StageKind.EXTENSION.value:
-                compared = next(s for s in reversed(record.steps) if s.kind == STEP_COMPARISON)
-                return _Next(STEP_VERSION, limits.fit_id, limits.limits_id, compared.resource_id)
-            if self._session(record).force_replace:
-                return _Next(STEP_VERSION, limits.fit_id, limits.limits_id)
-            return _Next(STEP_COMPARISON, limits.fit_id, limits.limits_id)
-        if last.kind == STEP_COMPARISON:
-            comparison = get_comparison(
-                self.comparisons, tenant, chart, record.model_id or "", last.resource_id
-            )
-            if comparison.extension_dataset_id is not None:
-                return _Next(STEP_FIT, comparison.extension_dataset_id)
-            return _Next(
-                STEP_VERSION, comparison.fit_id, comparison.limits_id, comparison.comparison_id
-            )
+            return _Next(STEP_VERSION, limits.fit_id, limits.limits_id)
         return None
 
     def _create(self, steps: Phase1Steps, record: PipelineRecord, nxt: _Next) -> None:
@@ -806,17 +797,17 @@ class RunRecalibrationJob:
             self.request_exclusion.execute(
                 tenant, chart, nxt.target, exclusion_id=rid, pipeline_id=pid
             )
-        elif nxt.kind == STEP_COMPARISON:
-            self.request_comparison.execute(
+        elif nxt.kind == STEP_EXTENSION:
+            # Síncrona: construye el dataset y avisa a la tubería para que siga.
+            self.request_extension.execute(
                 tenant,
                 chart,
                 model_id,
                 session.recalibration_id,
-                fit_id=nxt.target,
-                limits_id=nxt.limits_id or "",
-                comparison_id=rid,
-                pipeline_id=pid,
+                dataset_id=nxt.target,
+                extension_id=rid,
             )
+            notify_pipeline(self.queue, tenant, chart, pid)
         else:
             self.request_proposal.execute(
                 tenant,
@@ -825,7 +816,6 @@ class RunRecalibrationJob:
                 session.recalibration_id,
                 fit_id=nxt.target,
                 limits_id=nxt.limits_id or "",
-                comparison_id=nxt.comparison_id,
             )
 
     def _fail(self, record: PipelineRecord, error: ErrorInfo) -> None:

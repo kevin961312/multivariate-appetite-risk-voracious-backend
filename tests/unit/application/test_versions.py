@@ -16,7 +16,7 @@ from support.app import (
     score,
     trained_model,
 )
-from support.solo_test import fixed_tests_recalibration, small_data
+from support.solo_test import small_data
 from voracious.application.errors import (
     EffectiveFromNotAfterScoredError,
     ModelNotFoundError,
@@ -32,7 +32,7 @@ from voracious.application.records import (
     ModelVersion,
     VersionStatus,
 )
-from voracious.domain.charts.t2mrcd import LimitRegime, T2MRCDModel
+from voracious.domain.charts.t2mrcd import LimitRegime, T2MRCDModel, T2MRCDRecalibrationParams
 from voracious.domain.common import RecalibrationDecision
 
 
@@ -48,7 +48,7 @@ def _proposal(app: App, model_id: str, n: int = 30, start: object = T0) -> int:
         model_id,
         range_from=start,
         range_to=start + timedelta(hours=n - 1),
-        params=fixed_tests_recalibration(min_observations=10),
+        params=T2MRCDRecalibrationParams(seed=11, min_observations=10),
     )
     app.run_all()
     record = app.get_recalibration().execute(TENANT, CHART, model_id, rid)

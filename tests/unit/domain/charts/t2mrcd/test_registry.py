@@ -5,8 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from support.change_tests import permutation_covariance_test, permutation_mean_test
-from support.solo_test import SOLO_TEST_STRATEGIES, fast_params, solo_test_recalibration
+from support.solo_test import fast_params
 from voracious.domain.charts.t2mrcd import (
     BEST_SUBSET_CRITERION_NAME,
     DEFAULT_STRATEGIES,
@@ -43,13 +42,12 @@ def test_params_round_trip_by_name_is_plain_data() -> None:
     assert decoded.bootstrap.phase2_aggregation is pooled_quantile
 
 
-def test_recalibration_params_round_trip_with_solo_test_registry() -> None:
-    params = solo_test_recalibration(seed=5, threshold_decides=True, min_observations=9)
-    data = encode_recalibration_params(params, SOLO_TEST_STRATEGIES)
+def test_recalibration_params_round_trip_is_plain_data() -> None:
+    params = T2MRCDRecalibrationParams(seed=5, min_observations=9)
+    data = encode_recalibration_params(params)
     assert json.loads(json.dumps(data)) == data
-    assert data["covariance_test"] == permutation_covariance_test.name
-    assert data["mean_test"] == permutation_mean_test.name
-    assert decode_recalibration_params(data, SOLO_TEST_STRATEGIES) == params
+    assert data == {"seed": 5, "min_observations": 9}
+    assert decode_recalibration_params(data) == params
     defaults = T2MRCDRecalibrationParams(seed=1)
     assert decode_recalibration_params(encode_recalibration_params(defaults)) == defaults
 
@@ -73,19 +71,29 @@ def test_unknown_strategy_name_is_a_clear_error() -> None:
         "name": "mean_of_quantiles",
         "known": ["pooled_quantile"],
     }
-    # Las pruebas SOLO TEST no existen en el registro de producción.
-    data = encode_recalibration_params(solo_test_recalibration(), SOLO_TEST_STRATEGIES)
-    with pytest.raises(InvalidInputError) as info:
-        decode_recalibration_params(data)
-    assert info.value.details["reason"] == "unknown_strategy"
-    assert info.value.details["known"] == []
 
 
-def test_unregistered_strategy_cannot_be_persisted() -> None:
+@pytest.mark.parametrize(
+    "removed",
+    [
+        "relative_change_threshold",
+        "threshold_decides",
+        "relative_change_metric",
+        "covariance_test",
+        "mean_test",
+        "decision_rule",
+        "n_test_resamples",
+    ],
+)
+def test_fields_of_the_removed_base_test_are_unknown(removed: str) -> None:
+    """Sin comparación de bases (dueño, 2026-10-14): sus campos ya no existen."""
     with pytest.raises(InvalidInputError) as info:
-        encode_recalibration_params(solo_test_recalibration())
-    assert info.value.details["reason"] == "unregistered_strategy"
-    assert info.value.details["field"] == "recalibration.covariance_test"
+        decode_recalibration_params({"seed": 1, removed: None})
+    assert info.value.details["reason"] == "unknown_fields"
+    assert info.value.details["unknown"] == [removed]
+    removed_field: dict[str, object] = {removed: None}
+    with pytest.raises(TypeError):
+        T2MRCDRecalibrationParams(seed=1, **removed_field)
 
 
 @pytest.mark.parametrize(
@@ -112,8 +120,8 @@ def test_invalid_params_data(data: dict[str, object], field: str) -> None:
     ("data", "field"),
     [
         ({}, "recalibration.seed"),
-        ({"seed": 1, "threshold_decides": 1}, "recalibration.threshold_decides"),
-        ({"seed": 1, "n_test_resamples": "a"}, "recalibration.n_test_resamples"),
+        ({"seed": 1.5}, "recalibration.seed"),
+        ({"seed": 1, "min_observations": "a"}, "recalibration.min_observations"),
         ({"seed": 1, "unknown": 1}, "recalibration"),
     ],
 )
@@ -136,9 +144,9 @@ def test_stored_max_depuration_rounds_is_an_unknown_field() -> None:
 
 
 def test_chart_codec_uses_its_registry() -> None:
-    chart = T2MRCDChart(strategies=SOLO_TEST_STRATEGIES)
+    chart = T2MRCDChart(strategies=replace(DEFAULT_STRATEGIES))
     params = fast_params()
     assert chart.decode_params(chart.encode_params(params)) == params
-    recal = solo_test_recalibration()
+    recal = T2MRCDRecalibrationParams(seed=3, min_observations=30)
     assert chart.decode_recalibration_params(chart.encode_recalibration_params(recal)) == recal
     assert T2MRCDChart() == T2MRCDChart(strategies=replace(DEFAULT_STRATEGIES))

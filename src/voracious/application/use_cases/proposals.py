@@ -4,11 +4,13 @@
 decisión y encola (carril ``light``); ``RunVersionProposalJob`` ensambla el modelo con ellos, arma
 el informe y crea la versión **propuesta** inmutable (solo rige al aprobarse).
 
-- **EXTEND** (sin cambio detectado): ajuste y límites del dataset ``recalibration_extension``
-  (linaje ``EXTENSION``, hueco ``(0, 0)``).
-- **REPLACE** (cambio detectado o reemplazo forzado): ajuste y límites de las filas nuevas
-  conservadas tras la exclusión humana (operación ``NEW_ROWS``, hueco ``(1, 0)``), reutilizados
-  como hace ``ControlChart.recalibrate``.
+- **EXTEND** (por defecto): ajuste y límites del dataset ``recalibration_extension`` de la sesión
+  (``…/extension``; linaje ``EXTENSION``, hueco ``(0, 0)``).
+- **REPLACE** (evento estructural o petición explícita): ajuste y límites de las filas nuevas
+  conservadas tras la exclusión humana (operación ``NEW_ROWS``, hueco ``(1, 0)``), como hace
+  ``ControlChart.recalibrate``.
+
+Sin comparación de bases (decisión del dueño, 2026-10-14).
 
 Base nueva, justificación, ``base_hash``, ``base_refs``, exclusiones y la regla del evento
 estructural son las de la recalibración en una sola llamada (ADR 0008).
@@ -23,7 +25,6 @@ import numpy as np
 from voracious.application.charts import as_versioned_model
 from voracious.application.errors import (
     ApplicationError,
-    ComparisonNotReadyError,
     ProposalPendingError,
     RecalibrationNotInProgressError,
     VersionInputsMismatchError,
@@ -38,7 +39,6 @@ from voracious.application.lifecycle import (
 from voracious.application.phase1_steps import Calibration
 from voracious.application.ports import (
     Clock,
-    ComparisonRepository,
     DatasetStorage,
     ExclusionRepository,
     FitRepository,
@@ -59,7 +59,6 @@ from voracious.application.recalibration_steps import (
 from voracious.application.records import (
     BaseRowRef,
     BaseRowSource,
-    ComparisonRecord,
     DatasetRecord,
     DatasetSource,
     ErrorInfo,
@@ -77,7 +76,6 @@ from voracious.application.use_cases.common import (
     get_version,
     ready_model,
 )
-from voracious.application.use_cases.comparisons import get_comparison
 from voracious.application.use_cases.observations import STRUCTURAL_EVENT_NOTE
 from voracious.application.use_cases.recalibration_chain import (
     CandidateOutcome,
@@ -139,15 +137,14 @@ def justification(record: RecalibrationRecord, decision: RecalibrationDecision) 
         decision: Decisión de la carta.
 
     Returns:
-        ``structural_event``, ``forced_replace``, ``change_detected`` o ``no_change_detected``.
+        ``structural_event`` o ``forced_replace`` (REPLACE) y ``default_extend`` (EXTEND, la
+        decisión por defecto sin comparación de bases).
     """
     if record.structural_event_id is not None:
         return "structural_event"
-    if record.force_replace:
+    if record.force_replace or decision is RecalibrationDecision.REPLACE:
         return "forced_replace"
-    if decision is RecalibrationDecision.REPLACE:
-        return "change_detected"
-    return "no_change_detected"
+    return "default_extend"
 
 
 @dataclass(frozen=True)
@@ -241,7 +238,6 @@ class RequestVersionProposal:
         datasets: Almacenamiento.
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
-        comparisons: Repositorio de comparaciones.
         queue: Cola.
         clock: Reloj.
     """
@@ -252,7 +248,6 @@ class RequestVersionProposal:
     datasets: DatasetStorage
     fits: FitRepository
     limits: LimitsRepository
-    comparisons: ComparisonRepository
     queue: JobQueue
     clock: Clock
 
@@ -265,7 +260,6 @@ class RequestVersionProposal:
         *,
         fit_id: str,
         limits_id: str,
-        comparison_id: str | None = None,
     ) -> str:
         """Encola la propuesta; el trabajo es la recalibración (``GET …/recalibrations/{id}``).
 
@@ -274,9 +268,8 @@ class RequestVersionProposal:
             chart_id: Carta.
             model_id: Modelo.
             recalibration_id: Recalibración en curso.
-            fit_id: Ajuste final.
+            fit_id: Ajuste final (de la extensión en EXTEND; de las filas nuevas en REPLACE).
             limits_id: Límites de ese ajuste.
-            comparison_id: Comparación (obligatoria sin reemplazo forzado; prohibida con él).
 
         Returns:
             El ``recalibration_id``.
@@ -291,9 +284,8 @@ class RequestVersionProposal:
             LimitsNotFoundError: Si los límites no existen.
             LimitsNotReadyError: Si no están ``succeeded``.
             LimitsFitMismatchError: Si los límites son de otro ajuste.
-            ComparisonNotFoundError: Si la comparación no existe.
-            ComparisonNotReadyError: Si no está ``succeeded``.
-            VersionInputsMismatchError: Si los pasos no son los que exige la decisión.
+            VersionInputsMismatchError: Si los pasos no son los que exige la decisión
+                (``extension_required`` si se amplía la base y aún no hay extensión).
         """
         resolve_recalibration_steps(self.recalibration_steps, chart_id)
         session = open_session(
@@ -314,13 +306,12 @@ class RequestVersionProposal:
         if chain[0].origin_ref != recalibration_id:
             raise _mismatch("fit_not_of_recalibration", fit_id=fit_id)
         if session.force_replace:
-            _check_forced(chain, fit_id, comparison_id)
+            _check_replace(chain, fit_id)
         else:
-            self._check_compared(session, chain, fit_id, limits_id, comparison_id)
+            _check_extend(session, chain)
         request = ProposalRequest(
             fit_id=fit_id,
             limits_id=limits_id,
-            comparison_id=comparison_id,
             status=JobStatus.QUEUED,
             requested_at=self.clock.now(),
         )
@@ -339,70 +330,38 @@ class RequestVersionProposal:
         )
         return recalibration_id
 
-    def _check_compared(
-        self,
-        session: RecalibrationRecord,
-        chain: Sequence[DatasetRecord],
-        fit_id: str,
-        limits_id: str,
-        comparison_id: str | None,
-    ) -> None:
-        """Con comparación: EXTEND usa el dataset de extensión; REPLACE, el ajuste comparado.
 
-        Args:
-            session: Recalibración.
-            chain: Ascendencia del dataset del ajuste.
-            fit_id: Ajuste.
-            limits_id: Límites.
-            comparison_id: Comparación (obligatoria).
-
-        Raises:
-            VersionInputsMismatchError: Si falta la comparación o los pasos no son los de su
-                decisión.
-            ComparisonNotFoundError: Si la comparación no existe.
-            ComparisonNotReadyError: Si no está ``succeeded``.
-        """
-        if comparison_id is None:
-            raise _mismatch("comparison_required")
-        comparison = get_comparison(
-            self.comparisons, session.tenant_id, session.chart_id, session.model_id, comparison_id
-        )
-        if comparison.status is not JobStatus.SUCCEEDED:
-            raise ComparisonNotReadyError(
-                f"la comparación '{comparison_id}' no está lista",
-                details={"comparison_id": comparison_id, "status": str(comparison.status)},
-            )
-        if comparison.recalibration_id != session.recalibration_id:
-            raise _mismatch("comparison_not_of_recalibration", comparison_id=comparison_id)
-        if comparison.decision is RecalibrationDecision.EXTEND:
-            if len(chain) != 1 or chain[0].dataset_id != comparison.extension_dataset_id:
-                raise _mismatch(
-                    "extend_uses_extension_dataset",
-                    extension_dataset_id=comparison.extension_dataset_id,
-                )
-        elif (fit_id, limits_id) != (comparison.fit_id, comparison.limits_id):
-            raise _mismatch(
-                "replace_uses_compared_fit",
-                fit_id=comparison.fit_id,
-                limits_id=comparison.limits_id,
-            )
-
-
-def _check_forced(chain: Sequence[DatasetRecord], fit_id: str, comparison_id: str | None) -> None:
-    """Reemplazo forzado: sin comparación y con el ajuste de las filas nuevas.
+def _check_replace(chain: Sequence[DatasetRecord], fit_id: str) -> None:
+    """REPLACE (evento estructural o petición explícita): el ajuste de las filas nuevas.
 
     Args:
         chain: Ascendencia del dataset del ajuste.
         fit_id: Ajuste.
-        comparison_id: Debe ser ``None``.
 
     Raises:
-        VersionInputsMismatchError: Si hay comparación o el ajuste no es de las filas nuevas.
+        VersionInputsMismatchError: Si el ajuste no es de las filas nuevas.
     """
-    if comparison_id is not None:
-        raise _mismatch("forced_replace_has_no_comparison", comparison_id=comparison_id)
     if chain[0].source is not DatasetSource.RECALIBRATION_CANDIDATES:
         raise _mismatch("replace_uses_new_rows", fit_id=fit_id)
+
+
+def _check_extend(session: RecalibrationRecord, chain: Sequence[DatasetRecord]) -> None:
+    """EXTEND (por defecto): el ajuste del dataset de extensión de la sesión.
+
+    Args:
+        session: Recalibración.
+        chain: Ascendencia del dataset del ajuste.
+
+    Raises:
+        VersionInputsMismatchError: Si aún no hay extensión (``extension_required``) o el ajuste
+            no es de ella (``extend_uses_extension_dataset``).
+    """
+    if session.extension_dataset_id is None:
+        raise _mismatch("extension_required")
+    if len(chain) != 1 or chain[0].dataset_id != session.extension_dataset_id:
+        raise _mismatch(
+            "extend_uses_extension_dataset", extension_dataset_id=session.extension_dataset_id
+        )
 
 
 @dataclass(frozen=True)
@@ -410,7 +369,6 @@ class _Inputs:
     """Lo que la propuesta lee de los pasos encadenados."""
 
     decision: RecalibrationDecision
-    comparison: object | None
     outcome: CandidateOutcome
 
 
@@ -428,7 +386,6 @@ class RunVersionProposalJob:
         fits: Repositorio de ajustes.
         limits: Repositorio de límites.
         exclusions: Repositorio de exclusiones (destino de las candidatas).
-        comparisons: Repositorio de comparaciones.
         queue: Cola (aviso a la tubería).
         clock: Reloj.
     """
@@ -442,7 +399,6 @@ class RunVersionProposalJob:
     fits: FitRepository
     limits: LimitsRepository
     exclusions: ExclusionRepository
-    comparisons: ComparisonRepository
     queue: JobQueue
     clock: Clock
 
@@ -486,45 +442,41 @@ class RunVersionProposalJob:
         self,
         recalibration: RecalibrationSteps,
         session: RecalibrationRecord,
-        proposal: ProposalRequest,
         dataset: DatasetRecord,
     ) -> _Inputs:
-        """Decisión, comparación y destino de las candidatas.
+        """Decisión y destino de las candidatas.
+
+        Las filas nuevas conservadas son el propio dataset del ajuste en REPLACE y, en EXTEND, las
+        que se apilaron en la extensión (``kept_dataset_id``).
 
         Args:
             recalibration: Pasos de la recalibración.
             session: Recalibración.
-            proposal: Petición.
             dataset: Dataset del ajuste de la versión.
 
         Returns:
             Las entradas de la propuesta.
+
+        Raises:
+            TypeError: Si una sesión que amplía la base no tiene sus filas conservadas (error de
+                integración).
         """
-        tenant, chart = session.tenant_id, session.chart_id
-        if proposal.comparison_id is None:
-            decision = recalibration.decide(
-                None,
-                n_kept=int(dataset.data.shape[0]),
-                recalibration_params=session.params,
-                force_replace=True,
-            )
-            outcome = candidate_outcome(
-                self.exclusions, chart, dataset_chain(self.datasets, dataset)
-            )
-            return _Inputs(decision, None, outcome)
-        comparison: ComparisonRecord = get_comparison(
-            self.comparisons, tenant, chart, session.model_id, proposal.comparison_id
-        )
-        new_fit = ready_fit(self.fits, tenant, chart, comparison.fit_id)
-        chain = dataset_chain(self.datasets, get_dataset(self.datasets, tenant, new_fit.dataset_id))
-        if comparison.decision is None:
-            msg = "la comparación terminada no tiene decisión"
+        if session.force_replace:
+            kept = dataset
+        elif session.kept_dataset_id is None:
+            msg = "la recalibración que amplía la base no tiene sus filas conservadas"
             raise TypeError(msg)
-        return _Inputs(
-            comparison.decision,
-            comparison.result,
-            candidate_outcome(self.exclusions, chart, chain),
+        else:
+            kept = get_dataset(self.datasets, session.tenant_id, session.kept_dataset_id)
+        decision = recalibration.decide(
+            n_kept=int(kept.data.shape[0]),
+            recalibration_params=session.params,
+            force_replace=session.force_replace,
         )
+        outcome = candidate_outcome(
+            self.exclusions, session.chart_id, dataset_chain(self.datasets, kept)
+        )
+        return _Inputs(decision, outcome)
 
     def _run(
         self, recalibration: RecalibrationSteps, session: RecalibrationRecord
@@ -548,18 +500,16 @@ class RunVersionProposalJob:
         fit = ready_fit(self.fits, session.tenant_id, session.chart_id, proposal.fit_id)
         limits = ready_limits(self.limits, session.tenant_id, session.chart_id, proposal.limits_id)
         dataset = get_dataset(self.datasets, session.tenant_id, fit.dataset_id)
-        inputs = self._inputs(recalibration, session, proposal, dataset)
+        inputs = self._inputs(recalibration, session, dataset)
         model = recalibration.assemble_model(
             dataset.data, limits.params, fit.result, _calibration(limits)
         )
         report = recalibration.report(
             active.model,
             decision=inputs.decision,
-            forced=session.force_replace,
             n_base=int(active.base_data.shape[0]),
             new_dispositions=inputs.outcome.dispositions,
             recalibration_params=session.params,
-            comparison=inputs.comparison,
             model=model,
         )
         candidates = (

@@ -251,11 +251,9 @@ class RecalibrationChain:
         report = steps.report(
             active.model,
             decision=RecalibrationDecision.INSUFFICIENT,
-            forced=session.force_replace,
             n_base=int(active.base_data.shape[0]),
             new_dispositions=outcome.dispositions,
             recalibration_params=session.params,
-            comparison=None,
             model=None,
         )
         current = self.recalibrations.get(*key, session.recalibration_id)

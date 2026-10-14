@@ -2,9 +2,10 @@
 ``recalibrate`` (vuelta 3.2 del Paso 3).
 
 Cada caso se ejecuta dos veces: con el método completo de la carta y encadenando a mano
-``validate_phase1_input``, ``fit_base``, ``calibrate`` (operación → ``stage_spawn_key``),
-``compare`` y ``assemble_model``, como lo haría un orquestador. Sin depuración automática
-iterativa (decisión del dueño, 2026-10-09): una exclusión humana, un ajuste y una calibración. Se
+``validate_phase1_input``, ``fit_base``, ``calibrate`` (operación → ``stage_spawn_key``) y
+``assemble_model``, como lo haría un orquestador. Sin depuración automática
+iterativa (decisión del dueño, 2026-10-09) ni comparación de bases (2026-10-14): una exclusión
+humana, un ajuste y una calibración (EXTEND sobre la base ampliada; REPLACE sobre las nuevas). Se
 comparan todos los campos del modelo y del informe en su forma canónica (arreglos por ``tobytes``
 y reales por ``float.hex``): sin tolerancia.
 """
@@ -38,7 +39,6 @@ from voracious.domain.charts.t2mrcd import (
 from voracious.domain.charts.t2mrcd.revalidation import LimitsSnapshot
 from voracious.domain.common import (
     InvalidInputError,
-    MethodDecisionPendingError,
     RecalibrationDecision,
     RowDisposition,
     SerialTaskMapper,
@@ -94,32 +94,25 @@ def compose_recalibration(
     )
     rows = np.flatnonzero(~human).astype(np.int64)
     kept_new = new[rows]
-    stage: Phase1Stage | None = None
-    if rows.shape[0] >= params.min_observations:
-        fit = chart.fit_base(kept_new, rows, inherited)
-        stage = chart.calibrate(kept_new, fit, inherited, kind=StageKind.NEW_ROWS, mapper=MAPPER)
-        assert stage.limits.spawn_key == (SLOT_NEW_ROWS, 0)
-    comparison = None
-    if stage is not None and not case.force_replace:
-        comparison = chart.compare(active, base, kept_new, stage.fit, params, MAPPER)
     decision = decide(
-        comparison,
         n_kept=int(rows.shape[0]),
         min_observations=params.min_observations,
         force_replace=case.force_replace,
     )
     model = None
-    if stage is not None and decision is not RecalibrationDecision.INSUFFICIENT:
-        if decision is RecalibrationDecision.EXTEND:
-            x_final = np.vstack([base, kept_new])
-            rows_final = np.arange(x_final.shape[0], dtype=np.int64)
-            fit = chart.fit_base(x_final, rows_final, inherited)
-            final = chart.calibrate(
-                x_final, fit, inherited, kind=StageKind.EXTENSION, mapper=MAPPER
-            )
-            assert final.limits.spawn_key == (SLOT_PHASE1, 0)
-        else:
-            x_final, final = kept_new, stage
+    final: Phase1Stage | None = None
+    if decision is RecalibrationDecision.REPLACE:
+        x_final = kept_new
+        fit = chart.fit_base(kept_new, rows, inherited)
+        final = chart.calibrate(kept_new, fit, inherited, kind=StageKind.NEW_ROWS, mapper=MAPPER)
+        assert final.limits.spawn_key == (SLOT_NEW_ROWS, 0)
+    elif decision is RecalibrationDecision.EXTEND:
+        x_final = np.vstack([base, kept_new])
+        rows_final = np.arange(x_final.shape[0], dtype=np.int64)
+        fit = chart.fit_base(x_final, rows_final, inherited)
+        final = chart.calibrate(x_final, fit, inherited, kind=StageKind.EXTENSION, mapper=MAPPER)
+        assert final.limits.spawn_key == (SLOT_PHASE1, 0)
+    if final is not None:
         model = chart.assemble_model(
             x_final,
             inherited,
@@ -131,14 +124,12 @@ def compose_recalibration(
         )
     report = T2MRCDRecalibrationReport(
         decision=decision,
-        forced=case.force_replace,
         row_disposition=(RowDisposition.ALREADY_IN_BASE,) * base.shape[0] + _dispositions(human),
         n_base=int(base.shape[0]),
         n_new=m,
         n_excluded_assignable_cause=int(human.sum()),
         n_kept_new=int(rows.shape[0]),
         min_observations=params.min_observations,
-        comparison=comparison,
         before=LimitsSnapshot.of(active),
         after=None if model is None else LimitsSnapshot.of(model),
         phase2_exceeds_phase1=None if model is None else model.limits.phase2_exceeds_phase1,
@@ -317,22 +308,3 @@ def test_validate_phase1_input_rejects_what_fit_phase1_rejects() -> None:
     for bad in (np.zeros((0, 2)), np.array([[1.0, np.nan]]), [1.0, 2.0]):
         with pytest.raises(InvalidInputError):
             chart.validate_phase1_input(bad)
-
-
-def test_compare_requires_the_formal_tests(active: tuple[T2MRCDModel, np.ndarray]) -> None:
-    model, base = active
-    production = RECALIBRATION["forced"].params
-    with pytest.raises(MethodDecisionPendingError) as info:
-        T2MRCDChart().compare(model, base, base, model.mrcd, production, MAPPER)
-    assert "recalibration.covariance_test" in info.value.details["pending"]
-
-
-def test_compare_rejects_a_base_that_is_not_the_active_one(
-    active: tuple[T2MRCDModel, np.ndarray],
-) -> None:
-    model, base = active
-    with pytest.raises(InvalidInputError) as info:
-        T2MRCDChart().compare(
-            model, base[:-1], base, model.mrcd, RECALIBRATION["extend"].params, MAPPER
-        )
-    assert info.value.details["reason"] == "base_mismatch"

@@ -12,7 +12,6 @@ from typing import Any
 from voracious.application.ports import JobRequest
 from voracious.application.records import ModelRecord, MonitoringRecord
 from voracious.infrastructure.memory import (
-    InMemoryComparisonRepository,
     InMemoryDatasetStorage,
     InMemoryExclusionRepository,
     InMemoryFitRepository,
@@ -37,7 +36,6 @@ from voracious.infrastructure.memory import (
 
 __all__ = [
     "FixedClock",
-    "InMemoryComparisonRepository",
     "InMemoryDatasetStorage",
     "InMemoryExclusionRepository",
     "InMemoryFitRepository",

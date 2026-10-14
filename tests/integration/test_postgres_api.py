@@ -19,12 +19,12 @@ from fastapi.testclient import TestClient
 
 from support.api import BASE, DATASETS, T0, TENANT, observations, score, train, wait
 from support.bits import canonical
-from support.solo_test import solo_test_chart, solo_test_recalibration
 from voracious.api.app import create_app
 from voracious.application.records import JobStatus
 from voracious.application.use_cases import JOB_INTERRUPTED
 from voracious.config import Settings
 from voracious.container import Container, build_container
+from voracious.domain.charts.t2mrcd import T2MRCDChart, T2MRCDRecalibrationParams
 from voracious.infrastructure.memory import ModelRecordCodec
 from voracious.infrastructure.postgres import PostgresModelRepository, create_pool
 
@@ -41,7 +41,7 @@ def _postgres(url: str, storage: Path) -> Container:
         storage="local",
         storage_dir=storage,
     )
-    return build_container(settings, charts={CHART_ID: solo_test_chart()})
+    return build_container(settings, charts={CHART_ID: T2MRCDChart()})
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def _flow(container: Container) -> dict[str, Any]:
             model_id,
             range_from=T0,
             range_to=T0 + timedelta(hours=N - 1),
-            params=solo_test_recalibration(seed=11, min_observations=10),
+            params=T2MRCDRecalibrationParams(seed=11, min_observations=10),
         )
         recal = wait(client, f"{BASE}/{model_id}/recalibrations/{rid}")
         assert recal["status"] == "succeeded", recal
@@ -92,7 +92,7 @@ def _flow(container: Container) -> dict[str, Any]:
 
 
 def test_postgres_gives_the_same_bits_as_memory(pg_container: Container) -> None:
-    memory = build_container(Settings(), charts={CHART_ID: solo_test_chart()})
+    memory = build_container(Settings(), charts={CHART_ID: T2MRCDChart()})
     try:
         expected = _flow(memory)
     finally:

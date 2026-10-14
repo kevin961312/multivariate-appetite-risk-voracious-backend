@@ -2,17 +2,13 @@
 
 Fase I por pasos encadenables (datasets, exclusiones, ajustes, límites, modelo y tubería), Fase II
 (puntuar y registrar observaciones), versiones, anotaciones, eventos estructurales, recalibración
-(paso a paso: comparación y propuesta de versión; o tubería) y estado de la carta (ADR 0005,
+(paso a paso: extensión y propuesta de versión; o tubería) y estado de la carta (ADR 0005,
 ADR 0008).
 """
 
 from voracious.application.use_cases.common import INTERNAL_ERROR, JOB_INTERRUPTED
-from voracious.application.use_cases.comparisons import (
-    GetComparison,
-    RequestComparison,
-    RunComparisonJob,
-)
 from voracious.application.use_cases.dispatch import RunPipelineJob
+from voracious.application.use_cases.extension import RequestRecalibrationExtension
 from voracious.application.use_cases.monitoring import (
     GetMonitoring,
     MonitorObservations,
@@ -80,7 +76,6 @@ __all__ = [
     "CancelRecalibration",
     "DatasetLineage",
     "GetChartStatus",
-    "GetComparison",
     "GetDataset",
     "GetExclusion",
     "GetFit",
@@ -98,15 +93,14 @@ __all__ = [
     "RecoverInterruptedJobs",
     "RegisterStructuralEvent",
     "RejectVersion",
-    "RequestComparison",
     "RequestExclusion",
     "RequestFit",
     "RequestLimits",
     "RequestModel",
     "RequestPhase1Pipeline",
     "RequestRecalibration",
+    "RequestRecalibrationExtension",
     "RequestVersionProposal",
-    "RunComparisonJob",
     "RunExclusionJob",
     "RunFitJob",
     "RunLimitsJob",

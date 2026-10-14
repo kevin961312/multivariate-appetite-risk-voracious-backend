@@ -12,7 +12,6 @@ from enum import StrEnum
 from typing import Protocol
 
 from voracious.application.records import (
-    ComparisonRecord,
     DatasetRecord,
     ExclusionRecord,
     FitRecord,
@@ -32,7 +31,6 @@ from voracious.application.records import (
 
 __all__ = [
     "Clock",
-    "ComparisonRepository",
     "DatasetStorage",
     "DuplicateKeyError",
     "ExclusionRepository",
@@ -926,6 +924,33 @@ class RecalibrationRepository(Protocol):
         """
         ...
 
+    def set_extension(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        *,
+        kept_dataset_id: str,
+        extension_dataset_id: str,
+    ) -> RecalibrationRecord | None:
+        """Fija el dataset de extensión de la sesión de forma atómica (comparar-y-cambiar).
+
+        Solo si la recalibración sigue ``running``, sin propuesta pedida y sin extensión.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            kept_dataset_id: Filas nuevas conservadas con las que se construyó.
+            extension_dataset_id: Dataset ``recalibration_extension``.
+
+        Returns:
+            El registro con la extensión, o ``None`` si no cumplía la condición.
+        """
+        ...
+
     def cancel(
         self,
         tenant_id: str,
@@ -976,81 +1001,6 @@ class RecalibrationRepository(Protocol):
         ...
 
 
-class ComparisonRepository(Protocol):
-    """Comparaciones de bases (``/comparisons``), hijas de un modelo."""
-
-    def add(self, record: ComparisonRecord) -> None:
-        """Guarda una comparación nueva.
-
-        Args:
-            record: Registro.
-
-        Raises:
-            DuplicateKeyError: Si ya existe la clave.
-        """
-        ...
-
-    def get(
-        self, tenant_id: str, chart_id: str, model_id: str, comparison_id: str
-    ) -> ComparisonRecord | None:
-        """Busca una comparación.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-
-        Returns:
-            El registro, o ``None`` si no existe para esa clave.
-        """
-        ...
-
-    def update(self, record: ComparisonRecord) -> None:
-        """Reemplaza una comparación existente.
-
-        Args:
-            record: Registro nuevo.
-
-        Raises:
-            RecordNotFoundError: Si no existe.
-        """
-        ...
-
-    def claim(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        model_id: str,
-        comparison_id: str,
-        started_at: datetime,
-    ) -> ComparisonRecord | None:
-        """Pasa la comparación de ``queued`` a ``running`` de forma atómica.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-            started_at: Instante de inicio (UTC).
-
-        Returns:
-            El registro en ``running``, o ``None`` si no existe o no estaba ``queued``.
-        """
-        ...
-
-    def list_unfinished(self) -> list[ComparisonRecord]:
-        """Comparaciones ``queued`` o ``running`` de todos los tenants.
-
-        Solo lo usa ``RecoverInterruptedJobs``: con la cola en el proceso, lo que estaba en curso
-        al reiniciar no lo va a terminar nadie.
-
-        Returns:
-            Los registros, en orden de creación.
-        """
-        ...
-
-
 class JobKind(StrEnum):
     """Tipo de trabajo asíncrono (Paso 3: un trabajo por paso de cómputo encadenable).
 
@@ -1073,9 +1023,6 @@ class JobKind(StrEnum):
     SCORE = "score"
     """Puntuación de observaciones de Fase II contra un modelo."""
 
-    COMPARISON = "comparison"
-    """Comparación de bases (cambio en S y μ); el recurso es la comparación."""
-
     VERSION_PROPOSAL = "version_proposal"
     """Propuesta de una versión nueva de un modelo; el recurso es la recalibración."""
 
@@ -1094,7 +1041,7 @@ class JobLane(StrEnum):
     """Ajustes del estimador."""
 
     CALIBRATION = "calibration"
-    """Calibraciones con réplicas y comparaciones (lo más costoso)."""
+    """Calibraciones con réplicas (lo más costoso)."""
 
     LIGHT = "light"
     """Trabajos cortos: excluir filas, puntuar, ensamblar, proponer versión."""
@@ -1106,7 +1053,6 @@ class JobLane(StrEnum):
 _LANES: dict[JobKind, JobLane] = {
     JobKind.MRCD_FIT: JobLane.ESTIMATION,
     JobKind.LIMITS: JobLane.CALIBRATION,
-    JobKind.COMPARISON: JobLane.CALIBRATION,
     JobKind.EXCLUSION: JobLane.LIGHT,
     JobKind.MODEL_ASSEMBLY: JobLane.LIGHT,
     JobKind.SCORE: JobLane.LIGHT,
@@ -1127,7 +1073,7 @@ def lane_of(kind: JobKind) -> JobLane:
     return _LANES[kind]
 
 
-_MODEL_REQUIRED = frozenset({JobKind.SCORE, JobKind.VERSION_PROPOSAL, JobKind.COMPARISON})
+_MODEL_REQUIRED = frozenset({JobKind.SCORE, JobKind.VERSION_PROPOSAL})
 """Trabajos sobre un recurso hijo de un modelo: ``model_id`` es obligatorio."""
 
 
@@ -1141,10 +1087,10 @@ class JobRequest:
         scope: Espacio del recurso: la carta (``t2mrcd``…) a la que pertenece.
         resource_id: Recurso que el trabajo actualiza (el ajuste en ``mrcd_fit``, los límites en
             ``limits``, la exclusión en ``exclusion``, el modelo en ``model_assembly``, la
-            puntuación en ``score``, la tubería en ``pipeline``, la comparación en
-            ``comparison`` y la recalibración en ``version_proposal``).
-        model_id: Modelo del que cuelga el recurso: obligatorio en ``score``,
-            ``comparison`` y ``version_proposal``; ``None`` en el resto (o el recurso es el
+            puntuación en ``score``, la tubería en ``pipeline`` y la recalibración en
+            ``version_proposal``).
+        model_id: Modelo del que cuelga el recurso: obligatorio en ``score`` y
+            ``version_proposal``; ``None`` en el resto (o el recurso es el
             modelo, o no cuelga de ninguno).
     """
 

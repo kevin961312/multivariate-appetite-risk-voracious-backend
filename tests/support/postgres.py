@@ -35,10 +35,9 @@ TABLES = (
     "signal_annotations",
     "structural_events",
     "recalibrations",
-    "comparisons",
     "tenants",
 )
-"""Tablas del esquema (``0001_initial.sql``)."""
+"""Tablas del esquema tras aplicar todas las migraciones."""
 
 
 def admin_url() -> str:

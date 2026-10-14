@@ -256,7 +256,7 @@ class Table[R]:
         key: Sequence[object],
         condition: sql.Composable,
         condition_params: Iterable[object],
-        change: Callable[[R], R],
+        change: Callable[[R], R | None],
     ) -> R | None:
         """Comparar-y-cambiar atómico: si la fila cumple ``condition``, la cambia con ``change``.
 
@@ -268,7 +268,8 @@ class Table[R]:
             key: Clave.
             condition: Condición extra sobre las columnas (fragmento con ``%s``).
             condition_params: Sus valores.
-            change: Registro nuevo a partir del actual.
+            change: Registro nuevo a partir del actual, o ``None`` si el registro (su contenido,
+                no sus columnas) no cumple la condición: entonces no se escribe nada.
 
         Returns:
             El registro cambiado, o ``None`` si no existía o no cumplía la condición.
@@ -281,6 +282,8 @@ class Table[R]:
             if row is None:
                 return None
             updated = change(self.decode(row))
+            if updated is None:
+                return None
             self.write(conn, updated)
             return updated
 

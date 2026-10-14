@@ -1,16 +1,15 @@
 """Estrategias de T²MRCD por nombre y parámetros como datos (mejora M1, Paso 2b.2).
 
 Los parámetros de la carta (``T2MRCDParams``) y de la recalibración
-(``T2MRCDRecalibrationParams``) llevan estrategias (agregación, criterio de fila limpia, medida de
-cambio, pruebas formales, regla de decisión), que son objetos invocables. Para persistir un modelo,
-una versión o una recalibración sin guardar invocables, la aplicación guarda los parámetros
-**codificados**: solo números, textos, booleanos, ``None`` y diccionarios, con cada estrategia por
-su nombre estable. ``T2MRCDStrategies`` es el registro ``nombre → objeto`` con el que se
-decodifican.
+(``T2MRCDRecalibrationParams``) se guardan como datos. Los de la carta llevan estrategias
+(agregación y criterio de fila limpia), que son objetos invocables; los de la recalibración son
+solo números (semilla y mínimo de filas). Para persistir un modelo, una versión o una recalibración
+sin guardar invocables, la aplicación guarda los parámetros **codificados**: solo números, textos,
+``None`` y diccionarios, con cada estrategia por su nombre estable. ``T2MRCDStrategies`` es el
+registro ``nombre → objeto`` con el que se decodifican.
 
 ``DEFAULT_STRATEGIES`` solo contiene las estrategias de producción ya decididas
-(``docs/metodos/t2mrcd.md``); las pruebas formales de cambio están pendientes de cita y no tienen
-ninguna entrada. Los tests registran sus estrategias «SOLO TEST» en una copia
+(``docs/metodos/t2mrcd.md``). Los tests registran sus estrategias «SOLO TEST» en una copia
 (``dataclasses.replace``), nunca en ``src/``.
 
 El muestreador de réplicas (``bootstrap_oob``) y el estimador (MRCD, ADR 0002) no son parámetros:
@@ -25,14 +24,6 @@ import numpy as np
 
 from voracious.domain.charts.t2mrcd.aggregation import pooled_quantile
 from voracious.domain.charts.t2mrcd.clean import best_subset_criterion
-from voracious.domain.charts.t2mrcd.comparison import (
-    CovarianceChangeTest,
-    DecisionRule,
-    MeanChangeTest,
-    RelativeChangeMetric,
-    any_formal_test_change,
-    frobenius_relative_change,
-)
 from voracious.domain.charts.t2mrcd.params import (
     T2MRCD_MRCD_ALPHA,
     CleanCriterion,
@@ -72,19 +63,7 @@ _BOOTSTRAP_FIELDS: Final = frozenset(
 )
 _MRCD_FIELDS: Final = frozenset({"alpha", "h", "maxcsteps", "rho", "target", "maxcond"})
 _PARAMS_FIELDS: Final = frozenset({"bootstrap", "mrcd"})
-_RECALIBRATION_FIELDS: Final = frozenset(
-    {
-        "seed",
-        "min_observations",
-        "relative_change_threshold",
-        "threshold_decides",
-        "relative_change_metric",
-        "covariance_test",
-        "mean_test",
-        "decision_rule",
-        "n_test_resamples",
-    }
-)
+_RECALIBRATION_FIELDS: Final = frozenset({"seed", "min_observations"})
 
 
 @dataclass(frozen=True)
@@ -94,10 +73,6 @@ class T2MRCDStrategies:
     Attributes:
         clean_criteria: Criterios de fila limpia.
         aggregations: Agregaciones de límites (Fase I y Fase II).
-        relative_change_metrics: Medidas del cambio relativo de la dispersión.
-        covariance_tests: Pruebas formales de dispersión (vacío en producción: pendientes).
-        mean_tests: Pruebas formales de ubicación (vacío en producción: pendientes).
-        decision_rules: Reglas de decisión sobre las pruebas formales.
     """
 
     clean_criteria: Mapping[str, CleanCriterion] = field(
@@ -105,14 +80,6 @@ class T2MRCDStrategies:
     )
     aggregations: Mapping[str, LimitAggregation] = field(
         default_factory=lambda: {pooled_quantile.name: pooled_quantile}
-    )
-    relative_change_metrics: Mapping[str, RelativeChangeMetric] = field(
-        default_factory=lambda: {frobenius_relative_change.name: frobenius_relative_change}
-    )
-    covariance_tests: Mapping[str, CovarianceChangeTest] = field(default_factory=dict)
-    mean_tests: Mapping[str, MeanChangeTest] = field(default_factory=dict)
-    decision_rules: Mapping[str, DecisionRule] = field(
-        default_factory=lambda: {any_formal_test_change.name: any_formal_test_change}
     )
 
 
@@ -259,24 +226,6 @@ def _float(value: object, field_name: str) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float | np.integer | np.floating):
         raise InvalidInputError(f"'{field_name}' debe ser numérico", details={"field": field_name})
     return float(value)
-
-
-def _bool(value: object, field_name: str) -> bool:
-    """Booleano estricto.
-
-    Args:
-        value: Valor leído.
-        field_name: Campo.
-
-    Returns:
-        El booleano.
-
-    Raises:
-        InvalidInputError: Si no es booleano.
-    """
-    if not isinstance(value, bool):
-        raise InvalidInputError(f"'{field_name}' debe ser booleano", details={"field": field_name})
-    return value
 
 
 def _encode_mrcd(params: MRCDParams) -> dict[str, object]:
@@ -481,61 +430,32 @@ def decode_params(
     )
 
 
-def encode_recalibration_params(
-    params: T2MRCDRecalibrationParams, strategies: T2MRCDStrategies = DEFAULT_STRATEGIES
-) -> dict[str, object]:
-    """Codifica los parámetros de la recalibración como datos (estrategias por nombre).
+def encode_recalibration_params(params: T2MRCDRecalibrationParams) -> dict[str, object]:
+    """Codifica los parámetros de la recalibración como datos.
 
     Args:
         params: Parámetros de la recalibración.
-        strategies: Registro con el que se buscan los nombres.
 
     Returns:
-        Diccionario serializable.
-
-    Raises:
-        InvalidInputError: Si alguna estrategia no está registrada.
+        Diccionario serializable con ``seed`` y ``min_observations``.
     """
-    return {
-        "seed": params.seed,
-        "min_observations": params.min_observations,
-        "relative_change_threshold": params.relative_change_threshold,
-        "threshold_decides": params.threshold_decides,
-        "relative_change_metric": _name_of(
-            strategies.relative_change_metrics,
-            params.relative_change_metric,
-            "recalibration.relative_change_metric",
-        ),
-        "covariance_test": _name_of_optional(
-            strategies.covariance_tests, params.covariance_test, "recalibration.covariance_test"
-        ),
-        "mean_test": _name_of_optional(
-            strategies.mean_tests, params.mean_test, "recalibration.mean_test"
-        ),
-        "decision_rule": _name_of(
-            strategies.decision_rules, params.decision_rule, "recalibration.decision_rule"
-        ),
-        "n_test_resamples": params.n_test_resamples,
-    }
+    return {"seed": params.seed, "min_observations": params.min_observations}
 
 
-def decode_recalibration_params(
-    data: Mapping[str, object], strategies: T2MRCDStrategies = DEFAULT_STRATEGIES
-) -> T2MRCDRecalibrationParams:
+def decode_recalibration_params(data: Mapping[str, object]) -> T2MRCDRecalibrationParams:
     """Decodifica los parámetros de la recalibración (inversa de ``encode_recalibration_params``).
 
-    Un campo ausente toma el default de ``T2MRCDRecalibrationParams`` (citados en
-    ``revalidation.py``); ``seed`` es obligatoria.
+    Un campo ausente toma el default de ``T2MRCDRecalibrationParams`` (citado en
+    ``revalidation.py``); ``seed`` es obligatoria. Un campo desconocido es un error.
 
     Args:
         data: Parámetros codificados.
-        strategies: Registro de estrategias.
 
     Returns:
         Los parámetros.
 
     Raises:
-        InvalidInputError: Campo desconocido o inválido, o estrategia desconocida.
+        InvalidInputError: Campo desconocido o inválido.
     """
     raw = _mapping(data, "recalibration", _RECALIBRATION_FIELDS)
     if "seed" not in raw:
@@ -543,43 +463,9 @@ def decode_recalibration_params(
             "'recalibration.seed' es obligatoria", details={"field": "recalibration.seed"}
         )
     default = T2MRCDRecalibrationParams(seed=_int(raw["seed"], "recalibration.seed"))
-    n_test_resamples = raw.get("n_test_resamples", default.n_test_resamples)
     return T2MRCDRecalibrationParams(
         seed=default.seed,
         min_observations=_int(raw["min_observations"], "recalibration.min_observations")
         if "min_observations" in raw
         else default.min_observations,
-        relative_change_threshold=_float(
-            raw["relative_change_threshold"], "recalibration.relative_change_threshold"
-        )
-        if "relative_change_threshold" in raw
-        else default.relative_change_threshold,
-        threshold_decides=_bool(raw["threshold_decides"], "recalibration.threshold_decides")
-        if "threshold_decides" in raw
-        else default.threshold_decides,
-        relative_change_metric=_resolve(
-            strategies.relative_change_metrics,
-            raw["relative_change_metric"],
-            "recalibration.relative_change_metric",
-        )
-        if "relative_change_metric" in raw
-        else default.relative_change_metric,
-        covariance_test=_resolve_optional(
-            strategies.covariance_tests, raw["covariance_test"], "recalibration.covariance_test"
-        )
-        if "covariance_test" in raw
-        else default.covariance_test,
-        mean_test=_resolve_optional(
-            strategies.mean_tests, raw["mean_test"], "recalibration.mean_test"
-        )
-        if "mean_test" in raw
-        else default.mean_test,
-        decision_rule=_resolve(
-            strategies.decision_rules, raw["decision_rule"], "recalibration.decision_rule"
-        )
-        if "decision_rule" in raw
-        else default.decision_rule,
-        n_test_resamples=None
-        if n_test_resamples is None
-        else _int(n_test_resamples, "recalibration.n_test_resamples"),
     )

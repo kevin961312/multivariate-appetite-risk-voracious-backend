@@ -14,7 +14,7 @@ LANES = dict.fromkeys(JobLane, 1)
 
 
 def _job(kind: JobKind, resource: str = "r") -> JobRequest:
-    model = "m" if kind in {JobKind.SCORE, JobKind.COMPARISON, JobKind.VERSION_PROPOSAL} else None
+    model = "m" if kind in {JobKind.SCORE, JobKind.VERSION_PROPOSAL} else None
     return JobRequest(kind, "t", "c", resource, model)
 
 

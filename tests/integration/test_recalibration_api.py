@@ -1,12 +1,12 @@
 """Endpoints de la recalibración paso a paso (T24): códigos 201/202, 404 de otro tenant, 409 y 422.
 
-``POST …/recalibrations`` (``mode = stepwise``), ``/exclusions`` sobre candidatas, ``/limits`` con
-``recalibration_id``, ``…/comparisons`` (``POST``/``GET``) y ``…/versions``. Sin depuración
-automática iterativa (decisión del dueño, 2026-10-09).
+``POST …/recalibrations`` (``mode = stepwise``), ``/exclusions`` sobre candidatas,
+``…/recalibrations/{id}/extension``, ``/fits``, ``/limits`` con ``recalibration_id`` y
+``…/versions``. Sin depuración automática iterativa (decisión del dueño, 2026-10-09) ni
+comparación de bases (2026-10-14).
 """
 
 from collections.abc import Iterator
-from dataclasses import replace
 from datetime import timedelta
 from typing import Any
 
@@ -16,11 +16,10 @@ from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, FAST_PARAMS, OTHER, T0, TENANT, observations, score, wait
 from support.api import train as train_model
-from support.solo_test import solo_test_chart, solo_test_recalibration
 from voracious.api.app import create_app
-from voracious.application.records import RecalibrationMode
 from voracious.config import Settings
 from voracious.container import Container, build_container
+from voracious.domain.charts.t2mrcd import T2MRCDChart
 
 N = 30
 END = T0 + timedelta(hours=N - 1)
@@ -29,7 +28,7 @@ RANGE = {"range_from": T0.isoformat(), "range_to": END.isoformat()}
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings(), charts={"t2mrcd": solo_test_chart()})
+    built = build_container(Settings(), charts={"t2mrcd": T2MRCDChart()})
     yield built
     built.shutdown()
 
@@ -159,19 +158,16 @@ def test_stepwise_forced_replace_endpoints(client: TestClient) -> None:
         "RECALIBRATION_MISMATCH",
     )
 
-    comparisons = f"{BASE}/{model_id}/comparisons"
+    extension = f"{url}/{rid}/extension"
     forced = _error(
-        _post(client, comparisons, {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}),
+        _post(client, extension, {"dataset_id": human["output_dataset_id"]}),
         422,
         "INVALID_INPUT",
     )
-    assert forced["details"]["reason"] == "forced_replace_skips_comparison"
+    assert forced["details"]["reason"] == "forced_replace_has_no_extension"
     versions = f"{BASE}/{model_id}/versions"
     last = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
-    with_comparison = _error(
-        _post(client, versions, {**last, "comparison_id": "x"}), 422, "VERSION_INPUTS_MISMATCH"
-    )
-    assert with_comparison["details"]["reason"] == "forced_replace_has_no_comparison"
+    _error(_post(client, versions, {**last, "comparison_id": "x"}), 422, "INVALID_INPUT")
     mixed = {**last, "limits_id": limits1}
     mismatch = _error(_post(client, versions, mixed), 422, "VERSION_INPUTS_MISMATCH")
     assert mismatch["details"]["reason"] == "limits_of_another_fit"
@@ -196,90 +192,64 @@ def test_stepwise_forced_replace_endpoints(client: TestClient) -> None:
     _error(_post(client, url, stepwise), 409, "PROPOSAL_PENDING")
 
 
-def test_stepwise_comparison_endpoints(client: TestClient, container: Container) -> None:
+def test_stepwise_extension_endpoints(client: TestClient) -> None:
     model_id, _ = _scored(client)
-    rid = container.use_cases.request_recalibration.execute(
-        "tenant-a",
-        "t2mrcd",
-        model_id,
-        range_from=T0,
-        range_to=END,
-        params=solo_test_recalibration(seed=11, min_observations=10),
-        mode=RecalibrationMode.STEPWISE,
+    url = f"{BASE}/{model_id}/recalibrations"
+    body = {**RANGE, "params": {"seed": 11, "min_observations": 10}, "mode": "stepwise"}
+    opened = _ok(client, url, body, 201)
+    rid, candidates = opened["recalibration_id"], opened["candidates_dataset_id"]
+    extension = f"{url}/{rid}/extension"
+    human_first = _error(_post(client, extension, {"dataset_id": candidates}), 422, "INVALID_INPUT")
+    assert human_first["details"]["reason"] == "human_exclusion_required"
+    new_rows = _error(
+        _post(client, f"{CHART_BASE}/fits", {"dataset_id": candidates}), 422, "INVALID_INPUT"
     )
-    session = container.use_cases.get_recalibration.execute("tenant-a", "t2mrcd", model_id, rid)
-    assert session.candidates_dataset_id is not None
-    human = _exclude(client, {"dataset_id": session.candidates_dataset_id})
-    fit0 = _fit(client, human["output_dataset_id"])
-    limits0 = _limits(client, fit0, rid)
-    comparisons = f"{BASE}/{model_id}/comparisons"
-    versions = f"{BASE}/{model_id}/versions"
-    last = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
-    required = _error(_post(client, versions, last), 422, "VERSION_INPUTS_MISMATCH")
-    assert required["details"]["reason"] == "comparison_required"
-
-    repo = container.use_cases.request_comparison.recalibrations
-    stored = repo.get("tenant-a", "t2mrcd", model_id, rid)
-    assert stored is not None
-    repo.update(replace(stored, params={"seed": 11, "min_observations": 10}))
-    body = {"recalibration_id": rid, "fit_id": fit0, "limits_id": limits0}
-    pending = _error(_post(client, comparisons, body), 422, "RECALIBRATION_DECISION_PENDING")
-    assert pending["details"]["pending"] == [
-        "recalibration.covariance_test",
-        "recalibration.mean_test",
-        "recalibration.n_test_resamples",
-    ]
-    repo.update(stored)
-
-    _error(_post(client, comparisons, body, headers=OTHER), 404, "RECALIBRATION_NOT_FOUND")
-    _error(_post(client, comparisons, {**body, "fit_id": "nada"}), 404, "FIT_NOT_FOUND")
-    _error(_post(client, comparisons, {**body, "limits_id": "nada"}), 404, "LIMITS_NOT_FOUND")
-    legacy = {"recalibration_id": rid, "depuration_id": human["id"]}
-    _error(_post(client, comparisons, legacy), 422, "INVALID_INPUT")
-    comparison_id = _ok(client, comparisons, body)["id"]
-    comparison = _done(client, f"{comparisons}/{comparison_id}")
-    assert comparison["decision"] == "extend"
-    assert comparison["result"]["covariance"]["name"] == "permutation_covariance_solo_test"
-    assert (comparison["fit_id"], comparison["limits_id"]) == (fit0, limits0)
-    assert "depuration_id" not in comparison
-    _error(client.get(f"{comparisons}/{comparison_id}", headers=OTHER), 404, "COMPARISON_NOT_FOUND")
-    _error(_post(client, versions, {**last, "comparison_id": "nada"}), 404, "COMPARISON_NOT_FOUND")
-    wrong = _error(
-        _post(client, versions, {**last, "comparison_id": comparison_id}),
-        422,
-        "VERSION_INPUTS_MISMATCH",
+    assert new_rows["details"]["reason"] == "new_rows_require_replace"
+    human = _exclude(client, {"dataset_id": candidates})
+    kept = human["output_dataset_id"]
+    _error(
+        _post(client, extension, {"dataset_id": kept}, headers=OTHER),
+        404,
+        "RECALIBRATION_NOT_FOUND",
     )
-    assert wrong["details"]["reason"] == "extend_uses_extension_dataset"
-    ext_fit = _fit(client, comparison["extension_dataset_id"])
-    ext_limits = _limits(client, ext_fit, rid)
-    lineage = client.get(
-        f"/v1/datasets/{comparison['extension_dataset_id']}", headers=TENANT
-    ).json()
+    _error(
+        _post(client, f"{url}/nada/extension", {"dataset_id": kept}),
+        404,
+        "RECALIBRATION_NOT_FOUND",
+    )
+    _error(_post(client, extension, {"dataset_id": "nada"}), 404, "DATASET_NOT_FOUND")
+    _error(_post(client, extension, {"dataset_id": kept, "x": 1}), 422, "INVALID_INPUT")
+    _error(_post(client, extension, {}), 422, "INVALID_INPUT")
+    built = _ok(client, extension, {"dataset_id": kept}, 201)
+    assert built["n_kept_new"] == N - 1
+    assert _ok(client, extension, {"dataset_id": kept}, 201) == built  # idempotente
+    lineage = client.get(f"/v1/datasets/{built['dataset_id']}", headers=TENANT).json()
     assert lineage["source"] == "recalibration_extension"
+    assert lineage["n"] == built["n_base"] + built["n_kept_new"]
+    session = client.get(f"{url}/{rid}", headers=TENANT).json()
+    assert (session["kept_dataset_id"], session["extension_dataset_id"]) == (
+        kept,
+        built["dataset_id"],
+    )
     on_extension = _error(
-        _post(
-            client, f"{CHART_BASE}/exclusions", {"dataset_id": comparison["extension_dataset_id"]}
-        ),
+        _post(client, f"{CHART_BASE}/exclusions", {"dataset_id": built["dataset_id"]}),
         422,
         "INVALID_INPUT",
     )
     assert on_extension["details"]["reason"] == "human_exclusion_only_on_candidates"
-    ext_body = {"recalibration_id": rid, "fit_id": ext_fit, "limits_id": ext_limits}
-    _error(_post(client, comparisons, ext_body), 422, "RECALIBRATION_MISMATCH")
-    _error(
-        _post(client, comparisons, {**body, "limits_id": ext_limits}), 422, "LIMITS_FIT_MISMATCH"
-    )
-    proposal = {
-        "recalibration_id": rid,
-        "comparison_id": comparison_id,
-        "fit_id": ext_fit,
-        "limits_id": ext_limits,
-    }
+    ext_fit = _fit(client, built["dataset_id"])
+    ext_limits = _limits(client, ext_fit, rid)
+    versions = f"{BASE}/{model_id}/versions"
+    proposal = {"recalibration_id": rid, "fit_id": ext_fit, "limits_id": ext_limits}
+    _error(_post(client, versions, {**proposal, "comparison_id": "x"}), 422, "INVALID_INPUT")
     _ok(client, versions, proposal)
-    done = _done(client, f"{BASE}/{model_id}/recalibrations/{rid}")
-    assert (done["outcome"], done["proposal"]["comparison_id"]) == ("extend", comparison_id)
+    done = _done(client, f"{url}/{rid}")
+    assert done["outcome"] == "extend"
+    assert "comparison_id" not in done["proposal"]
+    assert "forced" not in done["report"]
     version = client.get(f"{versions}/{done['proposed_version']}", headers=TENANT).json()
-    assert (version["status"], version["justification"]) == ("proposed", "no_change_detected")
+    assert (version["status"], version["justification"]) == ("proposed", "default_extend")
+    _error(_post(client, extension, {"dataset_id": kept}), 409, "RECALIBRATION_NOT_IN_PROGRESS")
 
 
 def test_cancel_stepwise_session_frees_d6(client: TestClient) -> None:
@@ -297,9 +267,9 @@ def test_cancel_stepwise_session_frees_d6(client: TestClient) -> None:
     assert response.json()["finished_at"] is not None
     again = _error(client.post(cancel, headers=TENANT), 409, "RECALIBRATION_NOT_IN_PROGRESS")
     assert again["details"]["status"] == "cancelled"
-    fit_id = _fit(client, opened["candidates_dataset_id"])
+    # Los pasos sobre los datasets de una sesión cerrada ya no se aceptan (ni el ajuste).
     _error(
-        _post(client, f"{CHART_BASE}/limits", {"fit_id": fit_id, "recalibration_id": rid}),
+        _post(client, f"{CHART_BASE}/fits", {"dataset_id": opened["candidates_dataset_id"]}),
         409,
         "RECALIBRATION_NOT_IN_PROGRESS",
     )

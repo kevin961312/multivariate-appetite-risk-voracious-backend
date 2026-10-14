@@ -8,8 +8,8 @@ la base:
 - ``add_if_none_in_progress`` y ``add_proposal_if_none`` (D6): índices únicos parciales
   (``recalibrations_one_in_progress``, ``model_versions_one_proposal``) con
   ``INSERT … ON CONFLICT … DO NOTHING``.
-- Cambios de estado de versiones, pasos de tubería y propuestas de recalibración: comparar-y-
-  cambiar con ``SELECT … FOR UPDATE`` en una transacción.
+- Cambios de estado de versiones, pasos de tubería, propuestas y extensiones de recalibración:
+  comparar-y-cambiar con ``SELECT … FOR UPDATE`` en una transacción.
 - Observaciones, anotaciones y eventos son append-only: nunca se actualizan.
 """
 
@@ -25,7 +25,6 @@ from psycopg_pool import ConnectionPool
 
 from voracious.application.ports import DuplicateKeyError, VersionStatusChange
 from voracious.application.records import (
-    ComparisonRecord,
     ExclusionRecord,
     FitRecord,
     JobStatus,
@@ -54,7 +53,6 @@ from voracious.infrastructure.postgres.store import (
 )
 
 __all__ = [
-    "PostgresComparisonRepository",
     "PostgresExclusionRepository",
     "PostgresFitRepository",
     "PostgresLimitsRepository",
@@ -83,7 +81,6 @@ def _start[
         ModelRecord,
         MonitoringRecord,
         RecalibrationRecord,
-        ComparisonRecord,
     )
 ](started_at: datetime) -> Callable[[R], R]:
     """Función que pasa un registro de trabajo a ``running`` con su instante de inicio.
@@ -635,95 +632,6 @@ class PostgresMonitoringRepository:
         return self._t.unfinished()
 
 
-class PostgresComparisonRepository:
-    """``ComparisonRepository`` en la tabla ``comparisons``."""
-
-    def __init__(self, pool: Pool, codec: RecordCodec[ComparisonRecord]) -> None:
-        """Construye el repositorio.
-
-        Args:
-            pool: Pool de conexiones.
-            codec: Codec de las comparaciones.
-        """
-        self._t: Table[ComparisonRecord] = Table(
-            pool,
-            "comparisons",
-            (*_CHILD_KEYS, "comparison_id"),
-            codec,
-            lambda r: (r.tenant_id, r.chart_id, r.model_id, r.comparison_id),
-            lambda r: {
-                "status": r.status.value,
-                "recalibration_id": r.recalibration_id,
-                "created_at": r.created_at,
-            },
-        )
-
-    def add(self, record: ComparisonRecord) -> None:
-        """Guarda una comparación nueva.
-
-        Args:
-            record: Registro.
-        """
-        self._t.add(record)
-
-    def get(
-        self, tenant_id: str, chart_id: str, model_id: str, comparison_id: str
-    ) -> ComparisonRecord | None:
-        """Busca una comparación.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-
-        Returns:
-            El registro o ``None``.
-        """
-        return self._t.get((tenant_id, chart_id, model_id, comparison_id))
-
-    def update(self, record: ComparisonRecord) -> None:
-        """Reemplaza una comparación existente.
-
-        Args:
-            record: Registro nuevo.
-        """
-        self._t.update(record)
-
-    def claim(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        model_id: str,
-        comparison_id: str,
-        started_at: datetime,
-    ) -> ComparisonRecord | None:
-        """Pasa la comparación a ``running`` de forma atómica.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-            started_at: Instante de inicio.
-
-        Returns:
-            El registro en ``running`` o ``None``.
-        """
-        return self._t.claim(
-            (tenant_id, chart_id, model_id, comparison_id),
-            _start(started_at),
-        )
-
-    def list_unfinished(self) -> list[ComparisonRecord]:
-        """Comparaciones ``queued`` o ``running`` de todos los tenants.
-
-        Returns:
-            Los registros.
-        """
-        return self._t.unfinished()
-
-
 class PostgresRecalibrationRepository:
     """``RecalibrationRepository`` en la tabla ``recalibrations``."""
 
@@ -921,6 +829,49 @@ class PostgresRecalibrationRepository:
             sql.SQL("status = 'running' AND proposal_status IS NULL"),
             (),
             lambda r: replace(r, proposal=proposal),
+        )
+
+    def set_extension(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        *,
+        kept_dataset_id: str,
+        extension_dataset_id: str,
+    ) -> RecalibrationRecord | None:
+        """Fija la extensión si sigue ``running``, sin propuesta y sin extensión (atómico).
+
+        La extensión vive en el ``payload`` (no en una columna): la fila se bloquea con
+        ``SELECT … FOR UPDATE`` y la condición «sin extensión» se evalúa sobre el registro.
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            kept_dataset_id: Filas nuevas conservadas.
+            extension_dataset_id: Dataset de extensión.
+
+        Returns:
+            El registro con la extensión o ``None``.
+        """
+
+        def extend(record: RecalibrationRecord) -> RecalibrationRecord | None:
+            if record.extension_dataset_id is not None:
+                return None
+            return replace(
+                record,
+                kept_dataset_id=kept_dataset_id,
+                extension_dataset_id=extension_dataset_id,
+            )
+
+        return self._t.transition(
+            (tenant_id, chart_id, model_id, recalibration_id),
+            sql.SQL("status = 'running' AND proposal_status IS NULL"),
+            (),
+            extend,
         )
 
     def cancel(

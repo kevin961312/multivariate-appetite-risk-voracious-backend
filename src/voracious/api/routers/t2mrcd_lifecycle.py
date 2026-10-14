@@ -4,7 +4,8 @@ Solo traducen HTTP ↔ casos de uso: ninguna lógica estadística ni de ciclo de
 cómputo responden ``202`` con el identificador y se consultan con ``GET`` (estado
 ``queued | running | succeeded | failed``); los comandos sin cómputo responden ``201``/``200``.
 La recalibración paso a paso (vuelta 3.4) abre su sesión con ``201`` y se encadena por id con
-``/exclusions``, ``/fits``, ``/limits``, ``…/comparisons`` y ``…/versions``.
+``/exclusions``, ``…/recalibrations/{id}/extension`` (salvo reemplazo), ``/fits``, ``/limits`` y
+``…/versions``.
 ``POST /models`` (solo referencias) está en ``t2mrcd_phase1.py`` con el resto de los pasos de la
 Fase I; aquí queda la consulta del modelo y su ciclo de vida.
 """
@@ -37,8 +38,8 @@ from voracious.api.schemas.t2mrcd import (
     VersionSummary,
 )
 from voracious.api.schemas.t2mrcd_recalibration import (
-    ComparisonRequest,
-    ComparisonResponse,
+    ExtensionOut,
+    ExtensionRequest,
     StepwiseRecalibrationOut,
     VersionProposalRequest,
 )
@@ -453,60 +454,40 @@ def get_recalibration(
 
 
 @router.post(
-    "/{model_id}/comparisons",
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=AcceptedJob,
+    "/{model_id}/recalibrations/{recalibration_id}/extension",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ExtensionOut,
     tags=["t2mrcd-recalibrations"],
 )
-def request_comparison(
-    model_id: str, body: ComparisonRequest, tenant: TenantDep, c: ContainerDep
-) -> AcceptedJob:
-    """Valida y encola la comparación de bases (carril ``calibration``).
+def request_extension(
+    model_id: str,
+    recalibration_id: str,
+    body: ExtensionRequest,
+    tenant: TenantDep,
+    c: ContainerDep,
+) -> ExtensionOut:
+    """Construye (síncrono) el dataset de extensión: base vigente + filas nuevas conservadas.
 
-    Mientras las pruebas formales de S y μ no tengan cita responde
-    ``422 RECALIBRATION_DECISION_PENDING`` (P3); con reemplazo forzado no se compara.
+    Solo en una recalibración que amplía la base (por defecto); con reemplazo
+    (``force_replace`` o evento estructural) responde ``422 INVALID_INPUT``. Repetirla con el mismo
+    ``dataset_id`` devuelve la misma extensión.
 
     Args:
         model_id: Modelo.
-        body: Recalibración, ajuste y límites de las filas nuevas conservadas.
+        recalibration_id: Recalibración en curso.
+        body: Filas nuevas conservadas (candidatas o salida de su exclusión humana).
         tenant: Tenant.
         c: Contenedor.
 
     Returns:
-        El ``id`` de la comparación, ``queued``.
+        El dataset de extensión y sus filas.
     """
-    comparison_id = c.use_cases.request_comparison.execute(
-        tenant,
-        CHART_ID,
-        model_id,
-        body.recalibration_id,
-        fit_id=body.fit_id,
-        limits_id=body.limits_id,
+    extension_id = c.use_cases.request_extension.execute(
+        tenant, CHART_ID, model_id, recalibration_id, dataset_id=body.dataset_id
     )
-    return AcceptedJob(id=comparison_id)
-
-
-@router.get(
-    "/{model_id}/comparisons/{comparison_id}",
-    response_model=ComparisonResponse,
-    tags=["t2mrcd-recalibrations"],
-)
-def get_comparison(
-    model_id: str, comparison_id: str, tenant: TenantDep, c: ContainerDep
-) -> ComparisonResponse:
-    """Estado de una comparación y, si terminó bien, su resultado y su decisión.
-
-    Args:
-        model_id: Modelo.
-        comparison_id: Comparación.
-        tenant: Tenant.
-        c: Contenedor.
-
-    Returns:
-        La comparación.
-    """
-    record = c.use_cases.get_comparison.execute(tenant, CHART_ID, model_id, comparison_id)
-    return ComparisonResponse.of(record)
+    total = c.use_cases.get_dataset.execute(tenant, extension_id).dataset.data.shape[0]
+    kept = c.use_cases.get_dataset.execute(tenant, body.dataset_id).dataset.data.shape[0]
+    return ExtensionOut(dataset_id=extension_id, n_base=int(total - kept), n_kept_new=int(kept))
 
 
 @router.post(
@@ -525,7 +506,7 @@ def request_version(
 
     Args:
         model_id: Modelo.
-        body: Recalibración, comparación (salvo reemplazo forzado), ajuste y límites.
+        body: Recalibración, ajuste y límites.
         tenant: Tenant.
         c: Contenedor.
 
@@ -539,7 +520,6 @@ def request_version(
         body.recalibration_id,
         fit_id=body.fit_id,
         limits_id=body.limits_id,
-        comparison_id=body.comparison_id,
     )
     return AcceptedJob(id=recalibration_id)
 

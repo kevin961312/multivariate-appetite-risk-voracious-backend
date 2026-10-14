@@ -35,13 +35,14 @@ from support.api import (
     wait,
 )
 from support.bits import canonical
-from support.solo_test import small_data, solo_test_chart, solo_test_recalibration
+from support.solo_test import small_data
 from voracious.api.app import create_app
 from voracious.application.ports import JobKind, ModelVersionRepository
 from voracious.application.records import JobStatus, ModelVersion, VersionStatus
 from voracious.application.use_cases import JOB_INTERRUPTED, JOB_INTERRUPTED_NOTE
 from voracious.config import Settings
 from voracious.container import Container, build_container
+from voracious.domain.charts.t2mrcd import T2MRCDChart, T2MRCDRecalibrationParams
 
 TENANT_ID = TENANT["X-Tenant-ID"]
 CHART_ID = "t2mrcd"
@@ -89,7 +90,7 @@ class _Backend:
 
 @pytest.fixture(params=["memory", "postgres"])
 def backend(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[_Backend]:
-    charts = {CHART_ID: solo_test_chart()}
+    charts = {CHART_ID: T2MRCDChart()}
     if request.param == "memory":
         built = _Backend(lambda: build_container(Settings(), charts=charts), persistent=False)
     else:
@@ -179,7 +180,7 @@ def test_orphan_proposal_is_rejected_and_unblocks_recalibration(backend: _Backen
             model_id,
             range_from=T0,
             range_to=T0 + timedelta(hours=29),
-            params=solo_test_recalibration(seed=11, min_observations=10),
+            params=T2MRCDRecalibrationParams(seed=11, min_observations=10),
         )
 
     rid = recalibrate()

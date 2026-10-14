@@ -18,7 +18,6 @@ from voracious.application.use_cases import (
 )
 from voracious.application.use_cases.recovery import is_open_session
 from voracious.infrastructure.memory import (
-    InMemoryComparisonRepository,
     InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
@@ -35,14 +34,14 @@ def test_recovery_in_memory() -> None:
     fits, limits = InMemoryFitRepository(), InMemoryLimitsRepository()
     exclusions, pipelines = InMemoryExclusionRepository(), InMemoryPipelineRepository()
     models, monitorings = InMemoryModelRepository(), InMemoryMonitoringRepository()
-    recalibrations, comparisons = InMemoryRecalibrationRepository(), InMemoryComparisonRepository()
+    recalibrations = InMemoryRecalibrationRepository()
     models.add(rec.model())
     pipelines.add(rec.pipeline(status=JobStatus.SUCCEEDED))
     stepwise = RecalibrationMode.STEPWISE
     open_ = rec.recalibration(rid="open", status=JobStatus.RUNNING, mode=stepwise)
     done_proposal = replace(
         rec.recalibration(tenant="t2", status=JobStatus.RUNNING, mode=stepwise),
-        proposal=ProposalRequest("f", "l", None, JobStatus.FAILED, rec.T),
+        proposal=ProposalRequest("f", "l", JobStatus.FAILED, rec.T),
     )
     recalibrations.add(open_)
     recalibrations.add(done_proposal)
@@ -58,7 +57,6 @@ def test_recovery_in_memory() -> None:
         models,
         monitorings,
         recalibrations,
-        comparisons,
         versions,
         clock,
     ).execute()
@@ -86,7 +84,6 @@ def _recovery(
         models,
         InMemoryMonitoringRepository(),
         recalibrations,
-        InMemoryComparisonRepository(),
         versions,
         FixedClock(rec.T),
     )
@@ -124,7 +121,7 @@ def test_orphan_proposal_of_interrupted_recalibration_is_rejected() -> None:
     versions.add(rec.version())
     asked = replace(
         rec.recalibration(status=JobStatus.RUNNING, mode=RecalibrationMode.STEPWISE),
-        proposal=ProposalRequest("f", "l", None, JobStatus.RUNNING, rec.T),
+        proposal=ProposalRequest("f", "l", JobStatus.RUNNING, rec.T),
     )
     recalibrations.add(asked)
     proposed = rec.version(number=1, status=VersionStatus.PROPOSED)

@@ -1,7 +1,7 @@
 """Fábricas de registros mínimos para la suite de contrato de los repositorios.
 
 Los registros son de la carta ``c``, una carta de prueba (``StubChart``) que solo sabe codificar
-su modelo (``StubModel``), su informe, su ajuste, sus límites y su comparación: lo justo para que
+su modelo (``StubModel``), su informe, su ajuste y sus límites: lo justo para que
 los codecs reales (los de Postgres) funcionen sin ajustar nada.
 """
 
@@ -14,7 +14,6 @@ import numpy as np
 from voracious.application.records import (
     BaseRowRef,
     BaseRowSource,
-    ComparisonRecord,
     DatasetRecord,
     DatasetSource,
     ErrorInfo,
@@ -59,8 +58,8 @@ class StubChart:
     def _decode(data: Mapping[str, object]) -> StubModel:
         return StubModel(float.fromhex(str(data["value"])))
 
-    encode_model = encode_report = encode_fit = encode_limits = encode_comparison = _encode
-    decode_model = decode_report = decode_fit = decode_limits = decode_comparison = _decode
+    encode_model = encode_report = encode_fit = encode_limits = _encode
+    decode_model = decode_report = decode_fit = decode_limits = _decode
 
 
 STUB = StubChart()
@@ -147,12 +146,6 @@ def pipeline(
     return PipelineRecord(
         tenant, "c", rid, PipelineKind.PHASE1, status, "d", {}, (), LifecyclePolicy(), T
     )
-
-
-def comparison(
-    tenant: str = "t", rid: str = "x", status: JobStatus = JobStatus.QUEUED
-) -> ComparisonRecord:
-    return ComparisonRecord(tenant, "c", "m", rid, "r", "f", "l", status, T)
 
 
 def dataset(tenant: str = "t", rid: str = "d", dated: bool = True) -> DatasetRecord:

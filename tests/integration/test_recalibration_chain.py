@@ -2,24 +2,19 @@
 
 Tres caminos sobre el mismo modelo y las mismas observaciones:
 
-- **paso a paso** por HTTP: (exclusión humana, ``/exclusions``) → ``/fits`` → ``/limits`` con
-  ``recalibration_id`` → ``…/comparisons`` con ``{fit_id, limits_id}`` → (``extend``: ajuste y
-  límites del dataset de extensión) → ``…/versions``;
+- **paso a paso** por HTTP: (exclusión humana, ``/exclusions``) → si amplía la base,
+  ``…/recalibrations/{id}/extension`` → ``/fits`` → ``/limits`` con ``recalibration_id`` →
+  ``…/versions``;
 - **tubería** (``mode = pipeline``), que encadena los mismos casos de uso;
 - ``T2MRCDChart.recalibrate`` directo, con la base y el modelo de la versión 0.
 
 Se comparan en bits (``support.bits``) el modelo, el informe, ``base_hash``, ``base_refs``,
-``exclusions`` y la decisión en cuatro casos: EXTEND (pruebas formales «SOLO TEST» de
-``tests/support``, registradas solo aquí, con exclusión humana por anotaciones), REPLACE no
-forzado (las mismas pruebas, con la media de las filas nuevas desplazada para que decidan
-``replace``), REPLACE forzado e INSUFFICIENT (la exclusión humana deja menos de
-``min_observations``). Sin depuración automática iterativa (decisión del dueño, 2026-10-09). Se
-comprueban los huecos de semilla de cada calibración: ``(1, 0)`` las filas nuevas (que REPLACE
-reutiliza) y ``(0, 0)`` la base ampliada.
-
-Las pruebas formales no se pueden mandar por HTTP (en producción están pendientes, P3), así que
-en EXTEND y en REPLACE no forzado la recalibración se **abre** con el caso de uso y todo lo demás
-va por HTTP.
+``exclusions`` y la decisión en cuatro casos: EXTEND (por defecto, con exclusión humana por
+anotaciones), REPLACE forzado (``force_replace``), REPLACE por evento estructural (filas nuevas con
+la media desplazada, posteriores al evento) e INSUFFICIENT (la exclusión humana deja menos de
+``min_observations``). Sin depuración automática iterativa (decisión del dueño, 2026-10-09) ni
+comparación de bases (2026-10-14). Se comprueban los huecos de semilla de cada calibración:
+``(0, 0)`` la base ampliada y ``(1, 0)`` las filas nuevas de un reemplazo.
 """
 
 from collections.abc import Iterator
@@ -34,7 +29,7 @@ from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, T0, TENANT, score, train, wait
 from support.bits import canonical
-from support.solo_test import small_data, solo_test_chart, solo_test_recalibration
+from support.solo_test import small_data
 from voracious.api.app import create_app
 from voracious.application.lifecycle import base_content_hash
 from voracious.application.records import (
@@ -43,7 +38,6 @@ from voracious.application.records import (
     Exclusion,
     ExclusionReason,
     ModelVersion,
-    RecalibrationMode,
 )
 from voracious.config import Settings
 from voracious.container import Container, build_container
@@ -69,7 +63,7 @@ SHIFTED = (3, 7)
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings(), charts={CHART_ID: solo_test_chart()})
+    built = build_container(Settings(), charts={CHART_ID: T2MRCDChart()})
     yield built
     built.shutdown()
 
@@ -163,21 +157,14 @@ def _stepwise(
             assert body["output_dataset_id"] is None
             return _done(client, url)
         candidates = body["output_dataset_id"]
-    fit_id = _fit(client, candidates)
-    limits_id = _limits(client, fit_id, rid, "new_rows")
+    if forced:
+        fit_id = _fit(client, candidates)
+        limits_id = _limits(client, fit_id, rid, "new_rows")
+    else:
+        extension = _post(client, f"{url}/extension", {"dataset_id": candidates}, 201)
+        fit_id = _fit(client, extension["dataset_id"])
+        limits_id = _limits(client, fit_id, rid, "extension")
     version: dict[str, Any] = {"recalibration_id": rid, "fit_id": fit_id, "limits_id": limits_id}
-    if not forced:
-        comparison_id = _post(
-            client,
-            f"{BASE}/{model_id}/comparisons",
-            {"recalibration_id": rid, "fit_id": fit_id, "limits_id": limits_id},
-        )["id"]
-        comparison = _done(client, f"{BASE}/{model_id}/comparisons/{comparison_id}")
-        version["comparison_id"] = comparison_id
-        if comparison["decision"] == "extend":
-            ext_fit = _fit(client, comparison["extension_dataset_id"])
-            ext_limits = _limits(client, ext_fit, rid, "extension")
-            version.update(fit_id=ext_fit, limits_id=ext_limits)
     accepted = _post(client, f"{BASE}/{model_id}/versions", version)
     assert accepted["id"] == rid
     return _done(client, url)
@@ -198,7 +185,7 @@ def _reference(
     v0 = _version(container, scenario.model_id, 0)
     mask = np.zeros(N, dtype=np.bool_)
     mask[list(annotate)] = True
-    return solo_test_chart().recalibrate(
+    return T2MRCDChart().recalibrate(
         v0.model,
         v0.base_data,
         scenario.x,
@@ -285,119 +272,102 @@ def _reject(client: TestClient, model_id: str, number: int) -> None:
     assert response.status_code == 200, response.text
 
 
+def _body(params: dict[str, Any], **extra: object) -> dict[str, Any]:
+    return {
+        "range_from": T0.isoformat(),
+        "range_to": END.isoformat(),
+        "params": params,
+        **extra,
+    }
+
+
 def test_extend_with_human_exclusion_matches_recalibrate_in_bits(
     client: TestClient, container: Container
 ) -> None:
     annotate = (3,)
     scenario = _scenario(client, seed=50, annotate=annotate)
-    params = solo_test_recalibration(seed=11, min_observations=10)
+    raw = {"seed": 11, "min_observations": 10}
+    params = T2MRCDChart().decode_recalibration_params(raw)
     outcome = _reference(container, scenario, params, annotate=annotate, forced=False)
     assert outcome.decision is RecalibrationDecision.EXTEND
     assert outcome.report.n_excluded_assignable_cause == 1
     # Sin depuración automática: las filas desplazadas sin causa asignable se conservan.
     assert outcome.report.n_kept_new == N - 1
 
-    open_ = container.use_cases.request_recalibration
-    rid = open_.execute(
-        TENANT_ID,
-        CHART_ID,
-        scenario.model_id,
-        range_from=T0,
-        range_to=END,
-        params=params,
-        mode=RecalibrationMode.STEPWISE,
-    )
-    session = container.use_cases.get_recalibration.execute(
-        TENANT_ID, CHART_ID, scenario.model_id, rid
-    )
-    assert session.status.value == "running"
-    assert session.candidates_dataset_id is not None
+    url = f"{BASE}/{scenario.model_id}/recalibrations"
+    opened = _post(client, url, _body(raw, mode="stepwise"), 201)
+    assert opened["status"] == "running"
+    rid = opened["recalibration_id"]
     recal = _stepwise(
-        client, scenario.model_id, rid, session.candidates_dataset_id, human=True, forced=False
+        client, scenario.model_id, rid, opened["candidates_dataset_id"], human=True, forced=False
     )
     assert recal["outcome"] == "extend"
+    assert recal["extension_dataset_id"] is not None
     stepwise = _check(container, scenario, recal, outcome)
     human = [e for e in stepwise.exclusions if e.reason is ExclusionReason.ASSIGNABLE_CAUSE]
     assert [e.ref.ref for e in human] == [scenario.observation_ids[3]]
     assert all(e.annotation_id for e in human)
-    assert stepwise.justification == "no_change_detected"
+    assert stepwise.justification == "default_extend"
     _reject(client, scenario.model_id, stepwise.number)
 
-    pid = open_.execute(
-        TENANT_ID, CHART_ID, scenario.model_id, range_from=T0, range_to=END, params=params
-    )
-    piped = _done(client, f"{BASE}/{scenario.model_id}/recalibrations/{pid}")
+    piped = _done(client, f"{url}/{_post(client, url, _body(raw))['id']}")
     assert piped["mode"] == "pipeline"
     pipeline = _check(container, scenario, piped, outcome)
     _same_version(stepwise, pipeline)
-    assert _pipeline_slots(client, piped["pipeline_id"]) == [
-        ("new_rows", [SLOT_NEW_ROWS, 0]),
-        ("extension", [SLOT_PHASE1, 0]),
-    ]
+    # Una sola calibración, la de la base ampliada, en el hueco (0, 0).
+    assert _pipeline_slots(client, piped["pipeline_id"]) == [("extension", [SLOT_PHASE1, 0])]
     steps = client.get(f"{CHART_BASE}/pipelines/{piped['pipeline_id']}", headers=TENANT)
     kinds = [s["kind"] for s in steps.json()["steps"]]
-    assert kinds == ["exclusion", "fit", "limits", "comparison", "fit", "limits", "version"]
+    assert kinds == ["exclusion", "extension", "fit", "limits", "version"]
+    assert steps.json()["steps"][1]["id"] == piped["extension_dataset_id"]
 
 
-def test_unforced_replace_with_human_exclusion_matches_recalibrate_in_bits(
+def test_replace_after_structural_event_matches_recalibrate_in_bits(
     client: TestClient, container: Container
 ) -> None:
     annotate = (3,)
-    # Media de las filas nuevas desplazada en todas las variables: las pruebas deciden REPLACE.
+    # Media de las filas nuevas desplazada: sin comparación de bases no decide nada; reemplaza el
+    # evento estructural (anterior a todas ellas), que fuerza el reemplazo.
     scenario = _scenario(client, seed=53, annotate=annotate, shift=3.0)
-    params = solo_test_recalibration(seed=13, min_observations=10)
-    outcome = _reference(container, scenario, params, annotate=annotate, forced=False)
+    events = f"{BASE}/{scenario.model_id}/structural-events"
+    occurred = (T0 - timedelta(hours=1)).isoformat()
+    event = _post(client, events, {"occurred_at": occurred, "description": "fusión"}, 201)
+    raw = {"seed": 13, "min_observations": 10}
+    params = T2MRCDChart().decode_recalibration_params(raw)
+    outcome = _reference(container, scenario, params, annotate=annotate, forced=True)
     assert outcome.decision is RecalibrationDecision.REPLACE
     assert outcome.report.n_excluded_assignable_cause == 1
     assert outcome.report.n_kept_new == N - 1
 
-    open_ = container.use_cases.request_recalibration
-    rid = open_.execute(
-        TENANT_ID,
-        CHART_ID,
-        scenario.model_id,
-        range_from=T0,
-        range_to=END,
-        params=params,
-        mode=RecalibrationMode.STEPWISE,
-    )
-    session = container.use_cases.get_recalibration.execute(
-        TENANT_ID, CHART_ID, scenario.model_id, rid
-    )
-    assert session.status.value == "running"
-    assert session.candidates_dataset_id is not None
+    url = f"{BASE}/{scenario.model_id}/recalibrations"
+    opened = _post(client, url, _body(raw, mode="stepwise"), 201)
+    rid = opened["recalibration_id"]
+    session = client.get(f"{url}/{rid}", headers=TENANT).json()
+    assert (session["force_replace"], session["structural_event_id"]) == (True, event["id"])
     recal = _stepwise(
-        client, scenario.model_id, rid, session.candidates_dataset_id, human=True, forced=False
+        client, scenario.model_id, rid, opened["candidates_dataset_id"], human=True, forced=True
     )
     assert recal["outcome"] == "replace"
-    assert recal["proposal"]["comparison_id"] is not None
-    comparison = _done(
-        client, f"{BASE}/{scenario.model_id}/comparisons/{recal['proposal']['comparison_id']}"
-    )
-    assert comparison["decision"] == "replace"
-    assert comparison["extension_dataset_id"] is None
+    assert recal["extension_dataset_id"] is None
     stepwise = _check(container, scenario, recal, outcome)
     assert stepwise.decision is RecalibrationDecision.REPLACE
     human = [e for e in stepwise.exclusions if e.reason is ExclusionReason.ASSIGNABLE_CAUSE]
     assert [e.ref.ref for e in human] == [scenario.observation_ids[3]]
     assert all(e.annotation_id for e in human)
-    assert stepwise.justification == "change_detected"
+    assert stepwise.justification == "structural_event"
     _reject(client, scenario.model_id, stepwise.number)
 
-    pid = open_.execute(
-        TENANT_ID, CHART_ID, scenario.model_id, range_from=T0, range_to=END, params=params
-    )
-    piped = _done(client, f"{BASE}/{scenario.model_id}/recalibrations/{pid}")
+    piped = _done(client, f"{url}/{_post(client, url, _body(raw))['id']}")
     assert piped["mode"] == "pipeline"
     assert piped["outcome"] == "replace"
     pipeline = _check(container, scenario, piped, outcome)
     _same_version(stepwise, pipeline)
-    assert pipeline.justification == "change_detected"
-    # REPLACE reutiliza el ajuste y los límites de las filas nuevas: un solo hueco, (1, 0).
+    assert pipeline.justification == "structural_event"
+    # REPLACE: una sola calibración, la de las filas nuevas, en el hueco (1, 0).
     assert _pipeline_slots(client, piped["pipeline_id"]) == [("new_rows", [SLOT_NEW_ROWS, 0])]
     steps = client.get(f"{CHART_BASE}/pipelines/{piped['pipeline_id']}", headers=TENANT)
     kinds = [s["kind"] for s in steps.json()["steps"]]
-    assert kinds == ["exclusion", "fit", "limits", "comparison", "version"]
+    assert kinds == ["exclusion", "fit", "limits", "version"]
 
 
 def test_forced_replace_matches_recalibrate_in_bits(
@@ -428,7 +398,7 @@ def test_forced_replace_matches_recalibrate_in_bits(
         forced=True,
     )
     assert recal["outcome"] == "replace"
-    assert recal["proposal"]["comparison_id"] is None
+    assert "comparison_id" not in recal["proposal"]
     stepwise = _check(container, scenario, recal, outcome)
     assert stepwise.justification == "forced_replace"
     _reject(client, scenario.model_id, stepwise.number)
@@ -443,20 +413,16 @@ def test_forced_replace_matches_recalibrate_in_bits(
     assert _pipeline_slots(client, piped["pipeline_id"]) == [("new_rows", [SLOT_NEW_ROWS, 0])]
 
 
+@pytest.mark.parametrize("forced", [False, True])
 def test_insufficient_after_human_exclusion_matches_recalibrate_in_bits(
-    client: TestClient, container: Container
+    client: TestClient, container: Container, forced: bool
 ) -> None:
     annotate = (3,)
     scenario = _scenario(client, seed=52, annotate=annotate)
     raw = {"seed": 9, "min_observations": N}
-    body = {
-        "range_from": T0.isoformat(),
-        "range_to": END.isoformat(),
-        "params": raw,
-        "force_replace": True,
-    }
+    body = _body(raw, force_replace=forced)
     params = T2MRCDChart().decode_recalibration_params(raw)
-    outcome = _reference(container, scenario, params, annotate=annotate, forced=True)
+    outcome = _reference(container, scenario, params, annotate=annotate, forced=forced)
     assert outcome.decision is RecalibrationDecision.INSUFFICIENT
     assert outcome.report.n_kept_new == N - 1
 
@@ -471,7 +437,7 @@ def test_insufficient_after_human_exclusion_matches_recalibrate_in_bits(
             opened["recalibration_id"],
             opened["candidates_dataset_id"],
             human=True,
-            forced=True,
+            forced=forced,
         )
     )
     accepted = _post(client, f"{BASE}/{scenario.model_id}/recalibrations", body)

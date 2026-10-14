@@ -24,7 +24,11 @@ dataset es ``recalibration_candidates``, los límites heredan los parámetros de
 (``recalibration_id``, operación ``NEW_ROWS``) y la exclusión humana sale de las anotaciones (no
 del cliente); si deja menos de ``min_observations`` filas, la recalibración termina
 ``insufficient``. Sobre ``recalibration_extension`` (operación ``EXTENSION``) solo hay ajuste y
-límites. Lo propio de la recalibración llega por ``RecalibrationLinks``.
+límites. Sin comparación de bases (decisión del dueño, 2026-10-14), cada sesión usa una sola
+operación: ``NEW_ROWS`` si reemplaza la base (evento estructural o petición explícita) y
+``EXTENSION`` si la amplía (por defecto); ajustar o calibrar con la otra es ``INVALID_INPUT``
+(``check_recalibration_operation``). Lo propio de la recalibración llega por
+``RecalibrationLinks``.
 """
 
 import csv
@@ -114,6 +118,7 @@ __all__ = [
     "RunLimitsJob",
     "RunModelAssemblyJob",
     "UploadDataset",
+    "check_recalibration_operation",
     "check_same_fit",
     "dataset_chain",
     "get_dataset",
@@ -435,6 +440,41 @@ def recalibration_session(
     if chain[0].source not in _RECALIBRATION_ROOTS:
         return None
     return _require_links(links).session_for(tenant_id, chart_id, chain[0])
+
+
+def check_recalibration_operation(
+    session: RecalibrationRecord, kind: StageKind, resource: dict[str, object]
+) -> None:
+    """Exige la operación de la sesión: ``NEW_ROWS`` si reemplaza y ``EXTENSION`` si amplía.
+
+    Args:
+        session: Recalibración en curso.
+        kind: Operación deducida del dataset raíz.
+        resource: Identificadores del paso, para ``details``.
+
+    Raises:
+        InvalidInputError: ``new_rows_require_replace`` (ajuste o límites de las filas nuevas
+            sueltas en una recalibración que amplía la base) o ``extension_requires_extend``
+            (de la base ampliada en un reemplazo).
+    """
+    if kind is StageKind.NEW_ROWS and not session.force_replace:
+        raise InvalidInputError(
+            "la recalibración amplía la base: se ajusta su extensión, no las filas nuevas",
+            details={
+                **resource,
+                "recalibration_id": session.recalibration_id,
+                "reason": "new_rows_require_replace",
+            },
+        )
+    if kind is StageKind.EXTENSION and session.force_replace:
+        raise InvalidInputError(
+            "la recalibración reemplaza la base: no hay extensión",
+            details={
+                **resource,
+                "recalibration_id": session.recalibration_id,
+                "reason": "extension_requires_extend",
+            },
+        )
 
 
 def root_indices(chain: Sequence[DatasetRecord]) -> list[IndexVector]:
@@ -854,6 +894,7 @@ class RequestFit:
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
+        recalibration: Enlaces con la recalibración por pasos (``None``: solo Fase I).
     """
 
     steps: Phase1StepsRegistry
@@ -862,6 +903,7 @@ class RequestFit:
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
+    recalibration: RecalibrationLinks | None = None
 
     def execute(self, tenant_id: str, chart_id: str, dataset_id: str, fit_params: object) -> str:
         """Encola el ajuste.
@@ -879,7 +921,11 @@ class RequestFit:
         Raises:
             UnknownChartError: Si la carta no expone pasos.
             DatasetNotFoundError: Si el dataset no existe.
-            InvalidInputError: Si la carta no admite el dataset (validación síncrona).
+            InvalidInputError: Si la carta no admite el dataset (validación síncrona) o, en un
+                dataset de recalibración, no es la operación de la sesión
+                (``check_recalibration_operation``).
+            RecalibrationNotInProgressError: Si el dataset es de una recalibración que ya no
+                admite pasos.
         """
         steps = resolve_steps(self.steps, chart_id)
         return self.create(
@@ -914,6 +960,10 @@ class RequestFit:
         resolved = steps if steps is not None else resolve_steps(self.steps, chart_id)
         dataset = get_dataset(self.datasets, tenant_id, dataset_id)
         resolved.validate_input(dataset.data)
+        chain = dataset_chain(self.datasets, dataset)
+        session = recalibration_session(self.recalibration, tenant_id, chart_id, chain)
+        if session is not None:
+            check_recalibration_operation(session, stage_kind(chain), {"dataset_id": dataset_id})
         record = FitRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -1166,6 +1216,7 @@ class RequestLimits:
                     "hay candidatas con causa asignable: primero la exclusión humana",
                     details={"fit_id": fit_id, "reason": "human_exclusion_required"},
                 )
+            check_recalibration_operation(session, stage_kind(chain), {"fit_id": fit_id})
             params = dict(session.inherited_params)
         elif params is None:
             raise InvalidInputError(

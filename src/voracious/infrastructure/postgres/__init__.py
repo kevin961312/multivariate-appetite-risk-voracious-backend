@@ -14,7 +14,6 @@ from voracious.infrastructure.postgres.migrate import (
 )
 from voracious.infrastructure.postgres.pool import create_pool, database_ready
 from voracious.infrastructure.postgres.repositories import (
-    PostgresComparisonRepository,
     PostgresExclusionRepository,
     PostgresFitRepository,
     PostgresLimitsRepository,
@@ -33,7 +32,6 @@ __all__ = [
     "Migration",
     "MigrationChecksumError",
     "PayloadFormatError",
-    "PostgresComparisonRepository",
     "PostgresDatasetStorage",
     "PostgresExclusionRepository",
     "PostgresFitRepository",

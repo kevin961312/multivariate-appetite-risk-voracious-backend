@@ -33,10 +33,8 @@ from voracious.application.records import (
     VersionStatus,
 )
 from voracious.infrastructure.memory import (
-    ComparisonRecordCodec,
     ExclusionRecordCodec,
     FitRecordCodec,
-    InMemoryComparisonRepository,
     InMemoryExclusionRepository,
     InMemoryFitRepository,
     InMemoryLimitsRepository,
@@ -61,7 +59,6 @@ from voracious.infrastructure.memory import (
     StructuralEventCodec,
 )
 from voracious.infrastructure.postgres import (
-    PostgresComparisonRepository,
     PostgresDatasetStorage,
     PostgresExclusionRepository,
     PostgresFitRepository,
@@ -162,13 +159,6 @@ class Backend:
     def pipelines(self) -> object:
         return self._make(
             InMemoryPipelineRepository, PostgresPipelineRepository, PipelineRecordCodec()
-        )
-
-    def comparisons(self) -> object:
-        return self._make(
-            InMemoryComparisonRepository,
-            PostgresComparisonRepository,
-            ComparisonRecordCodec(rec.CHARTS),
         )
 
 
@@ -283,13 +273,6 @@ CASES = [
         lambda r, x: r.add(x),
         lambda r, t: _one(r.get(t, "c", "p")),
     ),
-    Case(
-        "comparisons",
-        Backend.comparisons,
-        lambda t: rec.comparison(t),
-        lambda r, x: r.add(x),
-        lambda r, t: _one(r.get(t, "c", "m", "x")),
-    ),
 ]
 
 JOB_NAMES = {
@@ -300,7 +283,6 @@ JOB_NAMES = {
     "limits",
     "exclusions",
     "pipelines",
-    "comparisons",
 }
 JOB_CASES = [c for c in CASES if c.name in JOB_NAMES]
 
@@ -327,7 +309,7 @@ def _claim(repo: object, name: str, tenant: str = "t") -> object:
     when = rec.T
     if name in {"models"}:
         return repo.claim(tenant, "c", "m", when)
-    if name in {"monitorings", "comparisons"}:
+    if name == "monitorings":
         return repo.claim(tenant, "c", "m", "x", when)
     if name == "recalibrations":
         return repo.claim(tenant, "c", "m", "r", when)
@@ -607,7 +589,7 @@ def test_recalibration_session_transitions(backend: Backend) -> None:
     repo.add(session)
     assert same(repo.find("t", "c", "r"), session)
     assert repo.find("otro", "c", "r") is None
-    proposal = ProposalRequest("f", "l", None, JobStatus.QUEUED, rec.T)
+    proposal = ProposalRequest("f", "l", JobStatus.QUEUED, rec.T)
     assert repo.claim_proposal("t", "c", "m", "r") is None  # sin propuesta
     asked = repo.request_proposal("t", "c", "m", "r", proposal)
     assert asked.proposal == proposal
@@ -626,6 +608,44 @@ def test_recalibration_session_transitions(backend: Backend) -> None:
     piped = rec.recalibration(tenant="t3", status=JobStatus.RUNNING)
     repo.add(piped)
     assert repo.cancel("t3", "c", "m", "r", rec.T) is None  # solo sesiones paso a paso
+
+
+def test_recalibration_extension_is_set_once(backend: Backend) -> None:
+    repo = backend.recalibrations()
+    session = rec.recalibration(status=JobStatus.RUNNING, mode=RecalibrationMode.STEPWISE)
+    repo.add(session)
+    assert (session.kept_dataset_id, session.extension_dataset_id) == (None, None)
+    assert (
+        repo.set_extension("otro", "c", "m", "r", kept_dataset_id="k", extension_dataset_id="e")
+        is None
+    )
+    wins = _race(
+        lambda: repo.set_extension(
+            "t", "c", "m", "r", kept_dataset_id="k", extension_dataset_id="e"
+        )
+    )
+    assert sum(r is not None for r in wins) == 1
+    stored = repo.get("t", "c", "m", "r")
+    assert (stored.kept_dataset_id, stored.extension_dataset_id) == ("k", "e")
+    assert (
+        repo.set_extension("t", "c", "m", "r", kept_dataset_id="k2", extension_dataset_id="e2")
+        is None
+    )
+    asked = rec.recalibration(
+        tenant="t2", status=JobStatus.RUNNING, mode=RecalibrationMode.STEPWISE
+    )
+    repo.add(asked)
+    repo.request_proposal("t2", "c", "m", "r", ProposalRequest("f", "l", JobStatus.QUEUED, rec.T))
+    assert (
+        repo.set_extension("t2", "c", "m", "r", kept_dataset_id="k", extension_dataset_id="e")
+        is None
+    )
+    done = rec.recalibration(tenant="t3", status=JobStatus.SUCCEEDED)
+    repo.add(done)
+    assert (
+        repo.set_extension("t3", "c", "m", "r", kept_dataset_id="k", extension_dataset_id="e")
+        is None
+    )
 
 
 def test_datasets_keep_variables_dates_and_check_hash(backend: Backend, tmp_path: Path) -> None:

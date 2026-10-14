@@ -12,8 +12,6 @@ para comportarse igual.
   exacta en bits.
 - ``FitRecordCodec`` y ``LimitsRecordCodec`` (vuelta 3.3): el ajuste y los límites se codifican
   con los pasos de su carta (``Phase1Steps.encode_fit`` / ``encode_limits``), exactos en bits.
-- ``ComparisonRecordCodec`` (vuelta 3.4): la comparación se codifica con los pasos de la
-  recalibración de su carta (``RecalibrationSteps.encode_comparison``), exacta en bits.
 - Paso 4.2 (Postgres): ``ExclusionRecordCodec``, ``PipelineRecordCodec``,
   ``MonitoringRecordCodec``, ``ObservationRecordCodec``, ``SignalAnnotationCodec`` y
   ``StructuralEventCodec`` (registros sin objetos de carta) y ``encode_dataset_meta`` /
@@ -31,15 +29,10 @@ from typing import Final, Protocol
 
 from voracious.application.charts import ChartRegistry, resolve_chart
 from voracious.application.phase1_steps import Phase1StepsRegistry, resolve_steps
-from voracious.application.recalibration_steps import (
-    RecalibrationStepsRegistry,
-    resolve_recalibration_steps,
-)
 from voracious.application.records import (
     AssignableCause,
     BaseRowRef,
     BaseRowSource,
-    ComparisonRecord,
     DatasetRecord,
     DatasetSource,
     ErrorInfo,
@@ -84,7 +77,6 @@ from voracious.domain.common.codec import (
 )
 
 __all__ = [
-    "ComparisonRecordCodec",
     "ExclusionRecordCodec",
     "FitRecordCodec",
     "LimitsRecordCodec",
@@ -813,12 +805,12 @@ _RECALIBRATION_FIELDS: Final = frozenset(
         "candidates_dataset_id",
         "pipeline_id",
         "proposal",
+        "kept_dataset_id",
+        "extension_dataset_id",
     }
 )
 
-_PROPOSAL_FIELDS: Final = frozenset(
-    {"fit_id", "limits_id", "comparison_id", "status", "requested_at"}
-)
+_PROPOSAL_FIELDS: Final = frozenset({"fit_id", "limits_id", "status", "requested_at"})
 
 
 def _encode_proposal(proposal: ProposalRequest | None) -> dict[str, object] | None:
@@ -835,7 +827,6 @@ def _encode_proposal(proposal: ProposalRequest | None) -> dict[str, object] | No
     return {
         "fit_id": proposal.fit_id,
         "limits_id": proposal.limits_id,
-        "comparison_id": proposal.comparison_id,
         "status": proposal.status.value,
         "requested_at": _encode_time(proposal.requested_at),
     }
@@ -856,7 +847,6 @@ def _decode_proposal(value: object) -> ProposalRequest | None:
     return ProposalRequest(
         fit_id=read_str(raw["fit_id"], "proposal.fit_id"),
         limits_id=read_str(raw["limits_id"], "proposal.limits_id"),
-        comparison_id=_optional_str(raw["comparison_id"], "proposal.comparison_id"),
         status=_enum(JobStatus, raw["status"], "proposal.status"),
         requested_at=_time(raw["requested_at"], "proposal.requested_at"),
     )
@@ -930,6 +920,8 @@ class RecalibrationRecordCodec:
             "candidates_dataset_id": record.candidates_dataset_id,
             "pipeline_id": record.pipeline_id,
             "proposal": _encode_proposal(record.proposal),
+            "kept_dataset_id": record.kept_dataset_id,
+            "extension_dataset_id": record.extension_dataset_id,
         }
 
     def decode(self, stored: object) -> RecalibrationRecord:
@@ -978,6 +970,8 @@ class RecalibrationRecordCodec:
             ),
             pipeline_id=_optional_str(raw["pipeline_id"], "pipeline_id"),
             proposal=_decode_proposal(raw["proposal"]),
+            kept_dataset_id=_optional_str(raw["kept_dataset_id"], "kept_dataset_id"),
+            extension_dataset_id=_optional_str(raw["extension_dataset_id"], "extension_dataset_id"),
         )
 
 
@@ -1170,111 +1164,6 @@ class LimitsRecordCodec:
             finished_at=_optional_time(raw["finished_at"], "finished_at"),
             result=None if result is None else steps.decode_limits(_chart_data(result, "result")),
             clean_rows=None if clean is None else decode_bool_array(clean, "clean_rows"),
-            error=_decode_error(raw["error"]),
-            pipeline_id=_optional_str(raw["pipeline_id"], "pipeline_id"),
-        )
-
-
-# --- ComparisonRecord (vuelta 3.4) ---------------------------------------------------------------
-
-_COMPARISON_FIELDS: Final = frozenset(
-    {
-        "tenant_id",
-        "chart_id",
-        "model_id",
-        "comparison_id",
-        "recalibration_id",
-        "fit_id",
-        "limits_id",
-        "status",
-        "created_at",
-        "started_at",
-        "finished_at",
-        "result",
-        "decision",
-        "extension_dataset_id",
-        "error",
-        "pipeline_id",
-    }
-)
-
-
-class ComparisonRecordCodec:
-    """Codec de ``ComparisonRecord``: registro entero como datos; la comparación, con su carta.
-
-    Attributes:
-        steps: Pasos de la recalibración por ``chart_id``.
-    """
-
-    def __init__(self, steps: RecalibrationStepsRegistry) -> None:
-        """Construye el codec.
-
-        Args:
-            steps: Registro de pasos de la recalibración.
-        """
-        self.steps = steps
-
-    def encode(self, record: ComparisonRecord) -> object:
-        """Codifica el registro.
-
-        Args:
-            record: Registro.
-
-        Returns:
-            Diccionario serializable.
-        """
-        steps = resolve_recalibration_steps(self.steps, record.chart_id)
-        return {
-            "tenant_id": record.tenant_id,
-            "chart_id": record.chart_id,
-            "model_id": record.model_id,
-            "comparison_id": record.comparison_id,
-            "recalibration_id": record.recalibration_id,
-            "fit_id": record.fit_id,
-            "limits_id": record.limits_id,
-            "status": record.status.value,
-            "created_at": _encode_time(record.created_at),
-            "started_at": _encode_time(record.started_at),
-            "finished_at": _encode_time(record.finished_at),
-            "result": None if record.result is None else steps.encode_comparison(record.result),
-            "decision": None if record.decision is None else record.decision.value,
-            "extension_dataset_id": record.extension_dataset_id,
-            "error": _encode_error(record.error),
-            "pipeline_id": record.pipeline_id,
-        }
-
-    def decode(self, stored: object) -> ComparisonRecord:
-        """Decodifica el registro.
-
-        Args:
-            stored: Diccionario guardado.
-
-        Returns:
-            El registro.
-        """
-        raw = read_mapping(stored, "comparison_record", _COMPARISON_FIELDS)
-        chart_id = read_str(raw["chart_id"], "chart_id")
-        steps = resolve_recalibration_steps(self.steps, chart_id)
-        result, decision = raw["result"], raw["decision"]
-        return ComparisonRecord(
-            tenant_id=read_str(raw["tenant_id"], "tenant_id"),
-            chart_id=chart_id,
-            model_id=read_str(raw["model_id"], "model_id"),
-            comparison_id=read_str(raw["comparison_id"], "comparison_id"),
-            recalibration_id=read_str(raw["recalibration_id"], "recalibration_id"),
-            fit_id=read_str(raw["fit_id"], "fit_id"),
-            limits_id=read_str(raw["limits_id"], "limits_id"),
-            status=_enum(JobStatus, raw["status"], "status"),
-            created_at=_time(raw["created_at"], "created_at"),
-            started_at=_optional_time(raw["started_at"], "started_at"),
-            finished_at=_optional_time(raw["finished_at"], "finished_at"),
-            result=None
-            if result is None
-            else steps.decode_comparison(_chart_data(result, "result")),
-            decision=None
-            if decision is None
-            else _enum(RecalibrationDecision, decision, "decision"),
-            extension_dataset_id=_optional_str(raw["extension_dataset_id"], "extension_dataset_id"),
             error=_decode_error(raw["error"]),
             pipeline_id=_optional_str(raw["pipeline_id"], "pipeline_id"),
         )

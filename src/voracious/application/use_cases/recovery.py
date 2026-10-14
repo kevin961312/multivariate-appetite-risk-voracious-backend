@@ -30,7 +30,6 @@ from dataclasses import dataclass, replace
 
 from voracious.application.ports import (
     Clock,
-    ComparisonRepository,
     ExclusionRepository,
     FitRepository,
     LimitsRepository,
@@ -107,7 +106,6 @@ class RecoverInterruptedJobs:
         models: Modelos.
         monitorings: Puntuaciones.
         recalibrations: Recalibraciones.
-        comparisons: Comparaciones.
         versions: Versiones (conciliación de la versión 0 y de las propuestas huérfanas).
         clock: Reloj.
     """
@@ -119,7 +117,6 @@ class RecoverInterruptedJobs:
     models: ModelRepository
     monitorings: MonitoringRepository
     recalibrations: RecalibrationRepository
-    comparisons: ComparisonRepository
     versions: ModelVersionRepository
     clock: Clock
 
@@ -141,7 +138,6 @@ class RecoverInterruptedJobs:
                 "models",
                 "scores",
                 "recalibrations",
-                "comparisons",
                 "versions",
             ),
             0,
@@ -181,11 +177,6 @@ class RecoverInterruptedJobs:
                 replace(mon, status=failed, finished_at=now, error=_interrupted(mon.status))
             )
             counts["scores"] += 1
-        for comp in self.comparisons.list_unfinished():
-            self.comparisons.update(
-                replace(comp, status=failed, finished_at=now, error=_interrupted(comp.status))
-            )
-            counts["comparisons"] += 1
         for recal in self.recalibrations.list_unfinished():
             if is_open_session(recal):
                 continue

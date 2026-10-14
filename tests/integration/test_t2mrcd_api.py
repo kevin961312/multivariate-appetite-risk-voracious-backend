@@ -289,8 +289,11 @@ def _recalibrate(client: TestClient, model_id: str, **extra: object) -> httpx2.R
 
 def test_recalibration_validation(client: TestClient, scored: dict[str, Any]) -> None:
     model_id = scored["model_id"]
-    body = _error(_recalibrate(client, model_id), 422, "RECALIBRATION_DECISION_PENDING")
-    assert body["details"]["pending"]
+    for removed in (
+        {"relative_change_threshold": 0.1},
+        {"threshold_decides": True},
+    ):
+        _error(_recalibrate(client, model_id, params={"seed": 11, **removed}), 422, "INVALID_INPUT")
     _error(
         _recalibrate(client, model_id, range_to=(T0 + timedelta(hours=2)).isoformat()),
         422,
@@ -321,7 +324,8 @@ def test_forced_recalibration_proposal_and_reject(client: TestClient) -> None:
     assert done["status"] == "succeeded", done
     assert done["outcome"] == "replace"
     assert done["proposed_version"] == 1
-    assert done["report"]["forced"] is True
+    assert "forced" not in done["report"]
+    assert done["extension_dataset_id"] is None
     assert done["report"]["row_disposition"] is None
     full = client.get(url, headers=TENANT, params={"include": "row_disposition"}).json()
     assert len(full["report"]["row_disposition"]) == full["report"]["n_base"] + 30

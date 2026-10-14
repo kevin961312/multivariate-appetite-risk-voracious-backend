@@ -63,6 +63,15 @@ def test_every_application_error_code_is_mapped() -> None:
     assert {InvalidInputError.CODE, TENANT_REQUIRED, "INTERNAL_ERROR"} <= set(CODE_TO_STATUS)
 
 
+@pytest.mark.parametrize(
+    "code", ["RECALIBRATION_DECISION_PENDING", "COMPARISON_NOT_FOUND", "COMPARISON_NOT_READY"]
+)
+def test_codes_of_the_removed_base_test_are_gone(code: str) -> None:
+    """Sin comparación de bases (dueño, 2026-10-14): ni en el catálogo ni como error."""
+    assert code not in CODE_TO_STATUS
+    assert code not in {c.code for c in APPLICATION_ERRORS}
+
+
 @pytest.mark.parametrize("cls", APPLICATION_ERRORS, ids=lambda c: c.code)
 def test_application_errors_respond_with_their_status(
     client: TestClient, cls: type[ApplicationError]

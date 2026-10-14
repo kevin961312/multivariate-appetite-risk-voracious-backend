@@ -22,7 +22,6 @@ from voracious.application.records import (
 from voracious.application.use_cases import JOB_INTERRUPTED, RecoverInterruptedJobs
 from voracious.infrastructure.clock import SystemClock
 from voracious.infrastructure.memory import (
-    ComparisonRecordCodec,
     ExclusionRecordCodec,
     FitRecordCodec,
     LimitsRecordCodec,
@@ -37,7 +36,6 @@ from voracious.infrastructure.postgres import (
     Migration,
     MigrationChecksumError,
     PayloadFormatError,
-    PostgresComparisonRepository,
     PostgresExclusionRepository,
     PostgresFitRepository,
     PostgresLimitsRepository,
@@ -116,10 +114,6 @@ def test_other_job_records_round_trip(pg_pool: ConnectionPool) -> None:
         (PostgresExclusionRepository(pg_pool, ExclusionRecordCodec()), rec.exclusion()),
         (PostgresPipelineRepository(pg_pool, PipelineRecordCodec()), rec.pipeline()),
         (PostgresMonitoringRepository(pg_pool, MonitoringRecordCodec()), rec.monitoring()),
-        (
-            PostgresComparisonRepository(pg_pool, ComparisonRecordCodec(rec.CHARTS)),
-            replace(rec.comparison(), result=rec.StubModel(float("inf"))),
-        ),
     ]
     for repo, record in pairs:
         repo.add(record)
@@ -184,9 +178,62 @@ def test_changed_migration_is_an_error_and_failed_one_rolls_back() -> None:
         assert migrate(url, [first, ok]) == ["0002"]
 
 
+_LEGACY_ROWS = {
+    "recalibration": (
+        "INSERT INTO recalibrations (tenant_id, chart_id, model_id, recalibration_id, status,"
+        " mode, created_at, format_version, payload)"
+        " VALUES ('t', 'c', 'm', 'r', 'succeeded', 'pipeline', now(), 1, '{}')"
+    ),
+    "comparison": (
+        "INSERT INTO comparisons (tenant_id, chart_id, model_id, comparison_id, status,"
+        " recalibration_id, created_at, format_version, payload)"
+        " VALUES ('t', 'c', 'm', 'x', 'succeeded', 'r', now(), 1, '{}')"
+    ),
+    "recalibrated_version": (
+        "INSERT INTO model_versions (tenant_id, chart_id, model_id, number, status, created_at,"
+        " format_version, payload) VALUES ('t', 'c', 'm', 1, 'proposed', now(), 1, '{}')"
+    ),
+}
+"""Filas en el formato anterior a 0002 que no se pueden leer (sin comparación de bases)."""
+
+
+def test_migration_0002_drops_comparisons_on_a_base_without_recalibrations() -> None:
+    initial, *_ = bundled_migrations()
+    with temporary_database(admin_url()) as url:
+        assert migrate(url, [initial]) == ["0001"]
+        with psycopg.connect(url, autocommit=True) as conn:
+            conn.execute("INSERT INTO tenants (tenant_id) VALUES ('t')")
+            conn.execute(
+                "INSERT INTO model_versions (tenant_id, chart_id, model_id, number, status,"
+                " created_at, format_version, payload)"
+                " VALUES ('t', 'c', 'm', 0, 'active', now(), 1, '{}')"
+            )
+        assert "comparisons" in _tables(url)
+        assert migrate(url) == ["0002"]
+        assert "comparisons" not in _tables(url)
+        assert {"recalibrations", "model_versions"} <= _tables(url)
+
+
+@pytest.mark.parametrize("legacy", sorted(_LEGACY_ROWS))
+def test_migration_0002_aborts_without_changes_on_legacy_rows(legacy: str) -> None:
+    """Decisión del dueño (2026-10-14): sin lector del formato anterior; se recrea la base."""
+    initial, *_ = bundled_migrations()
+    with temporary_database(admin_url()) as url:
+        migrate(url, [initial])
+        with psycopg.connect(url, autocommit=True) as conn:
+            conn.execute("INSERT INTO tenants (tenant_id) VALUES ('t')")
+            conn.execute(_LEGACY_ROWS[legacy])
+        with pytest.raises(psycopg.errors.RaiseException, match="recrea la base"):
+            migrate(url)
+        assert "comparisons" in _tables(url)  # nada aplicado
+        with psycopg.connect(url) as conn:
+            applied = conn.execute("SELECT version FROM schema_migrations").fetchall()
+        assert applied == [("0001",)]
+
+
 def test_bundled_migrations_are_well_named() -> None:
     names = [m.name for m in bundled_migrations()]
-    assert names[0] == "0001_initial.sql"
+    assert names[:2] == ["0001_initial.sql", "0002_drop_comparisons.sql"]
     assert names == sorted(names)
     assert all(len(m.checksum) == 64 for m in bundled_migrations())
 
@@ -202,7 +249,6 @@ def test_interrupted_jobs_fail_and_open_sessions_survive(pg_pool: ConnectionPool
     models = PostgresModelRepository(pg_pool, ModelRecordCodec(rec.CHARTS))
     monitorings = PostgresMonitoringRepository(pg_pool, MonitoringRecordCodec())
     recalibrations = PostgresRecalibrationRepository(pg_pool, RecalibrationRecordCodec(rec.CHARTS))
-    comparisons = PostgresComparisonRepository(pg_pool, ComparisonRecordCodec(rec.CHARTS))
     fits.add(rec.fit())
     fits.claim("t", "c", "f", rec.T)  # running
     fits.add(rec.fit(rid="ok", status=JobStatus.SUCCEEDED))
@@ -211,13 +257,12 @@ def test_interrupted_jobs_fail_and_open_sessions_survive(pg_pool: ConnectionPool
     pipelines.add(rec.pipeline())
     models.add(rec.model())
     monitorings.add(rec.monitoring(tenant="otro"))
-    comparisons.add(rec.comparison())
     stepwise = RecalibrationMode.STEPWISE
     recalibrations.add(rec.recalibration(rid="open", status=JobStatus.RUNNING, mode=stepwise))
     recalibrations.add(
         replace(
             rec.recalibration(tenant="t2", rid="asked", status=JobStatus.RUNNING, mode=stepwise),
-            proposal=ProposalRequest("f", "l", None, JobStatus.QUEUED, rec.T),
+            proposal=ProposalRequest("f", "l", JobStatus.QUEUED, rec.T),
         )
     )
     recalibrations.add(rec.recalibration(tenant="t3", rid="piped"))
@@ -229,7 +274,6 @@ def test_interrupted_jobs_fail_and_open_sessions_survive(pg_pool: ConnectionPool
         models,
         monitorings,
         recalibrations,
-        comparisons,
         PostgresModelVersionRepository(pg_pool, ModelVersionCodec(rec.CHARTS)),
         SystemClock(),
     )
@@ -242,7 +286,6 @@ def test_interrupted_jobs_fail_and_open_sessions_survive(pg_pool: ConnectionPool
         "models": 1,
         "scores": 1,
         "recalibrations": 2,
-        "comparisons": 1,
         "versions": 0,
     }
     failed = fits.get("t", "c", "f")

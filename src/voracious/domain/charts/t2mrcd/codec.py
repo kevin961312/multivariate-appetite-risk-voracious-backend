@@ -13,7 +13,6 @@ from enum import StrEnum
 from typing import Final
 
 from voracious.domain.charts.t2mrcd.bootstrap import BootstrapLimits
-from voracious.domain.charts.t2mrcd.comparison import ChangeTestResult, ComparisonResult
 from voracious.domain.charts.t2mrcd.model import LimitRegime, T2MRCDModel
 from voracious.domain.charts.t2mrcd.registry import (
     DEFAULT_STRATEGIES,
@@ -27,7 +26,6 @@ from voracious.domain.common.codec import (
     decode_bool_array,
     decode_float_array,
     encode_array,
-    read_bool,
     read_float,
     read_int,
     read_mapping,
@@ -40,11 +38,9 @@ from voracious.domain.estimators.mrcd import decode_fit, encode_fit
 __all__ = [
     "MODEL_FORMAT_VERSION",
     "REPORT_FORMAT_VERSION",
-    "decode_comparison",
     "decode_limits",
     "decode_model",
     "decode_report",
-    "encode_comparison",
     "encode_limits",
     "encode_model",
     "encode_report",
@@ -58,11 +54,14 @@ depuración automática iterativa, decisión del dueño 2026-10-09): un modelo d
 ``unknown_format_version``.
 """
 
-REPORT_FORMAT_VERSION: Final = 2
+REPORT_FORMAT_VERSION: Final = 3
 """Versión del formato del informe codificado (se comprueba al decodificar, antes que los campos).
 
-La 2 quita ``n_excluded_automatic``, ``depuration_rounds`` y ``depuration_converged``: un informe
-de la 1 se rechaza con ``unknown_format_version``.
+La 2 quitó ``n_excluded_automatic``, ``depuration_rounds`` y ``depuration_converged``. La 3 quita
+el resultado de la comparación de bases y ``forced`` (sin comparación de bases, decisión del dueño
+2026-10-14; ``REPLACE`` solo se da por evento estructural o petición explícita, así que ``forced``
+era redundante con la decisión). Un informe de la 1 o de la 2 se rechaza con
+``unknown_format_version``.
 """
 
 _LIMITS_FIELDS: Final = frozenset(
@@ -101,20 +100,6 @@ _MODEL_FIELDS: Final = frozenset(
         "statistic_reference",
     }
 )
-_TEST_FIELDS: Final = frozenset({"name", "statistic", "p_value", "changed"})
-_COMPARISON_FIELDS: Final = frozenset(
-    {
-        "metric_name",
-        "relative_change",
-        "threshold",
-        "exceeds_threshold",
-        "threshold_decides",
-        "covariance",
-        "mean",
-        "decision_rule_name",
-        "changed",
-    }
-)
 _SNAPSHOT_FIELDS: Final = frozenset(
     {
         "phase1_limit",
@@ -130,14 +115,12 @@ _REPORT_FIELDS: Final = frozenset(
     {
         "format_version",
         "decision",
-        "forced",
         "row_disposition",
         "n_base",
         "n_new",
         "n_excluded_assignable_cause",
         "n_kept_new",
         "min_observations",
-        "comparison",
         "before",
         "after",
         "phase2_exceeds_phase1",
@@ -362,124 +345,6 @@ def decode_model(
     )
 
 
-def _encode_test(test: ChangeTestResult) -> dict[str, object]:
-    """Codifica el resultado de una prueba de cambio.
-
-    Args:
-        test: Resultado.
-
-    Returns:
-        Diccionario serializable.
-    """
-    return {
-        "name": test.name,
-        "statistic": test.statistic,
-        "p_value": test.p_value,
-        "changed": test.changed,
-    }
-
-
-def _decode_test(data: object, field: str) -> ChangeTestResult:
-    """Decodifica el resultado de una prueba de cambio.
-
-    Args:
-        data: Resultado codificado.
-        field: Campo.
-
-    Returns:
-        El resultado.
-    """
-    raw = read_mapping(data, field, _TEST_FIELDS)
-    return ChangeTestResult(
-        name=read_str(raw["name"], f"{field}.name"),
-        statistic=read_float(raw["statistic"], f"{field}.statistic"),
-        p_value=read_optional_float(raw["p_value"], f"{field}.p_value"),
-        changed=read_bool(raw["changed"], f"{field}.changed"),
-    )
-
-
-def _encode_comparison(comparison: ComparisonResult | None) -> dict[str, object] | None:
-    """Codifica la comparación de bases.
-
-    Args:
-        comparison: Comparación o ``None``.
-
-    Returns:
-        Diccionario serializable o ``None``.
-    """
-    return None if comparison is None else encode_comparison(comparison)
-
-
-def _decode_comparison(data: object, field: str) -> ComparisonResult | None:
-    """Decodifica la comparación de bases.
-
-    Args:
-        data: Comparación codificada o ``None``.
-        field: Campo.
-
-    Returns:
-        La comparación o ``None``.
-    """
-    if data is None:
-        return None
-    raw = read_mapping(data, field, _COMPARISON_FIELDS)
-    return ComparisonResult(
-        metric_name=read_str(raw["metric_name"], f"{field}.metric_name"),
-        relative_change=read_float(raw["relative_change"], f"{field}.relative_change"),
-        threshold=read_float(raw["threshold"], f"{field}.threshold"),
-        exceeds_threshold=read_bool(raw["exceeds_threshold"], f"{field}.exceeds_threshold"),
-        threshold_decides=read_bool(raw["threshold_decides"], f"{field}.threshold_decides"),
-        covariance=_decode_test(raw["covariance"], f"{field}.covariance"),
-        mean=_decode_test(raw["mean"], f"{field}.mean"),
-        decision_rule_name=read_str(raw["decision_rule_name"], f"{field}.decision_rule_name"),
-        changed=read_bool(raw["changed"], f"{field}.changed"),
-    )
-
-
-def encode_comparison(comparison: ComparisonResult) -> dict[str, object]:
-    """Codifica una comparación de bases suelta (paso ``/comparisons``, vuelta 3.4).
-
-    Misma forma que la comparación dentro del informe; sin estadística.
-
-    Args:
-        comparison: Comparación.
-
-    Returns:
-        Diccionario serializable.
-    """
-    return {
-        "metric_name": comparison.metric_name,
-        "relative_change": comparison.relative_change,
-        "threshold": comparison.threshold,
-        "exceeds_threshold": comparison.exceeds_threshold,
-        "threshold_decides": comparison.threshold_decides,
-        "covariance": _encode_test(comparison.covariance),
-        "mean": _encode_test(comparison.mean),
-        "decision_rule_name": comparison.decision_rule_name,
-        "changed": comparison.changed,
-    }
-
-
-def decode_comparison(data: object) -> ComparisonResult:
-    """Decodifica una comparación de bases suelta (inversa de ``encode_comparison``).
-
-    Args:
-        data: Comparación codificada.
-
-    Returns:
-        La comparación.
-
-    Raises:
-        InvalidInputError: Campo desconocido, ausente o inválido, o ``None``.
-    """
-    decoded = _decode_comparison(data, "comparison")
-    if decoded is None:
-        raise InvalidInputError(
-            "la comparación codificada no puede ser nula", details={"field": "comparison"}
-        )
-    return decoded
-
-
 def _encode_snapshot(snapshot: LimitsSnapshot) -> dict[str, object]:
     """Codifica los límites de una versión (obligatorios: ``before``).
 
@@ -549,14 +414,12 @@ def encode_report(report: T2MRCDRecalibrationReport) -> dict[str, object]:
     return {
         "format_version": REPORT_FORMAT_VERSION,
         "decision": report.decision.value,
-        "forced": report.forced,
         "row_disposition": [d.value for d in report.row_disposition],
         "n_base": report.n_base,
         "n_new": report.n_new,
         "n_excluded_assignable_cause": report.n_excluded_assignable_cause,
         "n_kept_new": report.n_kept_new,
         "min_observations": report.min_observations,
-        "comparison": _encode_comparison(report.comparison),
         "before": _encode_snapshot(report.before),
         "after": _encode_optional_snapshot(report.after),
         "phase2_exceeds_phase1": report.phase2_exceeds_phase1,
@@ -580,7 +443,6 @@ def decode_report(data: Mapping[str, object]) -> T2MRCDRecalibrationReport:
     after = raw["after"]
     return T2MRCDRecalibrationReport(
         decision=_enum(RecalibrationDecision, raw["decision"], "report.decision"),
-        forced=read_bool(raw["forced"], "report.forced"),
         row_disposition=_dispositions(raw["row_disposition"], "report.row_disposition"),
         n_base=read_int(raw["n_base"], "report.n_base"),
         n_new=read_int(raw["n_new"], "report.n_new"),
@@ -589,7 +451,6 @@ def decode_report(data: Mapping[str, object]) -> T2MRCDRecalibrationReport:
         ),
         n_kept_new=read_int(raw["n_kept_new"], "report.n_kept_new"),
         min_observations=read_int(raw["min_observations"], "report.min_observations"),
-        comparison=_decode_comparison(raw["comparison"], "report.comparison"),
         before=_decode_snapshot(raw["before"], "report.before"),
         after=None if after is None else _decode_snapshot(after, "report.after"),
         phase2_exceeds_phase1=read_optional_bool(

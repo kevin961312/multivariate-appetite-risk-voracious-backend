@@ -113,7 +113,7 @@ def test_model_version_round_trip(fitted: tuple) -> None:
             ),
         ),
         RecalibrationDecision.EXTEND,
-        "no_change_detected",
+        "default_extend",
         T0,
         report=report,
         recalibration_id="r",
@@ -149,12 +149,22 @@ def test_recalibration_record_round_trip(fitted: tuple) -> None:
         outcome=RecalibrationDecision.EXTEND,
         report=report,
         proposed_version=1,
+        kept_dataset_id="k",
+        extension_dataset_id="e",
     )
     stored = codec.encode(record)
     _stored_is_data(stored)
     assert canonical(codec.decode(json.loads(json.dumps(stored)))) == canonical(record)
     queued = dataclasses.replace(record, status=JobStatus.QUEUED, outcome=None, report=None)
     assert canonical(codec.decode(codec.encode(queued))) == canonical(queued)
+    # Formato anterior a quitar la comparación de bases: sin lector (dueño, 2026-10-14).
+    assert isinstance(stored, dict)
+    legacy = {
+        k: v for k, v in stored.items() if k not in {"kept_dataset_id", "extension_dataset_id"}
+    }
+    with pytest.raises(InvalidInputError) as info:
+        codec.decode(legacy)
+    assert info.value.details["reason"] == "missing_fields"
 
 
 def test_repositories_store_encoded_data(fitted: tuple) -> None:

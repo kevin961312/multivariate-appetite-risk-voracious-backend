@@ -1,0 +1,34 @@
+{
+  "_comment": "Huellas solo del modelo (T2MRCDChart(statistic_reference=\"\"), sin informe). Línea base de c7f896b. NO se regeneran cuando cambian solo la cita o el formato del informe: si cambian, cambió el modelo.",
+  "baseline_commit": "c7f896b",
+  "hashes": {
+    "phase1/contaminated": "3d263e96e2671b78e3eaf094bf236f31738a32cbe4f525b6c876a140c2871d75",
+    "phase1/human_exclusion": "844ac5ebcd53968dd79ea4c3ae27acf7c4ff8c72c5a5bbfe9e832a8625498f32",
+    "phase1/n_gt_p": "66af13625467f4d61f1aca6a9c6e72ebef74abe89e657b33dafb6da94109aba7",
+    "phase1/p_gt_n": "c55c1e45327d5bc47977bce72003302b3b7d7809a78ec585365ead356034f2e9",
+    "recalibration/extend": [
+      "extend",
+      "420288a27da52f7a856b31537858199c2fccf56c40953f9c31f45e7a7c6824fc"
+    ],
+    "recalibration/forced": [
+      "replace",
+      "6889392ba87fb69909aa17a1ad626ba954c8d5838ca7679af56d57ab80e80a9a"
+    ],
+    "recalibration/insufficient": [
+      "insufficient",
+      "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91"
+    ],
+    "recalibration/insufficient_after_exclusion": [
+      "insufficient",
+      "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91"
+    ],
+    "recalibration/replace": [
+      "replace",
+      "d9d2cc2d7d8cbe1beb058b982ccf86166a40c61b0eb980eb9d193320d6e1f296"
+    ]
+  },
+  "platform": [
+    "Darwin",
+    "arm64"
+  ]
+}

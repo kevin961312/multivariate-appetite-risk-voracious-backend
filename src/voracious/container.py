@@ -14,7 +14,6 @@ import structlog
 from voracious.application.charts import AnyChart, ChartRegistry
 from voracious.application.phase1_steps import Phase1Steps, Phase1StepsRegistry
 from voracious.application.ports import (
-    ComparisonRepository,
     DatasetStorage,
     ExclusionRepository,
     FitRepository,
@@ -40,7 +39,6 @@ from voracious.application.use_cases import (
     ApproveVersion,
     CancelRecalibration,
     GetChartStatus,
-    GetComparison,
     GetDataset,
     GetExclusion,
     GetFit,
@@ -58,15 +56,14 @@ from voracious.application.use_cases import (
     RecoverInterruptedJobs,
     RegisterStructuralEvent,
     RejectVersion,
-    RequestComparison,
     RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
     RequestPhase1Pipeline,
     RequestRecalibration,
+    RequestRecalibrationExtension,
     RequestVersionProposal,
-    RunComparisonJob,
     RunExclusionJob,
     RunFitJob,
     RunLimitsJob,
@@ -88,10 +85,8 @@ from voracious.infrastructure.ids import UuidIdGenerator
 from voracious.infrastructure.jobs import InlineJobQueue, JobHandler
 from voracious.infrastructure.logging import configure_logging
 from voracious.infrastructure.memory import (
-    ComparisonRecordCodec,
     ExclusionRecordCodec,
     FitRecordCodec,
-    InMemoryComparisonRepository,
     InMemoryDatasetStorage,
     InMemoryExclusionRepository,
     InMemoryFitRepository,
@@ -116,7 +111,6 @@ from voracious.infrastructure.memory import (
 )
 from voracious.infrastructure.parallel import ProcessPoolTaskMapper
 from voracious.infrastructure.postgres import (
-    PostgresComparisonRepository,
     PostgresDatasetStorage,
     PostgresExclusionRepository,
     PostgresFitRepository,
@@ -185,8 +179,7 @@ class UseCases:
         request_recalibration: Recalibración (paso a paso o tubería).
         get_recalibration: Consulta de una recalibración.
         cancel_recalibration: Cancelación de una sesión paso a paso.
-        request_comparison: Comparación de bases de una recalibración (``…/comparisons``).
-        get_comparison: Consulta de una comparación.
+        request_extension: Extensión de la base de una recalibración (``…/extension``).
         request_version_proposal: Propuesta de versión de una recalibración (``…/versions``).
     """
 
@@ -216,8 +209,7 @@ class UseCases:
     request_recalibration: RequestRecalibration
     get_recalibration: GetRecalibration
     cancel_recalibration: CancelRecalibration
-    request_comparison: RequestComparison
-    get_comparison: GetComparison
+    request_extension: RequestRecalibrationExtension
     request_version_proposal: RequestVersionProposal
 
 
@@ -296,8 +288,8 @@ class Container:
 def _build_charts(settings: Settings) -> dict[str, AnyChart]:
     """Registro de cartas de producción.
 
-    ``settings.mrcd_threads`` llega a la carta, que lo pasa a cada ajuste MRCD (base, réplicas y
-    pruebas de cambio). Solo cambia el rendimiento, no ningún bit.
+    ``settings.mrcd_threads`` llega a la carta, que lo pasa a cada ajuste MRCD (base y réplicas).
+    Solo cambia el rendimiento, no ningún bit.
 
     Args:
         settings: Configuración.
@@ -356,7 +348,6 @@ class _Repositories:
     annotations: SignalAnnotationRepository
     events: StructuralEventRepository
     recalibrations: RecalibrationRepository
-    comparisons: ComparisonRepository
     readiness: Mapping[str, Callable[[], bool]]
     closers: tuple[Callable[[], None], ...] = ()
 
@@ -405,7 +396,6 @@ def _memory_repositories(
     settings: Settings,
     registry: ChartRegistry,
     steps: Phase1StepsRegistry,
-    rsteps: RecalibrationStepsRegistry,
 ) -> _Repositories:
     """Repositorios en memoria (``repository=memory``), con los mismos codecs que Postgres.
 
@@ -413,7 +403,6 @@ def _memory_repositories(
         settings: Configuración.
         registry: Cartas.
         steps: Pasos de Fase I.
-        rsteps: Pasos de la recalibración.
 
     Returns:
         Los repositorios.
@@ -435,7 +424,6 @@ def _memory_repositories(
         annotations=InMemorySignalAnnotationRepository(SignalAnnotationCodec()),
         events=InMemoryStructuralEventRepository(StructuralEventCodec()),
         recalibrations=InMemoryRecalibrationRepository(RecalibrationRecordCodec(registry)),
-        comparisons=InMemoryComparisonRepository(ComparisonRecordCodec(rsteps)),
         readiness=readiness,
     )
 
@@ -462,7 +450,6 @@ def _postgres_repositories(
     settings: Settings,
     registry: ChartRegistry,
     steps: Phase1StepsRegistry,
-    rsteps: RecalibrationStepsRegistry,
 ) -> _Repositories:
     """Repositorios en Postgres (``repository=postgres``); la matriz de los datasets, en disco.
 
@@ -470,7 +457,6 @@ def _postgres_repositories(
         settings: Configuración.
         registry: Cartas.
         steps: Pasos de Fase I.
-        rsteps: Pasos de la recalibración.
 
     Returns:
         Los repositorios.
@@ -498,7 +484,6 @@ def _postgres_repositories(
         annotations=PostgresSignalAnnotationRepository(pool, SignalAnnotationCodec()),
         events=PostgresStructuralEventRepository(pool, StructuralEventCodec()),
         recalibrations=PostgresRecalibrationRepository(pool, RecalibrationRecordCodec(registry)),
-        comparisons=PostgresComparisonRepository(pool, ComparisonRecordCodec(rsteps)),
         readiness={"database": lambda: database_ready(pool), "storage": matrices.writable},
         closers=(pool.close,),
     )
@@ -606,12 +591,12 @@ def build_container(
     steps: Phase1StepsRegistry = _build_steps(registry)
     rsteps: RecalibrationStepsRegistry = _build_recalibration_steps(registry)
     build = _postgres_repositories if resolved.repository == "postgres" else _memory_repositories
-    repos = build(resolved, registry, steps, rsteps)
+    repos = build(resolved, registry, steps)
     datasets, fits, limits = repos.datasets, repos.fits, repos.limits
     exclusions, pipelines, models = repos.exclusions, repos.pipelines, repos.models
     monitorings, versions, observations = repos.monitorings, repos.versions, repos.observations
     annotations, events = repos.annotations, repos.events
-    recalibrations, comparisons = repos.recalibrations, repos.comparisons
+    recalibrations = repos.recalibrations
     ids = UuidIdGenerator()
     clock = SystemClock()
     mapper = _build_mapper(resolved)
@@ -627,24 +612,15 @@ def build_container(
         },
     )
     chain = RecalibrationChain(rsteps, recalibrations, versions, annotations, clock)
-    request_fit = RequestFit(steps, datasets, fits, queue, ids, clock)
+    request_fit = RequestFit(steps, datasets, fits, queue, ids, clock, chain)
     request_limits = RequestLimits(steps, datasets, fits, limits, queue, ids, clock, chain)
     request_exclusion = RequestExclusion(steps, datasets, exclusions, queue, ids, clock, chain)
     request_model = RequestModel(steps, datasets, fits, limits, models, queue, ids, clock)
-    request_comparison = RequestComparison(
-        registry,
-        rsteps,
-        recalibrations,
-        datasets,
-        fits,
-        limits,
-        comparisons,
-        queue,
-        ids,
-        clock,
+    request_extension = RequestRecalibrationExtension(
+        registry, rsteps, recalibrations, versions, datasets, chain, ids, clock
     )
     request_proposal = RequestVersionProposal(
-        rsteps, recalibrations, versions, datasets, fits, limits, comparisons, queue, clock
+        rsteps, recalibrations, versions, datasets, fits, limits, queue, clock
     )
     handlers.update(
         {
@@ -682,32 +658,20 @@ def build_container(
                     fits,
                     limits,
                     exclusions,
-                    comparisons,
                     datasets,
                     chain,
                     request_exclusion,
                     request_fit,
                     request_limits,
-                    request_comparison,
+                    request_extension,
                     request_proposal,
+                    queue,
                     ids,
                     clock,
                 ),
             ).execute,
             JobKind.SCORE: RunMonitoringJob(
                 registry, models, versions, monitorings, observations, ids, clock
-            ).execute,
-            JobKind.COMPARISON: RunComparisonJob(
-                rsteps,
-                recalibrations,
-                versions,
-                datasets,
-                fits,
-                comparisons,
-                mapper,
-                queue,
-                ids,
-                clock,
             ).execute,
             JobKind.VERSION_PROPOSAL: RunVersionProposalJob(
                 rsteps,
@@ -719,7 +683,6 @@ def build_container(
                 fits,
                 limits,
                 exclusions,
-                comparisons,
                 queue,
                 clock,
             ).execute,
@@ -765,8 +728,7 @@ def build_container(
         ),
         get_recalibration=GetRecalibration(registry, recalibrations),
         cancel_recalibration=CancelRecalibration(registry, recalibrations, clock),
-        request_comparison=request_comparison,
-        get_comparison=GetComparison(registry, comparisons),
+        request_extension=request_extension,
         request_version_proposal=request_proposal,
     )
     return Container(
@@ -783,7 +745,6 @@ def build_container(
             models,
             monitorings,
             recalibrations,
-            comparisons,
             versions,
             clock,
         ),

@@ -43,7 +43,6 @@ def test_container_wires_use_cases_and_handlers() -> None:
             JobKind.MODEL_ASSEMBLY,
             JobKind.PIPELINE,
             JobKind.SCORE,
-            JobKind.COMPARISON,
             JobKind.VERSION_PROPOSAL,
         }
         assert isinstance(container.use_cases.request_fit.ids, UuidIdGenerator)
@@ -170,7 +169,6 @@ def test_memory_container_has_no_database_check(tmp_path: Path) -> None:
                 "models",
                 "scores",
                 "recalibrations",
-                "comparisons",
                 "versions",
             ),
             0,

@@ -18,7 +18,7 @@ from support.app import (
     trained_model,
 )
 from support.memory import FixedClock
-from support.solo_test import fast_params, fixed_tests_recalibration, small_data, solo_test_chart
+from support.solo_test import fast_params, small_data
 from voracious.application.errors import (
     ModelNotFoundError,
     ModelNotReadyError,
@@ -27,7 +27,6 @@ from voracious.application.errors import (
     PipelineNotFoundError,
     ProposalPendingError,
     RangeBeforeStructuralEventError,
-    RecalibrationDecisionPendingError,
     RecalibrationInProgressError,
     RecalibrationInsufficientObservationsError,
     RecalibrationNotFoundError,
@@ -41,7 +40,11 @@ from voracious.application.records import (
     LifecyclePolicy,
     VersionStatus,
 )
-from voracious.domain.charts.t2mrcd import T2MRCDRecalibrationParams, T2MRCDRecalibrationReport
+from voracious.domain.charts.t2mrcd import (
+    T2MRCDChart,
+    T2MRCDRecalibrationParams,
+    T2MRCDRecalibrationReport,
+)
 from voracious.domain.common import InvalidInputError, RecalibrationDecision
 
 N = 30
@@ -61,7 +64,7 @@ def _request(app: App, model_id: str, **kwargs: object) -> str:
     args: dict[str, object] = {
         "range_from": T0,
         "range_to": END,
-        "params": fixed_tests_recalibration(min_observations=10),
+        "params": T2MRCDRecalibrationParams(seed=11, min_observations=10),
     }
     args.update(kwargs)
     return app.request_recalibration().execute(TENANT, CHART, model_id, **args)
@@ -112,10 +115,12 @@ def test_human_exclusion_comes_from_confirmed_assignable_cause() -> None:
     assert record.actor == "ana"
     assert isinstance(record.report, T2MRCDRecalibrationReport)
     assert record.report.n_excluded_assignable_cause == 1
-    assert record.params["covariance_test"] == "never_changed_solo_test"  # M1: por nombre
+    assert record.params == {"seed": 11, "min_observations": 10}  # M1: solo datos
+    assert record.extension_dataset_id is not None
+    assert record.kept_dataset_id is not None
     version = app.get_version().execute(TENANT, CHART, model_id, 1)
     assert version.recalibration_id == rid
-    assert version.justification == "no_change_detected"
+    assert version.justification == "default_extend"
     human = [e for e in version.exclusions if e.reason is ExclusionReason.ASSIGNABLE_CAUSE]
     assert [(e.ref.ref, e.annotation_id) for e in human] == [(ids[3], annotation.annotation_id)]
     observation_refs = {r.ref for r in version.base_refs if r.source is BaseRowSource.OBSERVATION}
@@ -129,14 +134,6 @@ def test_request_validations() -> None:
     app = lifecycle_app()
     model_id = trained_model(app)
     _scored(app, model_id)
-    with pytest.raises(RecalibrationDecisionPendingError) as pending:
-        _request(app, model_id, params=T2MRCDRecalibrationParams(seed=1, min_observations=10))
-    assert pending.value.code == "RECALIBRATION_DECISION_PENDING"
-    assert pending.value.details["pending"] == [
-        "recalibration.covariance_test",
-        "recalibration.mean_test",
-        "recalibration.n_test_resamples",
-    ]
     with pytest.raises(RecalibrationInsufficientObservationsError) as few:
         _request(app, model_id, range_to=T0 + timedelta(hours=4))
     assert few.value.details == {"available": 5, "required": 10}
@@ -168,7 +165,7 @@ def test_request_validations() -> None:
     assert again.value.details["available"] == len(left_out) < 10
 
 
-def test_forced_replace_skips_pending_decisions() -> None:
+def test_forced_replace_uses_only_the_new_rows() -> None:
     app = lifecycle_app()
     model_id = trained_model(app)
     ids = _scored(app, model_id)
@@ -181,6 +178,7 @@ def test_forced_replace_skips_pending_decisions() -> None:
     app.run_all()
     record = app.get_recalibration().execute(TENANT, CHART, model_id, rid)
     assert record.outcome is RecalibrationDecision.REPLACE
+    assert record.extension_dataset_id is None
     version = app.get_version().execute(TENANT, CHART, model_id, 1)
     assert version.justification == "forced_replace"
     assert all(r.source is BaseRowSource.OBSERVATION for r in version.base_refs)
@@ -192,7 +190,7 @@ def test_insufficient_recalibration_succeeds_without_version() -> None:
     model_id = trained_model(app)
     ids = _scored(app, model_id)
     app.annotate().execute(TENANT, CHART, model_id, ids[3], assignable_cause=True)
-    rid = _request(app, model_id, params=fixed_tests_recalibration(min_observations=N))
+    rid = _request(app, model_id, params=T2MRCDRecalibrationParams(seed=11, min_observations=N))
     app.run_all()
     record = app.get_recalibration().execute(TENANT, CHART, model_id, rid)
     assert record.status is JobStatus.SUCCEEDED
@@ -297,7 +295,7 @@ def test_recalibration_requires_ready_model() -> None:
 
 def test_revalidation_due_by_months_and_by_observations() -> None:
     clock = FixedClock(datetime(2026, 1, 15, tzinfo=UTC))
-    app = App(charts={CHART: solo_test_chart()}, clock=clock)
+    app = App(charts={CHART: T2MRCDChart()}, clock=clock)
     model_id = trained_model(app)
     assert app.status().execute(TENANT, CHART, model_id).status is ChartStatus.STARTUP
     clock.advance(timedelta(days=181))
@@ -306,7 +304,7 @@ def test_revalidation_due_by_months_and_by_observations() -> None:
     assert status.revalidation_due_at == datetime(2026, 7, 15, tzinfo=UTC)
     assert status.notices == ("revalidation_due",)
 
-    counted = App(charts={CHART: solo_test_chart()})
+    counted = App(charts={CHART: T2MRCDChart()})
     policy = LifecyclePolicy(revalidate_every_months=None, revalidate_every_observations=N)
     counted_id = counted.train(TENANT, CHART, small_data(), fast_params(), policy=policy)
     assert not counted.status().execute(TENANT, CHART, counted_id).revalidation_due

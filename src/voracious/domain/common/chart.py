@@ -226,17 +226,6 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
         """
         ...
 
-    def pending_recalibration_decisions(self, params: RecalParamsT_contra) -> list[str]:
-        """Elementos estadísticos de la recalibración aún sin decidir, en orden estable.
-
-        Args:
-            params: Parámetros de la recalibración.
-
-        Returns:
-            Nombres de los campos pendientes (vacío si no falta nada).
-        """
-        ...
-
     def recalibrate(
         self,
         active_model: ModelT,
@@ -256,7 +245,8 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
             x_new: Observaciones nuevas ``m x p``.
             assignable_cause: Filas de ``x_new`` excluidas por una persona (causa asignable
                 confirmada), o ``None``.
-            force_replace: Reemplazar la base sin comparar (decisión humana).
+            force_replace: Reemplazar la base por las filas nuevas (evento estructural o
+                petición explícita); si no, se amplía la base vigente.
             params: Parámetros de la recalibración.
             mapper: Reparto de las tareas independientes.
 
@@ -264,6 +254,6 @@ class ControlChart(Protocol[ParamsT_contra, ModelT, ResultT_co, RecalParamsT_con
             La decisión, el modelo nuevo (o ``None``) y el informe.
 
         Raises:
-            DomainError: Entrada inválida, decisión pendiente o fallo de estimación.
+            DomainError: Entrada inválida o fallo de estimación.
         """
         ...

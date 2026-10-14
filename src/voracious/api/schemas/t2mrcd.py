@@ -2,8 +2,8 @@
 
 Los parámetros estadísticos que el cliente no envía **no** se rellenan aquí: se omiten y la
 carta aplica sus defaults citados (``docs/metodos/t2mrcd.md``). Así la API no duplica ningún
-default estadístico. Las estrategias (criterio de fila limpia, agregación, pruebas de cambio) no
-se exponen: se usan las de producción de la carta.
+default estadístico. Las estrategias (criterio de fila limpia, agregación) no se exponen: se usan
+las de producción de la carta.
 
 Mejora M3: las matrices grandes (histórico ``n x p``, base de una versión, dispersión ``p x p``)
 y los vectores por fila solo se devuelven si se piden con ``?include=``.
@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 import numpy as np
-from pydantic import Field, FiniteFloat
+from pydantic import Field
 
 from voracious.api.schemas.common import (
     ErrorBody,
@@ -40,7 +40,6 @@ from voracious.application.records import (
 from voracious.domain.charts.t2mrcd import (
     T2MRCD_MRCD_ALPHA,
     BootstrapLimits,
-    ComparisonResult,
     LimitsSnapshot,
     T2MRCDBootstrap,
     T2MRCDModel,
@@ -55,7 +54,6 @@ __all__ = [
     "AnnotationRequest",
     "ApproveRequest",
     "ChartStatusOut",
-    "ComparisonOut",
     "LifecyclePolicyIn",
     "LimitsOut",
     "MRCDFitOut",
@@ -277,14 +275,10 @@ class RecalibrationParamsIn(RequestModel):
     Attributes:
         seed: Semilla raíz (obligatoria).
         min_observations: Mínimo de filas nuevas conservadas.
-        relative_change_threshold: Umbral del cambio relativo.
-        threshold_decides: Si el umbral decide.
     """
 
     seed: int = Field(ge=0)
     min_observations: int | None = Field(default=None, ge=1)
-    relative_change_threshold: FiniteFloat | None = Field(default=None, gt=0)
-    threshold_decides: bool | None = None
 
     def to_domain(self) -> T2MRCDRecalibrationParams:
         """Construye los parámetros de dominio con solo los campos enviados.
@@ -302,7 +296,8 @@ class RecalibrationRequest(RequestModel):
         range_from: Inicio del rango (inclusivo).
         range_to: Fin del rango (inclusivo).
         params: Parámetros.
-        force_replace: Reemplazo forzado.
+        force_replace: Reemplazar la base por las filas nuevas (petición explícita); sin él se
+            amplía la base, salvo evento estructural sin resolver.
         actor: Quién la pide.
         mode: ``pipeline`` (por defecto) o ``stepwise``.
     """
@@ -752,70 +747,15 @@ class LimitsSnapshotOut(ResponseModel):
         )
 
 
-class ChangeTestOut(ResponseModel):
-    """Resultado de una prueba formal de cambio."""
-
-    name: str
-    statistic: float
-    p_value: float | None
-    changed: bool
-
-
-class ComparisonOut(ResponseModel):
-    """Comparación de bases."""
-
-    metric_name: str
-    relative_change: float
-    threshold: float
-    exceeds_threshold: bool
-    threshold_decides: bool
-    covariance: ChangeTestOut
-    mean: ChangeTestOut
-    decision_rule_name: str
-    changed: bool
-
-    @classmethod
-    def of(cls, result: ComparisonResult) -> "ComparisonOut":
-        """Convierte la comparación.
-
-        Args:
-            result: Comparación.
-
-        Returns:
-            La respuesta.
-        """
-        cov, mean = result.covariance, result.mean
-        return cls(
-            metric_name=result.metric_name,
-            relative_change=result.relative_change,
-            threshold=result.threshold,
-            exceeds_threshold=result.exceeds_threshold,
-            threshold_decides=result.threshold_decides,
-            covariance=ChangeTestOut(
-                name=cov.name, statistic=cov.statistic, p_value=cov.p_value, changed=cov.changed
-            ),
-            mean=ChangeTestOut(
-                name=mean.name,
-                statistic=mean.statistic,
-                p_value=mean.p_value,
-                changed=mean.changed,
-            ),
-            decision_rule_name=result.decision_rule_name,
-            changed=result.changed,
-        )
-
-
 class RecalibrationReportOut(ResponseModel):
     """Informe antes/después de una recalibración."""
 
     decision: str
-    forced: bool
     n_base: int
     n_new: int
     n_excluded_assignable_cause: int
     n_kept_new: int
     min_observations: int
-    comparison: ComparisonOut | None
     before: LimitsSnapshotOut
     after: LimitsSnapshotOut | None
     phase2_exceeds_phase1: bool | None
@@ -840,13 +780,11 @@ class RecalibrationReportOut(ResponseModel):
             raise TypeError(msg)
         return cls(
             decision=str(report.decision),
-            forced=report.forced,
             n_base=report.n_base,
             n_new=report.n_new,
             n_excluded_assignable_cause=report.n_excluded_assignable_cause,
             n_kept_new=report.n_kept_new,
             min_observations=report.min_observations,
-            comparison=None if report.comparison is None else ComparisonOut.of(report.comparison),
             before=LimitsSnapshotOut.of(report.before),
             after=None if report.after is None else LimitsSnapshotOut.of(report.after),
             phase2_exceeds_phase1=report.phase2_exceeds_phase1,
@@ -1026,7 +964,6 @@ class ProposalOut(ResponseModel):
 
     fit_id: str
     limits_id: str
-    comparison_id: str | None
     status: JobState
     requested_at: datetime
 
@@ -1056,6 +993,8 @@ class RecalibrationResponse(ResponseModel):
     inherited_params: dict[str, object]
     pipeline_id: str | None
     proposal: ProposalOut | None
+    kept_dataset_id: str | None
+    extension_dataset_id: str | None
     report: RecalibrationReportOut | None = None
     error: ErrorBody | None = None
 
@@ -1093,12 +1032,13 @@ class RecalibrationResponse(ResponseModel):
             n_already_in_base=len(record.already_in_base_ids),
             inherited_params=dict(record.inherited_params),
             pipeline_id=record.pipeline_id,
+            kept_dataset_id=record.kept_dataset_id,
+            extension_dataset_id=record.extension_dataset_id,
             proposal=None
             if proposal is None
             else ProposalOut(
                 fit_id=proposal.fit_id,
                 limits_id=proposal.limits_id,
-                comparison_id=proposal.comparison_id,
                 status=proposal.status.value,
                 requested_at=proposal.requested_at,
             ),

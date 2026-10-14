@@ -3,8 +3,8 @@
 Estimador declarado: MRCD, siempre (ADR 0002, ADR 0004 punto 5). Sin *fallbacks*: si MRCD o una
 réplica fallan, la operación termina en ``failed`` con su código. Las decisiones P2, P4, P6 y las
 de Fase II y recalibración (Q1 a Q9, dueño 2026-10-07) están en ``params.py``, ``aggregation.py``,
-``phase2_limit.py``, ``comparison.py`` y ``revalidation.py``. Se conserva el mecanismo de
-decisiones pendientes: un campo decisivo en ``None`` lanza ``MethodDecisionPendingError``
+``phase2_limit.py`` y ``revalidation.py``. Se conserva el mecanismo de decisiones pendientes de la
+Fase I: un campo decisivo en ``None`` lanza ``MethodDecisionPendingError``
 (``T2MRCD_DECISION_PENDING``) **antes** de ajustar nada.
 
 Límite operativo (Q2): la versión inicial vigila con ``phase1_limit`` de forma provisional
@@ -13,11 +13,14 @@ Límite operativo (Q2): la versión inicial vigila con ``phase1_limit`` de forma
 
 Sin depuración automática iterativa (decisión del dueño, 2026-10-09): la Fase I es exclusión
 humana opcional, un ajuste MRCD, una calibración y el modelo; la recalibración, exclusión humana
-de las filas nuevas y una recalibración como Fase I, en una sola pasada.
+de las filas nuevas y una recalibración como Fase I, en una sola pasada. Sin comparación de bases
+(decisión del dueño, 2026-10-14): la carta T² ya es la prueba de hipótesis sobre la media; la
+recalibración amplía la base por defecto y la reemplaza solo ante un evento estructural o una
+petición explícita.
 
 Piezas públicas (vuelta 3.2 del Paso 3): ``fit_phase1`` y ``recalibrate`` **componen** los pasos
-``validate_phase1_input``, ``fit_base``, ``calibrate`` (con la semilla de ``stage_spawn_key``),
-``compare`` y ``assemble_model``; un orquestador puede ejecutarlos por separado y obtiene los
+``validate_phase1_input``, ``fit_base``, ``calibrate`` (con la semilla de ``stage_spawn_key``) y
+``assemble_model``; un orquestador puede ejecutarlos por separado y obtiene los
 mismos bits. ``mrcd_threads`` solo cambia el rendimiento de ``pymrcd``.
 """
 
@@ -36,7 +39,6 @@ from voracious.domain.charts.t2mrcd.codec import (
     encode_model,
     encode_report,
 )
-from voracious.domain.charts.t2mrcd.comparison import ComparisonResult, compare_bases
 from voracious.domain.charts.t2mrcd.model import LimitRegime, T2MRCDModel, T2MRCDMonitoring
 from voracious.domain.charts.t2mrcd.params import T2MRCDParams, _is_int
 from voracious.domain.charts.t2mrcd.phase1 import (
@@ -87,7 +89,6 @@ from voracious.domain.common import (
 from voracious.domain.estimators.mrcd import (
     PYMRCD_VERSION,
     IndexVector,
-    MRCDEstimator,
     MRCDFit,
     MRCDParams,
 )
@@ -105,8 +106,12 @@ __all__ = [
 CHART_ID: Final = "t2mrcd"
 """Identificador de la carta (ruta ``/v1/charts/t2mrcd``)."""
 
-STATISTIC_REFERENCE: Final = "Artículo T²MRCD del dueño (en proceso de publicación)"
-"""Cita de la estadística T² (P6, decisión del dueño 2026-10-07); se sustituye al publicarse."""
+STATISTIC_REFERENCE: Final = (
+    "Pineda Jaramillo, K. S. (2026). Carta de control robusta para observaciones individuales en "
+    "fase I para procesos de alta dimensionalidad. Tesis de maestría, Universidad Nacional de "
+    "Colombia. https://repositorio.unal.edu.co/handle/unal/90389"
+)
+"""Cita de la estadística T² (P6): tesis de maestría del dueño (decisión del dueño, 2026-10-14)."""
 
 T2MRCD_DECISION_PENDING: Final = "T2MRCD_DECISION_PENDING"
 """Código de error: hay decisiones estadísticas pendientes (``details["pending"]``)."""
@@ -222,13 +227,13 @@ class T2MRCDChart:
 
     Attributes:
         statistic_reference: Cita del artículo que define la estadística T² de la carta (P6).
-            Por defecto ``STATISTIC_REFERENCE`` (artículo en proceso de publicación); se
-            actualiza con la cita final cuando se publique.
+            Por defecto ``STATISTIC_REFERENCE`` (tesis de maestría del dueño, repositorio de la
+            Universidad Nacional de Colombia).
         strategies: Registro ``nombre → estrategia`` con el que se codifican y decodifican los
             parámetros y los modelos (M1). Por defecto, solo las estrategias de producción
             decididas.
-        mrcd_threads: Hilos de la extensión C de ``pymrcd`` en cada ajuste MRCD (base, réplicas
-            y pruebas de cambio). Parámetro de **rendimiento**: no es estadístico, no se guarda
+        mrcd_threads: Hilos de la extensión C de ``pymrcd`` en cada ajuste MRCD (base y
+            réplicas). Parámetro de **rendimiento**: no es estadístico, no se guarda
             con el modelo y no cambia ningún bit (``fit_mrcd``). ``None`` ⇒ decide ``pymrcd``.
     """
 
@@ -286,18 +291,15 @@ class T2MRCDChart:
         return decode_params(data, self.strategies)
 
     def encode_recalibration_params(self, params: T2MRCDRecalibrationParams) -> dict[str, object]:
-        """Codifica los parámetros de la recalibración con las estrategias por nombre (M1).
+        """Codifica los parámetros de la recalibración como datos (M1).
 
         Args:
             params: Parámetros de la recalibración.
 
         Returns:
             Diccionario serializable.
-
-        Raises:
-            InvalidInputError: Si una estrategia no está en ``strategies``.
         """
-        return encode_recalibration_params(params, self.strategies)
+        return encode_recalibration_params(params)
 
     def decode_recalibration_params(self, data: Mapping[str, object]) -> T2MRCDRecalibrationParams:
         """Decodifica los parámetros de la recalibración.
@@ -309,9 +311,9 @@ class T2MRCDChart:
             Los parámetros de la recalibración.
 
         Raises:
-            InvalidInputError: Datos inválidos o estrategia desconocida.
+            InvalidInputError: Datos inválidos o campo desconocido.
         """
-        return decode_recalibration_params(data, self.strategies)
+        return decode_recalibration_params(data)
 
     def encode_model(self, model: T2MRCDModel) -> dict[str, object]:
         """Codifica un modelo como datos, exacto en bits (``codec.py``, M1).
@@ -386,20 +388,6 @@ class T2MRCDChart:
             Nombres de los campos pendientes (vacío si no falta nada).
         """
         return params.bootstrap.pending_fields()
-
-    def pending_recalibration_decisions(self, params: T2MRCDRecalibrationParams) -> list[str]:
-        """Elementos estadísticos de la recalibración sin decidir, en orden estable.
-
-        Con los defaults de producción quedan pendientes las pruebas formales de cambio
-        (``covariance_test``, ``mean_test``) y su número de remuestreos.
-
-        Args:
-            params: Parámetros de la recalibración.
-
-        Returns:
-            Nombres de los campos pendientes (vacío si no falta nada).
-        """
-        return params.pending_fields()
 
     def _aggregations(self, params: T2MRCDParams) -> Aggregations:
         """Resuelve las agregaciones o lanza el error de decisiones pendientes.
@@ -605,64 +593,6 @@ class T2MRCDChart:
             statistic_reference=self.statistic_reference,
         )
 
-    def compare(
-        self,
-        active_model: T2MRCDModel,
-        base: FloatMatrix,
-        new_kept: FloatMatrix,
-        fit1: MRCDFit,
-        params: T2MRCDRecalibrationParams,
-        mapper: TaskMapper,
-    ) -> ComparisonResult:
-        """Compara la base vigente con las filas nuevas conservadas (``compare_bases``).
-
-        Reajusta con MRCD y los parámetros del modelo vigente (Q8) y la semilla de la
-        recalibración (huecos de las pruebas, ``seeds.py``).
-
-        Args:
-            active_model: Modelo vigente (``μ₀``, ``S₀``).
-            base: Base del modelo vigente.
-            new_kept: Filas nuevas conservadas tras la exclusión humana.
-            fit1: Ajuste de esas filas (``μ₁``, ``S₁``).
-            params: Parámetros de la recalibración.
-            mapper: Reparto de los remuestreos.
-
-        Returns:
-            La comparación.
-
-        Raises:
-            InvalidInputError: Si ``base`` no es la del modelo vigente o ``new_kept`` no es
-                compatible.
-            MethodDecisionPendingError: ``T2MRCD_DECISION_PENDING`` si faltan las pruebas
-                formales o sus remuestreos.
-        """
-        base_arr = self._validated_base(active_model, base)
-        new = _validated(new_kept, name="x_new", n_features=active_model.n_features)
-        covariance_test, mean_test = params.covariance_test, params.mean_test
-        n_test_resamples = params.n_test_resamples
-        if covariance_test is None or mean_test is None or n_test_resamples is None:
-            raise MethodDecisionPendingError(
-                T2MRCD_DECISION_PENDING,
-                "la comparación de T²MRCD tiene decisiones pendientes (docs/metodos/t2mrcd.md)",
-                self.pending_recalibration_decisions(params),
-            )
-        return compare_bases(
-            base_arr,
-            new,
-            fit0=active_model.mrcd,
-            fit1=fit1,
-            metric=params.relative_change_metric,
-            threshold=params.relative_change_threshold,
-            threshold_decides=params.threshold_decides,
-            covariance_test=covariance_test,
-            mean_test=mean_test,
-            decision_rule=params.decision_rule,
-            estimator=MRCDEstimator(active_model.params.mrcd, self.mrcd_threads),
-            seed=params.seed,
-            n_test_resamples=n_test_resamples,
-            mapper=mapper,
-        )
-
     # --- Fase I y Fase II -----------------------------------------------------------------------
 
     def fit_phase1(
@@ -794,28 +724,26 @@ class T2MRCDChart:
     ) -> RecalibrationOutcome[T2MRCDModel, T2MRCDRecalibrationReport]:
         """Crea una nueva versión del modelo con las observaciones de Fase II.
 
-        Pasos: (1) validar; (2) pendientes antes de ajustar, salvo ``force_replace``;
-        (3) exclusión humana; (4) ``INSUFFICIENT`` si quedan menos de ``min_observations``;
-        (5) **un** ajuste y **una** calibración de las filas nuevas conservadas (heredando B,
-        niveles, agregaciones y MRCD del modelo vigente, Q8; operación ``NEW_ROWS``): ``μ₁``,
-        ``S₁``; (6) ``compare`` con la base vigente, salvo ``force_replace`` (deciden las pruebas
-        formales; el cambio relativo es informativo salvo ``threshold_decides``); (7) ``EXTEND``
-        = ``vstack(base, nuevas)`` o ``REPLACE`` = solo las nuevas; (8) Fase I final sobre la
-        nueva base con régimen ``PHASE2`` (``assemble_model``), e informe. Sin depuración
-        automática iterativa (decisión del dueño, 2026-10-09). El modelo guarda los parámetros
-        heredados tal cual con la semilla de la recalibración.
+        Pasos: (1) validar; (2) comprobar las decisiones pendientes de la Fase I heredada (antes de
+        ajustar); (3) exclusión humana; (4) ``decide``: ``INSUFFICIENT`` si quedan menos de
+        ``min_observations`` (sin ajustar nada), ``REPLACE`` si ``force_replace`` (evento
+        estructural o petición explícita) y, si no, ``EXTEND`` (por defecto); (5) **un** ajuste y
+        **una** calibración de la nueva base (heredando B, niveles, agregaciones y MRCD del modelo
+        vigente, Q8) con régimen ``PHASE2`` (``assemble_model``), e informe. Sin comparación de
+        bases (decisión del dueño, 2026-10-14) ni depuración automática iterativa (2026-10-09). El
+        modelo guarda los parámetros heredados tal cual con la semilla de la recalibración.
 
-        En ``REPLACE`` la nueva base es exactamente la de las filas nuevas conservadas (mismas
-        filas, mismo orden, mismos parámetros y semilla raíz), así que se reutiliza su ajuste y su
-        calibración (hueco ``(SLOT_NEW_ROWS, 0)``) en lugar de repetir las B réplicas. En
-        ``EXTEND`` se calibra con la operación ``EXTENSION`` (hueco ``(SLOT_PHASE1, 0)``).
+        En ``EXTEND`` la nueva base es ``vstack(base, nuevas conservadas)`` y se calibra con la
+        operación ``EXTENSION`` (hueco ``(SLOT_PHASE1, 0)``); en ``REPLACE``, solo las nuevas
+        conservadas, con la operación ``NEW_ROWS`` (hueco ``(SLOT_NEW_ROWS, 0)``).
 
         Args:
             active_model: Modelo vigente.
             base: Base del modelo vigente (``x[active_model.base_mask]`` de su entrada).
             x_new: Observaciones nuevas ``m x p``.
             assignable_cause: Filas de ``x_new`` con causa asignable confirmada, o ``None``.
-            force_replace: Reemplazar sin comparar (decisión humana).
+            force_replace: Reemplazar la base por las nuevas (evento estructural o petición
+                explícita).
             params: Parámetros de la recalibración.
             mapper: Reparto de las réplicas.
 
@@ -824,43 +752,34 @@ class T2MRCDChart:
 
         Raises:
             InvalidInputError: Entradas inválidas o base que no es la del modelo vigente.
-            MethodDecisionPendingError: ``T2MRCD_DECISION_PENDING`` (antes de ajustar).
+            MethodDecisionPendingError: ``T2MRCD_DECISION_PENDING`` si la Fase I heredada tiene
+                decisiones pendientes (antes de ajustar).
             EstimationError: Fallo de MRCD o del bootstrap.
         """
         base_arr = self._validated_base(active_model, base)
         new = _validated(x_new, name="x_new", n_features=active_model.n_features)
         human = _validated_mask(assignable_cause, new.shape[0], name="assignable_cause")
-        pending = self.pending_recalibration_decisions(params)
-        if pending and not force_replace:
-            raise MethodDecisionPendingError(
-                T2MRCD_DECISION_PENDING,
-                "la recalibración de T²MRCD tiene decisiones pendientes (docs/metodos/t2mrcd.md)",
-                pending,
-            )
         inherited = dataclasses.replace(
             active_model.params,
             bootstrap=dataclasses.replace(active_model.params.bootstrap, seed=params.seed),
         )
         self._aggregations(inherited)
         rows = _kept_rows(human)
-        kept_new = new[rows]
         n_kept = int(rows.shape[0])
-        stage = None
-        if n_kept >= params.min_observations:
-            stage = self._stage(new, rows, params=inherited, kind=StageKind.NEW_ROWS, mapper=mapper)
-        comparison = None
-        if stage is not None and not force_replace:
-            comparison = self.compare(active_model, base_arr, kept_new, stage.fit, params, mapper)
         decision = decide(
-            comparison,
             n_kept=n_kept,
             min_observations=params.min_observations,
             force_replace=force_replace,
         )
         model = None
-        if stage is not None and decision is not RecalibrationDecision.INSUFFICIENT:
-            if decision is RecalibrationDecision.EXTEND:
-                x_final = np.vstack([base_arr, kept_new])
+        if decision is not RecalibrationDecision.INSUFFICIENT:
+            if decision is RecalibrationDecision.REPLACE:
+                x_final = new[rows]
+                final_stage = self._stage(
+                    new, rows, params=inherited, kind=StageKind.NEW_ROWS, mapper=mapper
+                )
+            else:
+                x_final = np.vstack([base_arr, new[rows]])
                 final_stage = self._stage(
                     x_final,
                     np.arange(x_final.shape[0], dtype=np.int64),
@@ -868,9 +787,6 @@ class T2MRCDChart:
                     kind=StageKind.EXTENSION,
                     mapper=mapper,
                 )
-            else:
-                # REPLACE: las filas nuevas conservadas ya se ajustaron y calibraron.
-                x_final, final_stage = kept_new, stage
             model = self.assemble_model(
                 x_final,
                 inherited,
@@ -882,7 +798,6 @@ class T2MRCDChart:
             )
         report = T2MRCDRecalibrationReport(
             decision=decision,
-            forced=force_replace,
             row_disposition=(RowDisposition.ALREADY_IN_BASE,) * base_arr.shape[0]
             + _dispositions(human),
             n_base=int(base_arr.shape[0]),
@@ -890,7 +805,6 @@ class T2MRCDChart:
             n_excluded_assignable_cause=int(human.sum()),
             n_kept_new=n_kept,
             min_observations=params.min_observations,
-            comparison=comparison,
             before=LimitsSnapshot.of(active_model),
             after=None if model is None else LimitsSnapshot.of(model),
             phase2_exceeds_phase1=None if model is None else model.limits.phase2_exceeds_phase1,

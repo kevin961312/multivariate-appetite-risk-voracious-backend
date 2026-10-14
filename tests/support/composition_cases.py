@@ -2,8 +2,7 @@
 
 Los usa ``tests/unit/domain/charts/t2mrcd/test_composition.py`` (composición paso a paso frente a
 ``fit_phase1``/``recalibrate``) y sirvieron para capturar la instantánea previa al refactor de la
-vuelta 3.2. Parámetros: los de producción con B reducido (``fast_params``) y, en la recalibración,
-las pruebas de permutación «SOLO TEST».
+vuelta 3.2. Parámetros: los de producción con B reducido (``fast_params``).
 """
 
 from dataclasses import dataclass
@@ -11,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import numpy.typing as npt
 
-from support.solo_test import fast_params, solo_test_recalibration
+from support.solo_test import fast_params
 from voracious.domain.charts.t2mrcd import T2MRCDParams, T2MRCDRecalibrationParams
 
 FloatArray = npt.NDArray[np.float64]
@@ -72,8 +71,14 @@ def _short_after_exclusion() -> tuple[FloatArray, npt.NDArray[np.bool_]]:
 
 
 def recalibration_cases() -> dict[str, RecalibrationCase]:
-    """Casos de recalibración: EXTEND, REPLACE, INSUFFICIENT (de entrada y tras la exclusión
-    humana) y reemplazo forzado."""
+    """Casos de recalibración: EXTEND (por defecto), REPLACE (pedido con ``force_replace``, sobre
+    filas desplazadas y sobre filas en control), INSUFFICIENT (de entrada y tras la exclusión
+    humana).
+
+    Sin comparación de bases (decisión del dueño, 2026-10-14), «replace» es el reemplazo pedido
+    (evento estructural o petición explícita) y conserva su nombre y sus datos para que sus bits
+    sigan siendo los de antes.
+    """
     rng = np.random.default_rng(21)
     in_control = rng.normal(size=(60, 3))
     in_control[4] += 6.0
@@ -82,11 +87,17 @@ def recalibration_cases() -> dict[str, RecalibrationCase]:
     human[[1, 2]] = True
     short, short_human = _short_after_exclusion()
     return {
-        "extend": RecalibrationCase(in_control, solo_test_recalibration(), assignable_cause=human),
-        "replace": RecalibrationCase(shifted, solo_test_recalibration(seed=12)),
-        "insufficient": RecalibrationCase(rng.normal(size=(10, 3)), solo_test_recalibration()),
+        "extend": RecalibrationCase(
+            in_control, T2MRCDRecalibrationParams(seed=11), assignable_cause=human
+        ),
+        "replace": RecalibrationCase(
+            shifted, T2MRCDRecalibrationParams(seed=12), force_replace=True
+        ),
+        "insufficient": RecalibrationCase(
+            rng.normal(size=(10, 3)), T2MRCDRecalibrationParams(seed=11)
+        ),
         "insufficient_after_exclusion": RecalibrationCase(
-            short, solo_test_recalibration(seed=14), assignable_cause=short_human
+            short, T2MRCDRecalibrationParams(seed=14), assignable_cause=short_human
         ),
         "forced": RecalibrationCase(
             in_control, T2MRCDRecalibrationParams(seed=13), force_replace=True

@@ -1,4 +1,4 @@
-"""Repositorios en memoria de los trabajos: modelos, monitoreos, recalibraciones, comparaciones.
+"""Repositorios en memoria de los trabajos: modelos, monitoreos y recalibraciones.
 
 Cada uno implementa ``claim`` (``queued → running`` atómico) para que una entrega duplicada de
 la cola no ejecute dos veces el mismo trabajo.
@@ -10,7 +10,6 @@ from datetime import datetime
 
 from voracious.application.ports import DuplicateKeyError, RecordNotFoundError
 from voracious.application.records import (
-    ComparisonRecord,
     JobStatus,
     ModelRecord,
     MonitoringRecord,
@@ -22,7 +21,6 @@ from voracious.infrastructure.memory.codec import PassthroughCodec, RecordCodec
 from voracious.infrastructure.memory.store import KeyedStore
 
 __all__ = [
-    "InMemoryComparisonRepository",
     "InMemoryModelRepository",
     "InMemoryMonitoringRepository",
     "InMemoryRecalibrationRepository",
@@ -411,6 +409,47 @@ class InMemoryRecalibrationRepository:
             self._store.put(key, updated)
             return updated
 
+    def set_extension(
+        self,
+        tenant_id: str,
+        chart_id: str,
+        model_id: str,
+        recalibration_id: str,
+        *,
+        kept_dataset_id: str,
+        extension_dataset_id: str,
+    ) -> RecalibrationRecord | None:
+        """Fija la extensión si sigue ``running``, sin propuesta y sin extensión (atómico).
+
+        Args:
+            tenant_id: Tenant.
+            chart_id: Carta.
+            model_id: Modelo.
+            recalibration_id: Recalibración.
+            kept_dataset_id: Filas nuevas conservadas.
+            extension_dataset_id: Dataset de extensión.
+
+        Returns:
+            El registro con la extensión o ``None``.
+        """
+        key = (tenant_id, chart_id, model_id, recalibration_id)
+        with self._store.lock:
+            current = self._store.get(key)
+            if (
+                current is None
+                or current.status is not JobStatus.RUNNING
+                or current.proposal is not None
+                or current.extension_dataset_id is not None
+            ):
+                return None
+            updated = replace(
+                current,
+                kept_dataset_id=kept_dataset_id,
+                extension_dataset_id=extension_dataset_id,
+            )
+            self._store.put(key, updated)
+            return updated
+
     def cancel(
         self,
         tenant_id: str,
@@ -471,104 +510,3 @@ class InMemoryRecalibrationRepository:
             updated = replace(current, proposal=replace(current.proposal, status=JobStatus.RUNNING))
             self._store.put(key, updated)
             return updated
-
-
-class InMemoryComparisonRepository:
-    """``ComparisonRepository`` en memoria con clave (tenant, carta, modelo, comparación)."""
-
-    def __init__(self, codec: RecordCodec[ComparisonRecord] | None = None) -> None:
-        """Construye el repositorio vacío.
-
-        Args:
-            codec: Codec de los registros; ``None`` guarda el registro tal cual (tests).
-        """
-        self._store: KeyedStore[ChildKey, ComparisonRecord] = KeyedStore(
-            codec if codec is not None else PassthroughCodec(ComparisonRecord)
-        )
-
-    def list_unfinished(self) -> list[ComparisonRecord]:
-        """Registros ``queued`` o ``running`` de todos los tenants.
-
-        Returns:
-            Los registros, en orden de inserción.
-        """
-        return self._store.where(lambda r: r.status in _IN_PROGRESS)
-
-    @staticmethod
-    def _key(record: ComparisonRecord) -> ChildKey:
-        return (record.tenant_id, record.chart_id, record.model_id, record.comparison_id)
-
-    def add(self, record: ComparisonRecord) -> None:
-        """Guarda una comparación nueva.
-
-        Args:
-            record: Registro.
-
-        Raises:
-            DuplicateKeyError: Si ya existe la clave.
-        """
-        key = self._key(record)
-        with self._store.lock:
-            if self._store.contains(key):
-                raise DuplicateKeyError(str(key))
-            self._store.put(key, record)
-
-    def get(
-        self, tenant_id: str, chart_id: str, model_id: str, comparison_id: str
-    ) -> ComparisonRecord | None:
-        """Busca una comparación.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-
-        Returns:
-            El registro o ``None``.
-        """
-        return self._store.get((tenant_id, chart_id, model_id, comparison_id))
-
-    def update(self, record: ComparisonRecord) -> None:
-        """Reemplaza una comparación existente.
-
-        Args:
-            record: Registro nuevo.
-
-        Raises:
-            RecordNotFoundError: Si no existe.
-        """
-        key = self._key(record)
-        with self._store.lock:
-            if not self._store.contains(key):
-                raise RecordNotFoundError(str(key))
-            self._store.put(key, record)
-
-    def claim(
-        self,
-        tenant_id: str,
-        chart_id: str,
-        model_id: str,
-        comparison_id: str,
-        started_at: datetime,
-    ) -> ComparisonRecord | None:
-        """Pasa la comparación de ``queued`` a ``running`` de forma atómica.
-
-        Args:
-            tenant_id: Tenant.
-            chart_id: Carta.
-            model_id: Modelo.
-            comparison_id: Comparación.
-            started_at: Instante de inicio.
-
-        Returns:
-            El registro en ``running`` o ``None`` si no existe o no estaba ``queued``.
-        """
-        key = (tenant_id, chart_id, model_id, comparison_id)
-        with self._store.lock:
-            current = self._store.get(key)
-            if current is None or current.status is not JobStatus.QUEUED:
-                return None
-            running = replace(current, status=JobStatus.RUNNING, started_at=started_at)
-            self._store.put(key, running)
-            return running

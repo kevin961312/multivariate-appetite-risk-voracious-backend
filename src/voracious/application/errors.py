@@ -4,8 +4,6 @@ from collections.abc import Mapping
 
 __all__ = [
     "ApplicationError",
-    "ComparisonNotFoundError",
-    "ComparisonNotReadyError",
     "DatasetNotFoundError",
     "EffectiveFromNotAfterScoredError",
     "ExclusionNotFoundError",
@@ -23,7 +21,6 @@ __all__ = [
     "PipelineNotFoundError",
     "ProposalPendingError",
     "RangeBeforeStructuralEventError",
-    "RecalibrationDecisionPendingError",
     "RecalibrationInProgressError",
     "RecalibrationInsufficientObservationsError",
     "RecalibrationMismatchError",
@@ -147,17 +144,6 @@ class RecalibrationInsufficientObservationsError(ApplicationError):
     code = "RECALIBRATION_INSUFFICIENT_OBSERVATIONS"
 
 
-class RecalibrationDecisionPendingError(ApplicationError):
-    """La recalibración tiene decisiones estadísticas pendientes y no se forzó el reemplazo.
-
-    Código ``RECALIBRATION_DECISION_PENDING``; ``details["pending"]`` lista los campos. Es la
-    validación síncrona previa a encolar; si llegara a ejecutarse, la carta fallaría con su propio
-    código (``T2MRCD_DECISION_PENDING`` en T²MRCD).
-    """
-
-    code = "RECALIBRATION_DECISION_PENDING"
-
-
 class EffectiveFromNotAfterScoredError(ApplicationError):
     """``effective_from`` no es posterior a la última observación puntuada (Q6).
 
@@ -243,24 +229,13 @@ class RecalibrationMismatchError(ApplicationError):
     code = "RECALIBRATION_MISMATCH"
 
 
-class ComparisonNotFoundError(ApplicationError):
-    """La comparación no existe, es de otro modelo o de otro tenant (``COMPARISON_NOT_FOUND``)."""
-
-    code = "COMPARISON_NOT_FOUND"
-
-
-class ComparisonNotReadyError(ApplicationError):
-    """La comparación existe pero no está en ``succeeded`` (``COMPARISON_NOT_READY``)."""
-
-    code = "COMPARISON_NOT_READY"
-
-
 class VersionInputsMismatchError(ApplicationError):
     """Los pasos pedidos para la versión no son los que exige la decisión de la recalibración.
 
-    Código ``VERSION_INPUTS_MISMATCH`` (vuelta 3.4): EXTEND exige el ajuste y los límites del
-    dataset de extensión; REPLACE, los de las filas nuevas (los comparados); sin reemplazo
-    forzado hace falta la comparación. ``details.reason`` dice cuál falló.
+    Código ``VERSION_INPUTS_MISMATCH`` (vuelta 3.4): EXTEND (por defecto) exige el ajuste y los
+    límites del dataset de extensión de la sesión (``extension_required`` si aún no se construyó);
+    REPLACE (evento estructural o petición explícita), los de las filas nuevas conservadas.
+    ``details.reason`` dice cuál falló.
     """
 
     code = "VERSION_INPUTS_MISMATCH"

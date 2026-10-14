@@ -6,7 +6,6 @@ from datetime import UTC, datetime, timedelta
 import numpy.typing as npt
 
 from support.memory import (
-    InMemoryComparisonRepository,
     InMemoryDatasetStorage,
     InMemoryExclusionRepository,
     InMemoryFitRepository,
@@ -23,7 +22,7 @@ from support.memory import (
     SequentialIds,
     TickingClock,
 )
-from support.solo_test import fast_params, small_data, solo_test_chart
+from support.solo_test import fast_params, small_data
 from voracious.application.charts import AnyChart
 from voracious.application.phase1_steps import Phase1Steps
 from voracious.application.ports import Clock, JobKind, JobRequest
@@ -39,7 +38,6 @@ from voracious.application.use_cases import (
     AnnotateSignal,
     ApproveVersion,
     GetChartStatus,
-    GetComparison,
     GetDataset,
     GetExclusion,
     GetFit,
@@ -55,15 +53,14 @@ from voracious.application.use_cases import (
     RecalibrationChain,
     RegisterStructuralEvent,
     RejectVersion,
-    RequestComparison,
     RequestExclusion,
     RequestFit,
     RequestLimits,
     RequestModel,
     RequestPhase1Pipeline,
     RequestRecalibration,
+    RequestRecalibrationExtension,
     RequestVersionProposal,
-    RunComparisonJob,
     RunExclusionJob,
     RunFitJob,
     RunLimitsJob,
@@ -108,7 +105,6 @@ class App:
     limits: InMemoryLimitsRepository = field(default_factory=InMemoryLimitsRepository)
     exclusions: InMemoryExclusionRepository = field(default_factory=InMemoryExclusionRepository)
     pipelines: InMemoryPipelineRepository = field(default_factory=InMemoryPipelineRepository)
-    comparisons: InMemoryComparisonRepository = field(default_factory=InMemoryComparisonRepository)
 
     @property
     def steps(self) -> dict[str, Phase1Steps]:
@@ -148,7 +144,9 @@ class App:
         return GetDataset(self.datasets)
 
     def request_fit(self) -> RequestFit:
-        return RequestFit(self.steps, self.datasets, self.fits, self.queue, self.ids, self.clock)
+        return RequestFit(
+            self.steps, self.datasets, self.fits, self.queue, self.ids, self.clock, self.chain
+        )
 
     def get_fit(self) -> GetFit:
         return GetFit(self.steps, self.fits)
@@ -355,45 +353,26 @@ class App:
             self.fits,
             self.limits,
             self.exclusions,
-            self.comparisons,
             self.datasets,
             self.chain,
             self.request_exclusion(),
             self.request_fit(),
             self.request_limits(),
-            self.request_comparison(),
+            self.request_extension(),
             self.request_version_proposal(),
-            self.ids,
-            self.clock,
-        )
-
-    def request_comparison(self) -> RequestComparison:
-        return RequestComparison(
-            self.charts,
-            self.rsteps,
-            self.recalibrations,
-            self.datasets,
-            self.fits,
-            self.limits,
-            self.comparisons,
             self.queue,
             self.ids,
             self.clock,
         )
 
-    def get_comparison(self) -> GetComparison:
-        return GetComparison(self.charts, self.comparisons)
-
-    def run_comparison(self) -> RunComparisonJob:
-        return RunComparisonJob(
+    def request_extension(self) -> RequestRecalibrationExtension:
+        return RequestRecalibrationExtension(
+            self.charts,
             self.rsteps,
             self.recalibrations,
             self.versions,
             self.datasets,
-            self.fits,
-            self.comparisons,
-            SerialTaskMapper(),
-            self.queue,
+            self.chain,
             self.ids,
             self.clock,
         )
@@ -406,7 +385,6 @@ class App:
             self.datasets,
             self.fits,
             self.limits,
-            self.comparisons,
             self.queue,
             self.clock,
         )
@@ -422,7 +400,6 @@ class App:
             self.fits,
             self.limits,
             self.exclusions,
-            self.comparisons,
             self.queue,
             self.clock,
         )
@@ -458,7 +435,6 @@ class App:
             JobKind.MODEL_ASSEMBLY: self.run_assembly,
             JobKind.PIPELINE: self.run_pipeline,
             JobKind.SCORE: self.run_monitoring,
-            JobKind.COMPARISON: self.run_comparison,
             JobKind.VERSION_PROPOSAL: self.run_version_proposal,
         }
         runners[job.kind]().execute(job)
@@ -481,8 +457,8 @@ def hours(m: int, start: datetime = T0) -> list[datetime]:
 
 
 def lifecycle_app() -> App:
-    """App con la carta T²MRCD y el registro de estrategias SOLO TEST."""
-    return App(charts={CHART: solo_test_chart()})
+    """App con la carta T²MRCD de producción."""
+    return App(charts={CHART: T2MRCDChart()})
 
 
 def trained_model(app: App, n: int = 40, seed: int = 3) -> str:

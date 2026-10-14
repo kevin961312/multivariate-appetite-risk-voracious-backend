@@ -31,7 +31,6 @@ __all__ = [
     "AssignableCause",
     "BaseRowRef",
     "BaseRowSource",
-    "ComparisonRecord",
     "DatasetRecord",
     "DatasetSource",
     "ErrorInfo",
@@ -383,8 +382,8 @@ class PipelineKind(StrEnum):
     """Fase I completa: exclusión humana (si la hay), ajuste, límites y modelo."""
 
     RECALIBRATION = "recalibration"
-    """Recalibración completa (modo ``pipeline``): exclusión humana de las filas nuevas, ajuste,
-    límites, comparación, extensión y propuesta de versión (vuelta 3.4)."""
+    """Recalibración completa (modo ``pipeline``): exclusión humana de las filas nuevas,
+    extensión (si se amplía la base), ajuste, límites y propuesta de versión (vuelta 3.4)."""
 
 
 @dataclass(frozen=True)
@@ -392,7 +391,7 @@ class PipelineStep:
     """Paso de una tubería: el recurso que creó.
 
     Attributes:
-        kind: ``exclusion``, ``fit``, ``limits``, ``model``, ``comparison`` o ``version``.
+        kind: ``exclusion``, ``fit``, ``limits``, ``model``, ``extension`` o ``version``.
         resource_id: Identificador del recurso.
     """
 
@@ -583,7 +582,7 @@ class ModelVersion:
         exclusions: Filas candidatas que no entraron en la base.
         decision: ``initial``, ``extend`` o ``replace``.
         justification: Por qué se tomó la decisión (``initial_fit``, ``structural_event``,
-            ``forced_replace``, ``change_detected`` o ``no_change_detected``).
+            ``forced_replace`` o ``default_extend``).
         report: Informe de la recalibración (antes/después), ``None`` en la versión 0.
         recalibration_id: Recalibración que la propuso.
         structural_event_id: Evento estructural que resuelve, si lo hay.
@@ -728,14 +727,12 @@ class ProposalRequest:
     Attributes:
         fit_id: Ajuste final (filas nuevas en REPLACE; base ampliada en EXTEND).
         limits_id: Límites de ese ajuste.
-        comparison_id: Comparación de bases (``None`` en un reemplazo forzado).
         status: Estado del trabajo de la propuesta.
         requested_at: Instante de la petición (UTC).
     """
 
     fit_id: str
     limits_id: str
-    comparison_id: str | None
     status: JobStatus
     requested_at: datetime
 
@@ -779,6 +776,10 @@ class RecalibrationRecord:
         candidates_dataset_id: Dataset ``recalibration_candidates``.
         pipeline_id: Tubería que la orquesta (modo ``pipeline``).
         proposal: Petición de la versión propuesta, si se hizo.
+        kept_dataset_id: Filas nuevas conservadas con las que se construyó la extensión (las
+            candidatas o la salida de su exclusión humana), si se construyó.
+        extension_dataset_id: Dataset ``recalibration_extension`` (base vigente + nuevas
+            conservadas), si se construyó; se fija una sola vez (``set_extension``).
     """
 
     tenant_id: str
@@ -807,44 +808,5 @@ class RecalibrationRecord:
     candidates_dataset_id: str | None = None
     pipeline_id: str | None = None
     proposal: ProposalRequest | None = None
-
-
-@dataclass(frozen=True, eq=False)
-class ComparisonRecord:
-    """Comparación de la base vigente con las filas nuevas conservadas (``/comparisons``).
-
-    Attributes:
-        tenant_id: Tenant propietario.
-        chart_id: Carta.
-        model_id: Modelo recalibrado.
-        comparison_id: Identificador.
-        recalibration_id: Recalibración a la que pertenece.
-        fit_id: Ajuste de las filas nuevas conservadas (``μ₁``, ``S₁``).
-        limits_id: Límites de ese ajuste (operación ``new_rows``).
-        status: Estado del trabajo.
-        created_at: Instante de creación (UTC).
-        started_at: Instante en que pasó a ``running`` (UTC).
-        finished_at: Instante en que terminó (UTC).
-        result: Comparación de la carta si ``succeeded``.
-        decision: ``extend`` o ``replace`` si ``succeeded``.
-        extension_dataset_id: Dataset ``recalibration_extension`` (base + nuevas) si ``extend``.
-        error: Error si ``failed``.
-        pipeline_id: Tubería que la pidió, si la hay.
-    """
-
-    tenant_id: str
-    chart_id: str
-    model_id: str
-    comparison_id: str
-    recalibration_id: str
-    fit_id: str
-    limits_id: str
-    status: JobStatus
-    created_at: datetime
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    result: object | None = None
-    decision: RecalibrationDecision | None = None
+    kept_dataset_id: str | None = None
     extension_dataset_id: str | None = None
-    error: ErrorInfo | None = None
-    pipeline_id: str | None = None

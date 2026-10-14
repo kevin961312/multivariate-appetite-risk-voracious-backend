@@ -1,7 +1,7 @@
 """Vocabulario común de la recalibración de una carta (Fase II → nueva versión del modelo).
 
-Solo enumeraciones y el contenedor del resultado; cómo decide cada carta (umbral, pruebas de
-cambio) vive en su paquete (``domain/charts/<carta>/``). Sin lógica estadística.
+Solo enumeraciones y el contenedor del resultado; cómo decide cada carta vive en su paquete
+(``domain/charts/<carta>/``). Sin lógica estadística.
 """
 
 from dataclasses import dataclass
@@ -17,10 +17,10 @@ class RecalibrationDecision(StrEnum):
     """Versión inicial del modelo (Fase I sobre el histórico; no hay versión anterior)."""
 
     EXTEND = "extend"
-    """Sin cambio detectado: la nueva base es la base vigente más las filas nuevas conservadas."""
+    """Por defecto: la nueva base es la base vigente más las filas nuevas conservadas."""
 
     REPLACE = "replace"
-    """Cambio detectado (o reemplazo forzado): la nueva base son solo las nuevas conservadas."""
+    """Evento estructural o petición explícita: la nueva base son solo las nuevas conservadas."""
 
     INSUFFICIENT = "insufficient"
     """Muy pocas filas nuevas conservadas: no se crea modelo; el vigente sigue activo."""
@@ -46,7 +46,7 @@ class RecalibrationOutcome[ModelT, ReportT]:
     Attributes:
         decision: Decisión tomada.
         model: Nueva versión del modelo, o ``None`` si ``decision`` es ``INSUFFICIENT``.
-        report: Informe de la carta (antes/después, comparación, destino de cada fila).
+        report: Informe de la carta (antes/después y destino de cada fila).
     """
 
     decision: RecalibrationDecision

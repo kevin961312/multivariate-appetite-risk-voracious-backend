@@ -128,7 +128,7 @@ def test_format_1_with_depuration_fields_is_rejected_by_its_version(
     outcomes: tuple[T2MRCDModel, np.ndarray, dict[str, RecalibrationOutcome]],
 ) -> None:
     """Registros anteriores a quitar la depuración automática (dueño, 2026-10-09)."""
-    assert MODEL_FORMAT_VERSION == REPORT_FORMAT_VERSION == 2
+    assert MODEL_FORMAT_VERSION == 2
     legacy_model = {
         **CHART.encode_model(outcomes[0]),
         "format_version": 1,
@@ -149,6 +149,22 @@ def test_format_1_with_depuration_fields_is_rejected_by_its_version(
     with pytest.raises(InvalidInputError) as info:
         CHART.decode_report(legacy_report)
     assert info.value.details["reason"] == "unknown_format_version"
+
+
+def test_report_format_2_with_base_test_is_rejected_by_its_version(
+    outcomes: tuple[T2MRCDModel, np.ndarray, dict[str, RecalibrationOutcome]],
+) -> None:
+    """Informes con la comparación de bases y ``forced`` (eliminados por el dueño, 2026-10-14)."""
+    assert REPORT_FORMAT_VERSION == 3
+    encoded = CHART.encode_report(outcomes[2]["extend"].report)
+    assert "forced" not in encoded
+    legacy_report = {**encoded, "format_version": 2, "forced": False, "comparison": None}
+    with pytest.raises(InvalidInputError) as info:
+        CHART.decode_report(legacy_report)
+    assert info.value.details["reason"] == "unknown_format_version"
+    with pytest.raises(InvalidInputError) as info:
+        CHART.decode_report({**encoded, "forced": False})
+    assert info.value.details["reason"] == "unknown_fields"
 
 
 def test_encode_report_checks_its_type() -> None:

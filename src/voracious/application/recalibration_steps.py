@@ -1,16 +1,18 @@
 """Puerto de los pasos encadenables de la recalibración de una carta (vuelta 3.4 del Paso 3).
 
 La recalibración se puede pedir paso a paso, encadenando por id los pasos de la Fase I (exclusión
-humana, ajuste y límites de las filas nuevas) con dos pasos propios: la **comparación** de la base
-vigente con las filas nuevas conservadas (``/comparisons``) y la **propuesta** de versión
-(``/versions``). Los casos de uso son comunes a todas las cartas y solo pasan datos (parámetros
-codificados) y valores opacos (ajuste, límites, comparación, modelo e informe); la carta concreta
+humana, ajuste y límites) con dos pasos propios: la **extensión** (``…/extension``: base vigente
+más filas nuevas conservadas, si se amplía la base) y la **propuesta** de versión (``/versions``).
+Sin comparación de bases (decisión del dueño, 2026-10-14): se amplía la base por defecto y se
+reemplaza solo ante un evento estructural o una petición explícita. Los casos de uso son comunes a
+todas las cartas y solo pasan datos (parámetros codificados) y valores opacos (ajuste, límites,
+modelo e informe); la carta concreta
 los interpreta a través de este puerto, cuyo adaptador vive en ``infrastructure``
 (``T2MRCDRecalibrationSteps``).
 
 Contrato de equivalencia: encadenar los pasos con el linaje que deduce la aplicación (``NEW_ROWS``
-para las filas nuevas, ``EXTENSION`` para la base ampliada) da el mismo modelo e informe, en bits,
-que ``ControlChart.recalibrate``.
+para las filas nuevas de un reemplazo, ``EXTENSION`` para la base ampliada) da el mismo modelo e
+informe, en bits, que ``ControlChart.recalibrate``.
 """
 
 from collections.abc import Mapping, Sequence
@@ -22,7 +24,6 @@ from voracious.domain.common import (
     FloatMatrix,
     RecalibrationDecision,
     RowDisposition,
-    TaskMapper,
 )
 
 __all__ = ["RecalibrationSteps", "RecalibrationStepsRegistry", "resolve_recalibration_steps"]
@@ -68,37 +69,8 @@ class RecalibrationSteps(Protocol):
         """
         ...
 
-    def compare(
-        self,
-        active_model: object,
-        base: FloatMatrix,
-        new_kept: FloatMatrix,
-        fit: object,
-        recalibration_params: Mapping[str, object],
-        *,
-        mapper: TaskMapper,
-    ) -> object:
-        """Compara la base vigente con las filas nuevas conservadas.
-
-        Args:
-            active_model: Modelo de la versión base.
-            base: Base de la versión base.
-            new_kept: Filas nuevas conservadas tras la exclusión humana.
-            fit: Ajuste de esas filas.
-            recalibration_params: Parámetros de la recalibración.
-            mapper: Reparto de los remuestreos.
-
-        Returns:
-            La comparación (opaca).
-
-        Raises:
-            DomainError: Entrada inválida o decisiones pendientes.
-        """
-        ...
-
     def decide(
         self,
-        comparison: object | None,
         *,
         n_kept: int,
         recalibration_params: Mapping[str, object],
@@ -107,10 +79,9 @@ class RecalibrationSteps(Protocol):
         """Decisión de la recalibración.
 
         Args:
-            comparison: Comparación, o ``None`` en un reemplazo forzado.
             n_kept: Filas nuevas conservadas.
             recalibration_params: Parámetros de la recalibración.
-            force_replace: Reemplazo forzado.
+            force_replace: Reemplazo pedido (evento estructural o petición explícita).
 
         Returns:
             La decisión.
@@ -142,11 +113,9 @@ class RecalibrationSteps(Protocol):
         active_model: object,
         *,
         decision: RecalibrationDecision,
-        forced: bool,
         n_base: int,
         new_dispositions: Sequence[RowDisposition],
         recalibration_params: Mapping[str, object],
-        comparison: object | None,
         model: object | None,
     ) -> object:
         """Informe antes/después de la recalibración.
@@ -154,37 +123,13 @@ class RecalibrationSteps(Protocol):
         Args:
             active_model: Modelo de la versión base.
             decision: Decisión.
-            forced: Reemplazo forzado.
             n_base: Filas de la base vigente.
             new_dispositions: Destino de cada fila nueva.
             recalibration_params: Parámetros de la recalibración.
-            comparison: Comparación, o ``None``.
             model: Modelo nuevo, o ``None`` (``insufficient``).
 
         Returns:
             El informe de la carta.
-        """
-        ...
-
-    def encode_comparison(self, comparison: object) -> dict[str, object]:
-        """Codifica una comparación como datos (ida y vuelta exacta en bits).
-
-        Args:
-            comparison: Comparación.
-
-        Returns:
-            Diccionario serializable.
-        """
-        ...
-
-    def decode_comparison(self, data: Mapping[str, object]) -> object:
-        """Decodifica una comparación.
-
-        Args:
-            data: Comparación codificada.
-
-        Returns:
-            La comparación.
         """
         ...
 
