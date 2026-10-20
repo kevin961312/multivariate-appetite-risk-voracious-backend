@@ -14,7 +14,7 @@
 # Base y uv fijados por versión y digest (M5); Dependabot propone las subidas (.github/dependabot.yml).
 FROM ghcr.io/astral-sh/uv:0.12.23@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 AS uv
 
-FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS builder
+FROM python:3.15-slim-trixie@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce AS builder
 
 COPY --from=uv /uv /uvx /bin/
 
@@ -61,7 +61,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 CMD ["scripts/gate.sh"]
 
 
-FROM python:3.12-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
+FROM python:3.15-slim-trixie@sha256:2da676046630d7bf14c6764ae1143dc7fa0377a53f94bf5a642f0b214aca5bce AS runtime
 
 LABEL org.opencontainers.image.title="voracious" \
       org.opencontainers.image.licenses="GPL-3.0-or-later"
