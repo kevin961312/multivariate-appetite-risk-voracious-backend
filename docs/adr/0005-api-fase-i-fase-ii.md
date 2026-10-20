@@ -277,3 +277,29 @@ El texto original no se reescribe. Sustituye a lo anterior en lo que choque; dec
   cuerpo Pydantic: con un JSON mal formado responde `422` antes que `403`.
 - **`actor` fuera de los cuerpos:** anotaciones, eventos estructurales, aprobación, rechazo y recalibración ya no
   aceptan `actor`; enviarlo da `422` (campo extra). El actor y `decided_by` son el `sub` del token.
+
+## Enmienda 2026-10-20 (paso E): URL pública, 429 y códigos del borde
+
+El texto original no se reescribe. Decisiones y alternativas en el [ADR 0013](0013-exposicion-publica-https.md).
+
+- **URL pública permanente:** `https://api.voracious.cloud` (negocio en `/v1/…`, salud en `/health`). Solo HTTPS; el
+  puerto 80 está cerrado. `/ready` y la documentación (`/docs`, `/redoc`, `/openapi.json`) **no** se publican en el
+  borde: el integrador recibe el `openapi.json` con la guía. Siguen disponibles para el operador en
+  `127.0.0.1:8000` (túnel SSH). La API se autentica igual que antes (enmienda 2026-10-20 anterior).
+- **Códigos nuevos de la app (429):**
+
+  | Código | HTTP | Cuándo |
+  | --- | --- | --- |
+  | `RATE_LIMITED` | 429 | Más de 600 peticiones por minuto desde la IP del cliente (ráfaga de 120). Trae `Retry-After` (≥ 1 s) y `details.retry_after_seconds`. También se responde sin token |
+  | `TOO_MANY_JOBS` | 429 | El tenant ya tiene 4 trabajos de cómputo en cola o en curso (ajustes y límites sueltos, tuberías de Fase I y recalibración). `details {max_active_jobs, active_jobs}`. **Sin `Retry-After`**: no se sabe cuándo se libera un hueco. Se comprueba después de las validaciones síncronas |
+
+  El 429 se declara (`ErrorResponse`) en todas las operaciones del OpenAPI.
+- **Códigos del borde** (los genera Caddy, mismo formato `{code, message, details}` con `details: {}`; no llevan
+  cabeceras CORS y no pasan por la app): `ROUTE_NOT_FOUND` 404 (cualquier ruta fuera de `/health` y `/v1/*`, también
+  con otro `Host`; la app usa el mismo código para una ruta inexistente que sí alcanza), `PAYLOAD_TOO_LARGE` 413 (cuerpo
+  de más de 51 MiB; entre 50 y 51 MiB responde la app con su 413 y `details.max_bytes`), `UPSTREAM_UNAVAILABLE` 502/503
+  (la API no responde), `UPSTREAM_TIMEOUT` 504 y **`EDGE_ERROR`** (cualquier otro error del borde, con su estado). Un
+  front en navegador los ve como «error de red» (sin CORS): reintentar con espera.
+- **`500 INTERNAL_ERROR`** sigue siendo el de la app, ahora emitido por `ErrorBoundaryMiddleware` para que lleve CORS.
+- **CORS:** `GET` y `POST`, cabeceras `Authorization` y `Content-Type`, expone `Retry-After` y `WWW-Authenticate`,
+  `max_age` 600, sin credenciales. En la demo, cualquier origen (`*`).

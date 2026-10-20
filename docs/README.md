@@ -8,9 +8,9 @@ aquí no se repite el diff.
 | Documento | Para qué | Quién lo actualiza | Cuándo |
 | --- | --- | --- | --- |
 | [`arquitectura.md`](arquitectura.md) | Capas, puertos, adaptadores, contrato de la API, variables `VORACIOUS_*` | `documentador` | Al añadir un puerto, adaptador, variable o endpoint |
-| [`adr/`](adr/) | Decisiones difíciles de revertir (la seguridad mínima: [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md)) | `documentador` (redacta), dueño (acepta) | Antes de implementar una decisión así |
+| [`adr/`](adr/) | Decisiones difíciles de revertir (la seguridad mínima: [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md); la exposición pública por HTTPS: [ADR 0013](adr/0013-exposicion-publica-https.md)) | `documentador` (redacta), dueño (acepta) | Antes de implementar una decisión así |
 | [`metodos/<método>.md`](metodos/README.md) | Un documento por carta o estimador: cada decisión ↔ su referencia (archivo:línea de `rrcov`, o artículo) | `documentador`, revisado por `validador-estadistico` | Con cada cambio en `domain/estimators/<estimador>/` o `domain/charts/<carta>/` |
-| [`despliegue.md`](despliegue.md) | Operación del servidor: despliegue con secretos cifrados, emisión de tokens, rotaciones y recuperación | `documentador` | Al cambiar `scripts/deploy.sh`, `issue_token.sh`, `jwt_keygen.sh`, `docker-compose.yml` o `deploy/` |
+| [`despliegue.md`](despliegue.md) | Operación del servidor: despliegue con secretos cifrados, exposición pública (Caddy, cortafuegos, vuelta atrás), emisión de tokens, rotaciones y recuperación | `documentador` | Al cambiar `scripts/deploy.sh`, `issue_token.sh`, `jwt_keygen.sh`, `check_public.sh`, `docker-compose.yml`, `deploy/` o `.github/workflows/vigilancia.yml` |
 | [`ESTADO.md`](ESTADO.md) | Hecho / parcial / pendiente y siguiente hito | `documentador` | Al cerrar cada paso |
 
 ## Reglas

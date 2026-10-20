@@ -1,6 +1,6 @@
 # ADR 0012 — Seguridad mínima: secretos con SOPS + age y autenticación JWT con roles
 
-- **Estado:** Propuesto
+- **Estado:** Propuesto — acotado por [ADR 0013](0013-exposicion-publica-https.md) en «la API no se expone» (la demo ya se publica por HTTPS)
 - **Fecha:** 2026-10-20
 
 Cierra la parte más urgente del «paso de seguridad antes de vender» ([`ESTADO.md`](../ESTADO.md)): que los
@@ -235,3 +235,32 @@ de tenants si el IdP es compartido.
 - SC2155 previo en el trabajo `sanitizers`.
 - Sin revocación por token (solo rotar la llave); el resto del paso grande y las mejoras M3, M5, M6, M8, M9 y M10
   están en [`ESTADO.md`](../ESTADO.md).
+
+## Enmienda 2026-10-20 (paso E): HTTPS hecho y la API ya se expone (demo)
+
+El texto original no se reescribe. Decisiones y alternativas en el [ADR 0013](0013-exposicion-publica-https.md).
+
+- **HTTPS, hecho** (Caddy con Let's Encrypt delante de la API). Sale del paso grande de seguridad. **«La API sigue sin
+  exponerse» (Consecuencias, `ESTADO.md`) queda superado** para la demo: `https://api.voracious.cloud`, solo con datos
+  sintéticos o de prueba (P1 del dueño). La condición «login del banco» sigue vigente para datos del banco. Sigue
+  pendiente del paso grande: OIDC/SSO, Row-Level Security, auditoría completa, `users`/`memberships` e
+  instalación dedicada vs. SaaS compartido.
+- **El token entra por el front de forma provisional, hasta OIDC.** Todavía no hay login: lo emite el operador con
+  `issue_token.sh` y el front lo pega. Un XSS del front lo expone; mitigación: memoria o `sessionStorage` (nunca
+  `localStorage`) y TTL de 8 h o menos. Es una fila nueva de la tabla de amenazas (parcial, depende del front).
+- **Filas nuevas de amenazas:** interceptación en el camino (TLS, HSTS, 80 cerrado; cubierta), ruta de negocio sin token
+  (puerta de `deploy.sh`; cubierta), inundación (límite por IP, parcial), acaparar cómputo (cupo por tenant, parcial).
+- **IP en el registro de acceso (M2):** el campo `client` guarda la IP del cliente (dato personal, Ley 1581). La línea
+  `http_request` sigue sin token, query, cabeceras ni cuerpos. Retención: la rotación de Docker (5 × 10 MB). Los
+  *preflight* de CORS van a nivel `debug`.
+- **Orden de middlewares** (D8): ya no es «acceso → autenticación → aplicación». De fuera adentro: proxy headers →
+  acceso → CORS → barrera de errores → límite de peticiones → autenticación → aplicación. El 401 sigue saliendo antes de
+  leer el cuerpo.
+- **D8, rutas públicas:** `/health` y `/ready` siempre; la documentación solo con `VORACIOUS_API_DOCS=true` (por
+  defecto). En el borde público solo se publica `/health`.
+- **M9 (documentación tras autenticación o desactivable), cerrada** como la M2 del ADR 0013: `VORACIOUS_API_DOCS=false`.
+- **CORS:** `VORACIOUS_CORS_ALLOWED_ORIGINS=*` en la demo. Es seguro porque el token va en `Authorization` y no hay
+  cookies; el navegador nunca lo manda por su cuenta.
+- **Versiones de las herramientas:** sops 3.13.3 y age v1.3.2 se instalaron en el servidor **sin sudo**, en
+  `~/.local/bin`, verificados contra el SHA-256 y el `digest` de GitHub (la contraseña de sudo no se recuerda). Una
+  orden por ssh sin terminal no carga ese PATH: ver [`despliegue.md`](../despliegue.md).

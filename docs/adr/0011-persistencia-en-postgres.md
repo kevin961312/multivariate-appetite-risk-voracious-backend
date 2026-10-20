@@ -186,3 +186,15 @@ del servidor, y por `env_file` acababan en `docker inspect`. Sustituye a ese pun
   ser la contraseña actual.
 - Siguen sin cambio: la base no publica puertos y la API solo está en `127.0.0.1`. Los volcados siguen en el mismo
   servidor (deuda M8).
+
+## Enmienda 2026-10-20 (paso E): Postgres en una red interna
+
+Por qué: con la API en internet ([ADR 0013](0013-exposicion-publica-https.md)), la base no debe estar en la misma red
+que el proxy ni poder salir a internet.
+
+- `postgres`, `migrate`, `backup` y `api` van en la red `backend`, **`internal: true`** (sin salida a internet).
+  `postgres` no está en `edge`, donde solo están `api` y `proxy`: el proxy no puede alcanzar la base. `deploy.sh`
+  lo comprueba (proxy fuera de `backend`, postgres fuera de `edge`) y CI lo valida sobre el modelo de Compose.
+- Sigue valiendo lo anterior: la base no publica ningún puerto. Los volcados siguen en el mismo servidor (deuda M8).
+- El cupo de trabajos por tenant (M1) cuenta sobre los índices parciales `*_unfinished` ya existentes: **no hay
+  migración nueva**.

@@ -22,9 +22,9 @@ Ver [ADR 0001](adr/0001-hexagonal.md).
                      Kubernetes con autoescalado
 ```
 
-## Arquitectura de hoy (Pasos 1 a 4.2)
+## Arquitectura de hoy (Pasos 1 a 4.2 y paso E)
 
-Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, autenticación JWT y matriz de roles, registro de acceso), `workers`
+Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, autenticación JWT y matriz de roles, registro de acceso, límite de peticiones por IP y CORS), `workers`
 (punto de entrada sin lógica), `cli` (`migrate`, `issue-token` y `jwt-keygen`, sin lógica), `infrastructure` (cola en hilos
 por carriles, repositorios en memoria **o en Postgres**, almacenamiento, `ProcessPoolTaskMapper`, reloj, ids, logging),
 `application` (casos de uso, puertos, registros, recuperación al arrancar) y el dominio. Siguen siendo **objetivo**:
@@ -32,7 +32,7 @@ Celery, TimescaleDB, S3, el login OIDC del banco y Row-Level Security (el JWT pr
 desde el 4.2, [ADR 0011](adr/0011-persistencia-en-postgres.md)).
 
 ```
- HTTP ─▶ api/ (routers por paso y por carta, schemas, errores; middleware JWT y registro de acceso; tenant y rol del token)
+ HTTP ─▶ api/ (routers por paso y por carta, schemas, errores; pila de middlewares: proxy, acceso, CORS, barrera de errores, límite, JWT; tenant y rol del token)
  workers/ (run.handle; Celery después) · cli.py (migrate)│
             └────────┬────────────────┘
                      ▼ ambos usan
@@ -43,7 +43,7 @@ desde el 4.2, [ADR 0011](adr/0011-persistencia-en-postgres.md)).
                      │ implementa los puertos de
                      ▼
           application/ (casos de uso por paso: ajuste, límites, exclusión, modelo, tubería, puntuación,
-          recalibración, comparación, versión; puertos Protocol)
+          recalibración, versión; admisión de trabajos por tenant; puertos Protocol)
                      │ usa
                      ▼
           domain/
@@ -54,12 +54,14 @@ desde el 4.2, [ADR 0011](adr/0011-persistencia-en-postgres.md)).
 
 Flujo de dependencias: `api | workers | cli` → `container` → `infrastructure` → `application` → `domain`.
 
-## Despliegue (Pasos 4.1 y 4.2)
+## Despliegue (Pasos 4.1, 4.2 y paso E)
 
-Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (imagen, CI) y el
-[ADR 0011](adr/0011-persistencia-en-postgres.md) (Postgres, migraciones, backup, recuperación).
+Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (imagen, CI), el
+[ADR 0011](adr/0011-persistencia-en-postgres.md) (Postgres, migraciones, backup, recuperación) y el
+[ADR 0013](adr/0013-exposicion-publica-https.md) (exposición pública por HTTPS). **El paso E está implementado pero
+sin desplegar**: hasta entonces la API solo escucha en `127.0.0.1:8000`.
 
-- **Compose** (`docker-compose.yml`): cuatro servicios. `postgres` (17, por digest, **sin `ports`**, volumen
+- **Compose** (`docker-compose.yml`): cinco servicios, el quinto (`proxy`) solo con el perfil `public` (abajo). `postgres` (17, por digest, **sin `ports`**, volumen
   `pgdata`, healthcheck `pg_isready`); `migrate` (ejecuta `python -m voracious.cli migrate` y termina); `api` (un
   solo worker de uvicorn: la cola vive en el proceso y el arranque cierra como interrumpidos los trabajos en curso);
   `backup` (`pg_dump` diario, 7 días, volumen `pgbackups`). La API espera a `postgres` sano y a `migrate` terminado
@@ -69,8 +71,19 @@ Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (im
 - **Límites (M7):** `api` 2g / 1.5 CPU / 512 pids; `postgres` 768m / 0.75 CPU / 256 pids; `migrate` 256m / 0.5 CPU;
   `backup` 256m / 0.25 CPU. Pensados para 2 vCPU y 3.7 GiB: con la cola en el proceso la memoria de `api` crece con
   los trabajos en curso y los datasets cargados.
-- **Puerto:** `127.0.0.1:8000`, sin exponer a la red; acceso remoto por túnel SSH. La base de datos **nunca** se
-  expone.
+- **Borde público (paso E, perfil `public`):** `proxy` = Caddy 2 oficial sin plugins (`deploy/proxy/`), imagen con
+  uid 10002, raíz de solo lectura, `cap_drop: ALL`, 192m / 0.5 CPU / 128 pids. Termina TLS (Let's Encrypt por
+  TLS-ALPN-01 en el 443; el 80 está cerrado), pone el tope de cuerpo (51 MiB), las cabeceras de seguridad y solo pasa
+  `/health` y `/v1/*` a `api:8000`; lo demás da `404 ROUTE_NOT_FOUND`. Sin registro de acceso. Volúmenes `caddy_data`
+  (certificados; `down -v` los borra) y `caddy_config`. Lo arranca `scripts/deploy.sh` y solo tras su puerta (ninguna
+  ruta de negocio responde sin token).
+- **Redes y puertos.** `backend` (`internal: true`, sin salida a internet): `postgres`, `migrate`, `backup` y `api`.
+  `edge` (subred `DEPLOY_EDGE_SUBNET`, 172.29.80.0/24): `api` y `proxy`, que tiene la IP fija `DEPLOY_PROXY_IP`
+  (172.29.80.10), la única en la que la API cree `X-Forwarded-For`. El proxy publica **solo `443/tcp`**; la API sigue
+  en `127.0.0.1:8000` para el operador (túnel SSH: `/ready` y la documentación); Postgres no publica nada y el proxy
+  no lo ve. `api` sí tiene salida por `edge`; hoy no la usa.
+- **Ficheros públicos de `deploy/demo/`:** `api.env` (CORS, `env_file` obligatorio de `api`) y `proxy.env` (host y modo
+  de TLS; su existencia activa el modo público).
 - **Secretos:** Compose secrets, no variables de entorno (se verían en `docker inspect`). `postgres_password` y
   `database_url` viven cifrados con SOPS + age en `deploy/demo/secrets.enc.yaml`; `scripts/deploy.sh` los descifra en
   `DEPLOY_SECRETS_DIR` (fuera del repo, 0700/0444) y Compose los monta en `/run/secrets/…`, donde `POSTGRES_PASSWORD_FILE`
@@ -178,6 +191,7 @@ los de la columna «después» son objetivo.
 | Datasets (linaje, huella) | `DatasetStorage` | `memory` o `LocalDatasetStorage` (`.npy` con hash, M6; con Postgres, metadatos y fechas en la base) | `S3DatasetStorage` | `VORACIOUS_STORAGE`, `VORACIOUS_STORAGE_DIR` |
 | Ajustes, límites, exclusiones, tuberías | `FitRepository`, `LimitsRepository`, `ExclusionRepository`, `PipelineRepository` | `memory` (seguros entre hilos) o **Postgres** (`infrastructure/postgres/`, [ADR 0011](adr/0011-persistencia-en-postgres.md)); ambos con `claim` (CAS `queued → running`) | Postgres con TimescaleDB (sin fecha) | `VORACIOUS_REPOSITORY=memory\|postgres`, `VORACIOUS_DATABASE_URL` |
 | Modelos y puntuaciones | `ModelRepository`, `MonitoringRepository` | `memory` o Postgres, con `claim` | ídem | ídem |
+| Cupo de trabajos por tenant (M1, paso E) | `JobAdmission` (caso de uso) sobre `FitRepository.count_unfinished_standalone`, `LimitsRepository.count_unfinished_standalone` y `PipelineRepository.count_unfinished` | `memory` (bajo el candado) y Postgres (`SELECT count(*)` sobre los índices parciales `*_unfinished`; sin migración) | ídem | `VORACIOUS_MAX_ACTIVE_JOBS_PER_TENANT` |
 | Ciclo de vida | `ModelVersionRepository` (append-only, CAS de estado, `add_proposal_if_none`), `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` (`add_if_none_in_progress`) | `memory` o Postgres; altas atómicas (D6) con índices únicos parciales | ídem | ídem |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta nueva | — |
 | Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio) o `ProcessPoolTaskMapper` | Celery/Dask | `VORACIOUS_REPLICATE_PROCESSES` |
@@ -310,16 +324,22 @@ producción se configuren igual (plantilla en `.env.example`).
 | `VORACIOUS_JWT_ISSUER` / `VORACIOUS_JWT_AUDIENCE` | texto | vacío | `iss` y `aud` exigidos, comparados enteros. Obligatorios con el JWKS. |
 | `VORACIOUS_JWT_ALGORITHMS` | `EdDSA`, `ES256`, `RS256`, `PS256` (separados por comas) | `EdDSA` | Algoritmos admitidos; nunca `none` ni `HS*`. |
 | `VORACIOUS_JWT_LEEWAY_SECONDS` | entero de 0 a 300 | 30 | Margen de reloj para `exp`, `nbf` e `iat`. |
+| `VORACIOUS_TRUSTED_PROXIES` | IP o CIDR separados por comas | vacío (no se cree a nadie) | Proxies cuyo `X-Forwarded-For` y `X-Forwarded-Proto` se creen (`ProxyHeadersMiddleware`, la capa más exterior). Se rechazan `*`, nombres de host y `/0` al arrancar. En Compose: `DEPLOY_PROXY_IP`. ADR 0013. |
+| `VORACIOUS_RATE_LIMIT_PER_MINUTE` / `VORACIOUS_RATE_LIMIT_BURST` | enteros ≥ 1 | 600 / 120 | Cubo de fichas por IP de cliente; por encima, `429 RATE_LIMITED` con `Retry-After`. Exentos 127.0.0.0/8 y `::1`. En memoria (exacto con 1 worker). Operativos, no estadísticos. |
+| `VORACIOUS_CORS_ALLOWED_ORIGINS` | `*` solo, o lista `esquema://host[:puerto]` separada por comas | vacío (CORS cerrado) | Orígenes de navegador. `*` (la demo, `deploy/demo/api.env`) es seguro porque el token va en `Authorization` y no hay cookies; sin credenciales. En la lista: sin comodines parciales, `null`, ruta, query, credenciales ni puertos por defecto, y `http` solo en localhost. Inválido = no arranca. |
+| `VORACIOUS_API_DOCS` | `true` \| `false` | `true` | Con `false` no existen `/docs`, `/redoc` ni `/openapi.json` y solo `/health` y `/ready` son públicas (`app.openapi()` sigue disponible). |
+| `VORACIOUS_MAX_ACTIVE_JOBS_PER_TENANT` | entero ≥ 1 | 4 | Trabajos en cola o en curso por tenant (ajustes y límites sueltos, más tuberías); por encima, `429 TOO_MANY_JOBS`. Cupo **blando**. Operativo, no estadístico. |
 | `VORACIOUS_DATABASE_POOL_SIZE` | entero ≥ 1 | 10 | Conexiones máximas del pool. Solo rendimiento. |
 | `POSTGRES_USER` / `POSTGRES_DB` | texto | `voracious` / `voracious` | No son de la aplicación: los lee Compose para los servicios `postgres` y `backup`. La contraseña ya no es una variable: es el secreto `postgres_password`. |
-| `DEPLOY_SECRETS_DIR` / `DEPLOY_DIR` / `DEPLOY_TIMEOUT` / `DEPLOY_API_URL` / `DEPLOY_ENV_FILE` / `SOPS_AGE_KEY_FILE` / `SOPS_CONFIG` / `VORACIOUS_IMAGE` | rutas, segundos o URL | ver [`despliegue.md`](despliegue.md) | **No son de la aplicación**: las leen `docker-compose.yml` y `scripts/{deploy,issue_token,jwt_keygen}.sh`. `DEPLOY_SECRETS_DIR` es obligatoria para Compose. |
+| `DEPLOY_SECRETS_DIR` / `DEPLOY_DIR` / `DEPLOY_TIMEOUT` / `DEPLOY_API_URL` / `DEPLOY_ENV_FILE` / `DEPLOY_EDGE_SUBNET` / `DEPLOY_PROXY_IP` / `SOPS_AGE_KEY_FILE` / `SOPS_CONFIG` / `VORACIOUS_IMAGE` | rutas, segundos, URL o red | ver [`despliegue.md`](despliegue.md) | **No son de la aplicación**: las leen `docker-compose.yml` y `scripts/{deploy,issue_token,jwt_keygen}.sh`. `DEPLOY_SECRETS_DIR` es obligatoria para Compose. |
+| `PROXY_PUBLIC_HOST` / `PROXY_TLS_MODE` | nombre DNS / `acme` \| `internal` | `api.voracious.cloud` / `acme` (en `deploy/demo/proxy.env`) | **No son de la aplicación**: las lee el Caddyfile del proxy. Faltando una, el proxy no arranca. |
 | `VORACIOUS_API_TOKEN` | JWT | vacío | Solo `scripts/demo_seed.py` (alternativa a `--token-file`); nunca como argumento. |
 | `VORACIOUS_TEST_DATABASE_URL` | URL de un Postgres de prueba | vacío | Solo pruebas y compuerta; sin ella la compuerta levanta uno con Docker (`compose.test.yaml`). |
 | `VORACIOUS_STORAGE` | `memory` \| `local` | `memory` | Almacenamiento de datasets. |
 | `VORACIOUS_STORAGE_DIR` | ruta | vacío | Directorio base; obligatorio con `local`. |
 | `VORACIOUS_REPLICATE_PROCESSES` | entero ≥ 1, o vacío | vacío (serie) | Procesos para repartir réplicas bootstrap. Solo rendimiento. |
 | `VORACIOUS_QUEUE_WORKERS_ESTIMATION` / `_CALIBRATION` / `_LIGHT` / `_ORCHESTRATION` | entero ≥ 1 | 1 / 1 / 4 / 2 | Hilos de cada carril. |
-| `VORACIOUS_MAX_UPLOAD_MB` | entero ≥ 1 | 50 | Tamaño máximo del cuerpo de `POST /v1/datasets`; por encima, `413`. |
+| `VORACIOUS_MAX_UPLOAD_MB` | entero ≥ 1 | 50 | Tamaño máximo del cuerpo de `POST /v1/datasets`; por encima, `413`. Si se sube, hay que subir también el `max_size` del Caddyfile (valor + 1 MiB). |
 
 **Sobresuscripción.** Cada ajuste MRCD usa hilos y el bootstrap puede repartir réplicas en procesos
 (`TaskMapper`): procesos × hilos no debe superar los núcleos (se avisa al arrancar). Con réplicas en procesos conviene fijar
@@ -342,7 +362,12 @@ del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
 - Estados `queued | running | succeeded | failed`. Un fallo de dominio **de un trabajo** queda en el registro y el
   `GET` responde `200`; los errores **síncronos** usan el formato `{code, message, details}` y los estados de
   `CODE_TO_STATUS` (`api/errors.py`).
-- Toda ruta de negocio exige `Authorization: Bearer <JWT>` (`401 UNAUTHENTICATED` con `details.reason`; solo `/health`, `/ready` y la documentación son públicas) y un rol de la matriz (`403 FORBIDDEN` con `details.required_roles`): lectura = analyst, approver, admin; operación = analyst, admin; decisión (`approve`, `reject`) = approver, admin. El tenant sale del token y un tenant nunca ve recursos de otro; la cabecera de tenant anterior se ignora y `actor` ya no va en los cuerpos (es el `sub`). Ver la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
+- Toda ruta de negocio exige `Authorization: Bearer <JWT>` (`401 UNAUTHENTICATED` con `details.reason`; solo `/health`, `/ready` y la documentación son públicas en la app; **en el borde público solo `/health`**) y un rol de la matriz (`403 FORBIDDEN` con `details.required_roles`): lectura = analyst, approver, admin; operación = analyst, admin; decisión (`approve`, `reject`) = approver, admin. El tenant sale del token y un tenant nunca ve recursos de otro; la cabecera de tenant anterior se ignora y `actor` ya no va en los cuerpos (es el `sub`). Ver la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
+- **URL pública (objetivo, paso E sin desplegar):** `https://api.voracious.cloud`, solo HTTPS, solo datos de prueba.
+  Códigos de la app nuevos: `429 RATE_LIMITED` (por IP, con `Retry-After`) y `429 TOO_MANY_JOBS` (cupo por tenant, sin
+  `Retry-After`). Códigos del borde, generados por Caddy y sin CORS: `ROUTE_NOT_FOUND` 404, `PAYLOAD_TOO_LARGE` 413,
+  `UPSTREAM_UNAVAILABLE` 502/503, `UPSTREAM_TIMEOUT` 504 y `EDGE_ERROR` (otros). Enmienda 2026-10-20 del
+  [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
 - `?include=` (M3) pide las matrices grandes de modelos, versiones y recalibraciones; por defecto no se envían.
 - Con los defaults de T²MRCD la Fase I se ejecuta completa; si un campo decisivo se pasa como `None`, el rechazo es
   síncrono (`T2MRCD_DECISION_PENDING` con `details.pending`). Fase I y Fase II tienen límites distintos que
@@ -382,10 +407,16 @@ la base) y su `justification` (`initial_fit`, `structural_event`, `forced_replac
 
 ### Autenticación y registro de acceso (seguridad mínima, [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md))
 
-Orden de middlewares: **acceso → autenticación → aplicación**. El de autenticación (ASGI puro) verifica antes de leer
+Orden de middlewares (paso E, [ADR 0013](adr/0013-exposicion-publica-https.md)), de fuera adentro: **proxy headers**
+(solo con `VORACIOUS_TRUSTED_PROXIES`) → **acceso** → **CORS** (solo con orígenes) → **barrera de errores** → **límite de
+peticiones** → **autenticación** → aplicación. Por qué así: el *preflight* de CORS no puede llevar `Authorization`, así
+que se resuelve antes del límite y de la autenticación; el acceso queda fuera para registrar también los 401 y los 429;
+y la barrera (`ErrorBoundaryMiddleware`) va dentro de CORS porque Starlette instala el manejador de `Exception` fuera de
+los middlewares de usuario y un `500` saldría sin cabeceras CORS (se quitó ese manejador). El límite por IP va antes de
+autenticar para acotar también las ráfagas de 401. El de autenticación (ASGI puro) verifica antes de leer
 el cuerpo, de modo que una subida de 50 MB o un JSON mal formado sin token responden `401` sin consumir nada. El
 registro de acceso (`http_request`) escribe método, **plantilla** de la ruta, estado, duración y `sub`/`tenant`/`jti`
-(o el motivo del 401); nunca el token ni la query. Por eso el `CMD` de la imagen lleva `uvicorn --no-access-log`.
+(o el motivo del 401) y, desde el paso E, la IP del cliente (`client`; dato personal, ADR 0013); nunca el token ni la query. Por eso el `CMD` de la imagen lleva `uvicorn --no-access-log`.
 
 ### Salud (Paso 1; checks reales desde el 4.2)
 

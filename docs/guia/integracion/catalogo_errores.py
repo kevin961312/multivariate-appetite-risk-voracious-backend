@@ -96,6 +96,12 @@ CUANDO: Final[Mapping[str, str]] = {
     "construyó) o los de las filas nuevas en REPLACE; `details.reason`.",
     "VARIABLES_MISMATCH": "Las variables de una puntuación o recalibración no son las del dataset "
     "raíz del modelo (en número, nombres u orden).",
+    "RATE_LIMITED": "Demasiadas peticiones desde la misma IP de cliente (por defecto 600 por "
+    "minuto con ráfaga de 120, también las que no llevan token). La respuesta lleva `Retry-After` "
+    "y `details.retry_after_seconds`: hay que esperar al menos ese tiempo antes de reintentar.",
+    "TOO_MANY_JOBS": "El tenant ya tiene el máximo de trabajos de cómputo en cola o en curso "
+    "(`details.max_active_jobs` frente a `details.active_jobs`); se vuelve a pedir cuando "
+    "termine alguno.",
     "INTERNAL_ERROR": "Fallo inesperado del servidor; el detalle queda en el registro del "
     "servidor, nunca en el cuerpo. También puede aparecer en el `error` de un trabajo `failed`.",
     "JOB_INTERRUPTED": "Solo en el `error` de un trabajo `failed` (el `GET` responde `200`): el "

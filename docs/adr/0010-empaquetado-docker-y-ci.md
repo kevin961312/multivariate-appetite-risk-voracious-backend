@@ -145,3 +145,32 @@ trabajo `image` ya no puede arrancar la imagen «sin configuración» ni validar
 - `gate.sh` termina con `[ "${failed}" -eq 0 ]` en lugar de `exit "${failed}"`: así la trampa `EXIT` sigue bajando
   Postgres sin cambiar el código y shellcheck ve que las funciones de arriba se usan (SC2329).
 - El `CMD` de la imagen lleva `--no-access-log` (ADR 0012).
+
+## Enmienda 2026-10-20 (paso E): proxy, redes, `CMD`, `deploy.sh` en CI y vigilancia
+
+Decisiones de fondo en el [ADR 0013](0013-exposicion-publica-https.md); aquí solo lo que cambia el empaquetado.
+
+- **Imagen del proxy** (`deploy/proxy/Dockerfile`): `caddy:2.11.7-alpine` fijada por versión y digest
+  (`sha256:d8542f48…`), uid 10002, `setcap -r` sobre el binario (con `cap_drop: ALL` el oficial no arranca), Caddyfile
+  y los dos modos de TLS dentro, y `caddy adapt` en la build para que falle si no se puede leer. Se construye donde se
+  usa (como la de la API), no se publica. Dependabot sigue su base (`/deploy/proxy`).
+- **Compose pasa de cuatro servicios a cinco**: `proxy` (perfil `public`, publica solo `443/tcp`, raíz de solo lectura,
+  192 MiB, 0.5 CPU). **Redes:** `backend` (`internal: true`: postgres, migrate, backup, api) y `edge` (subred fija;
+  api y proxy). Volúmenes nuevos `caddy_data` (certificados y llave ACME) y `caddy_config`: `down -v` los borra.
+- **`CMD` de la imagen:** a `--workers 1 --no-access-log` se suman `--no-proxy-headers` (de las cabeceras de proxy decide
+  solo la app, con su lista validada), `--no-server-header` y `--timeout-keep-alive 75` (por encima de los 60 s con que
+  Caddy reutiliza conexiones; si no, 502 por conexión ya cerrada).
+- **Ficheros públicos nuevos** en `deploy/demo/`: `api.env` (`VORACIOUS_CORS_ALLOWED_ORIGINS`, `env_file` obligatorio
+  de `api`) y `proxy.env` (`PROXY_PUBLIC_HOST`, `PROXY_TLS_MODE`; su existencia activa el modo público). `.gitignore`
+  los admite en la lista blanca, con `deploy/proxy/{Dockerfile,Caddyfile,*.caddy}`.
+- **CI, trabajo `image`:** ya no hace `docker compose up`: ejecuta el **`scripts/deploy.sh` real** en modo público con
+  `tls internal` y el host `api.voracious.test`, y cifra sus secretos de prueba con una configuración de sops aislada
+  en `RUNNER_TEMP` (nunca el `.sops.yaml` del repo; el último paso comprueba con `git diff --exit-code` que no se
+  tocó). Siguen las comprobaciones de la enmienda anterior y se añaden las del borde (TLS, h2, puertos, cabeceras,
+  rutas, topes de cuerpo, IP del cliente, CORS, límite de peticiones, 502, query fuera de los registros,
+  `check_public.sh`) y un despliegue fallido a propósito que debe dejar el 443 cerrado. Timeout 40 min. **Aún no se ha
+  ejecutado en GitHub.**
+- **`tests/integration/test_deploy_sops.py`** cifra con `sops --config <tmp>`: corregido el rojo que dejó `a34bb70`
+  (el `.sops.yaml` de la raíz no tenía regla para `/dev/stdin`).
+- **Nuevo `.github/workflows/vigilancia.yml`** (M4): `schedule` cada 3 horas y `workflow_dispatch`, permisos de solo
+  lectura, 5 minutos de tope y `scripts/check_public.sh --cors-origin http://localhost:5173 https://api.voracious.cloud`.
