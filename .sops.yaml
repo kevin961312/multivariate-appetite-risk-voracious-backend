@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: ^deploy/demo/.*\.enc\.yaml$
+    age: age12jnppf43utflsyacjf0sc3eht3gp6lpkan6yht3fks67fpx0agvqru67fw
