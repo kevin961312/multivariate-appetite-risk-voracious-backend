@@ -1,0 +1,173 @@
+/*
+ * Hoja de estilos de marca de Voracious (tema claro) para documentos PDF generados con WeasyPrint.
+ * Fuente de los valores: tokens.json (misma carpeta). Si cambias un color aquí, cámbialo también allí.
+ * Uso: <link rel="stylesheet" href="../marca/voracious.css"> y docs/guia/build.py.
+ */
+
+/* ---------- Tipografías (OFL-1.1, en ./fuentes) ---------- */
+@font-face { font-family: "Poppins"; font-weight: 400; src: url("fuentes/Poppins-Regular.ttf"); }
+@font-face { font-family: "Poppins"; font-weight: 500; src: url("fuentes/Poppins-Medium.ttf"); }
+@font-face { font-family: "Poppins"; font-weight: 600; src: url("fuentes/Poppins-SemiBold.ttf"); }
+@font-face { font-family: "Poppins"; font-weight: 700; src: url("fuentes/Poppins-Bold.ttf"); }
+@font-face { font-family: "Lato"; font-weight: 400; src: url("fuentes/Lato-Regular.ttf"); }
+@font-face { font-family: "Lato"; font-weight: 400; font-style: italic; src: url("fuentes/Lato-Italic.ttf"); }
+@font-face { font-family: "Lato"; font-weight: 700; src: url("fuentes/Lato-Bold.ttf"); }
+@font-face { font-family: "Lato"; font-weight: 700; font-style: italic; src: url("fuentes/Lato-BoldItalic.ttf"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url("fuentes/IBMPlexMono-Regular.ttf"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url("fuentes/IBMPlexMono-Medium.ttf"); }
+
+/* ---------- Tokens ---------- */
+:root {
+  --indigo-300: #645EB5; --indigo-400: #463EA1; --indigo-500: #2C2492; --indigo-600: #1D1676; --indigo-700: #100A5B;
+  --indigo-50: #F7F6FB; --indigo-100: #EEEDF6; --indigo-150: #DFDEEF; --indigo-200: #C0BDDE; --indigo-250: #9692C8;
+  --morado-300: #9450AD; --morado-400: #7E319A; --morado-500: #6D168B; --morado-600: #560B71; --morado-700: #400356;
+  --morado-50: #F9F6FA; --morado-100: #F3ECF6; --morado-150: #E9DCEE; --morado-200: #D3B9DC; --morado-250: #B68AC5;
+  --turquesa-300: #4895A0; --turquesa-400: #2B828E; --turquesa-500: #127381; --turquesa-600: #085C68; --turquesa-700: #014650;
+  --turquesa-50: #F6F9FA; --turquesa-100: #ECF4F5; --turquesa-150: #DBEAEC; --turquesa-200: #B8D5D9; --turquesa-250: #88B9C0;
+  --fondo: #FFFFFF; --superficie: #F7F6FB; --borde: #DFDEEF;
+  --texto: #1E2035; --texto-2: #4A4D66; --texto-tenue: #6B6E86;
+  --exito: #1B6E46; --exito-fondo: #E8F5EE; --exito-borde: #7CC3A0;
+  --aviso: #8A5300; --aviso-fondo: #FFF4E0; --aviso-borde: #F0B952;
+  --error: #B42318; --error-fondo: #FDECEA; --error-borde: #F2A39B;
+  --info: #2C2492; --info-fondo: #EEEDF6; --info-borde: #9692C8;
+}
+
+/* ---------- Página ---------- */
+@page {
+  size: A4;
+  margin: 24mm 20mm 22mm 22mm;
+  @top-left { content: "Voracious"; font: 500 7.5pt "Poppins"; color: var(--texto-tenue); }
+  @top-right { content: "Documentación de producto"; font: 400 7.5pt "Poppins"; color: var(--texto-tenue); }
+  @bottom-left { content: "© 2026 Voracious · Documentación de producto"; font: 400 7.5pt "Lato"; color: var(--texto-tenue); }
+  @bottom-right { content: string(seccion) "  —  " counter(page); font: 500 7.5pt "Poppins"; color: var(--indigo-500); }
+}
+@page portada { margin: 0; @top-left { content: none; } @top-right { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+
+html { font-family: "Lato", sans-serif; font-size: 10.5pt; line-height: 1.5; color: var(--texto); background: var(--fondo); }
+body { margin: 0; }
+/* Para cambiar el encabezado de un documento: <style>@page { @top-left { content: "…"; } }</style> en su <head>. */
+
+/* ---------- Portada (clara) ---------- */
+.portada { page: portada; height: 297mm; position: relative; overflow: hidden; page-break-after: always; background: var(--fondo); }
+.portada .franja { position: absolute; left: 0; right: 0; top: 0; height: 9mm; display: flex; }
+.portada .franja span { flex: 1; }
+.portada .franja .f1 { background: var(--indigo-500); flex: 3; }
+.portada .franja .f2 { background: var(--morado-500); }
+.portada .franja .f3 { background: var(--turquesa-500); }
+.portada .forma { position: absolute; right: -40mm; top: 40mm; width: 150mm; height: 150mm; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--indigo-100), var(--morado-50) 55%, var(--fondo) 72%); }
+.portada .forma2 { position: absolute; right: 30mm; top: 150mm; width: 70mm; height: 70mm; border-radius: 50%;
+  background: radial-gradient(circle, var(--turquesa-100), var(--fondo) 70%); }
+.portada .contenido { position: absolute; left: 24mm; right: 24mm; top: 34mm; }
+.portada .titulo { font: 600 30pt/1.15 "Poppins"; color: var(--indigo-500); margin: 70mm 0 4mm; }
+.portada .subtitulo { font: 500 15pt "Poppins"; color: var(--morado-500); margin: 0 0 14mm; }
+.portada .meta { font: 400 9.5pt/1.7 "Lato"; color: var(--texto-2); border-left: 3pt solid var(--turquesa-500); padding-left: 4mm; }
+.portada .pie { position: absolute; left: 24mm; right: 24mm; bottom: 18mm; font: 400 8pt "Lato"; color: var(--texto-tenue);
+  border-top: 0.6pt solid var(--borde); padding-top: 3mm; }
+
+/* ---------- Logotipo provisional (texto + icono) ---------- */
+.logo { display: inline-flex; align-items: center; gap: 2.5mm; }
+.logo .icono { width: 9mm; height: 9mm; }
+.logo .nombre { font: 600 19pt "Poppins"; color: var(--indigo-500); letter-spacing: -0.2pt; }
+.logo .nombre b { color: var(--turquesa-500); font-weight: 600; }
+.logo.pequeno .icono { width: 6mm; height: 6mm; }
+.logo.pequeno .nombre { font-size: 12pt; }
+
+/* ---------- Índice ---------- */
+.indice { page-break-after: always; }
+.indice h2 { margin-top: 0; }
+.indice ol { list-style: none; padding: 0; margin: 0; }
+.indice li { margin: 0; }
+.indice li a { display: block; color: var(--texto); text-decoration: none; padding: 1.2mm 0; }
+.indice li.n1 a { font: 600 10.5pt "Poppins"; color: var(--indigo-500); margin-top: 2mm; }
+.indice li.n2 a { padding-left: 8mm; font-size: 9.5pt; }
+.indice li.n3 a { padding-left: 16mm; font-size: 9pt; color: var(--texto-2); }
+.indice li a::after { content: leader(".") target-counter(attr(href), page); color: var(--texto-tenue); font-weight: 400; }
+
+/* ---------- Títulos numerados ---------- */
+body { counter-reset: h1; }
+h1 { counter-increment: h1; counter-reset: h2; font: 600 22pt/1.2 "Poppins"; color: var(--indigo-500); margin: 0 0 6mm;
+  page-break-before: always; string-set: seccion content(); bookmark-level: 1; }
+h1::before { content: counter(h1) "  "; color: var(--turquesa-500); }
+h2 { counter-increment: h2; counter-reset: h3; font: 600 15pt/1.3 "Poppins"; color: var(--indigo-500); margin: 8mm 0 3mm; bookmark-level: 2; page-break-after: avoid; }
+h2::before { content: counter(h1) "." counter(h2) "  "; color: var(--indigo-300); }
+h3 { counter-increment: h3; font: 600 12pt/1.3 "Poppins"; color: var(--morado-500); margin: 6mm 0 2mm; bookmark-level: 3; page-break-after: avoid; }
+h3::before { content: counter(h1) "." counter(h2) "." counter(h3) "  "; color: var(--morado-300); }
+h4 { font: 600 10.5pt "Poppins"; color: var(--indigo-600); margin: 5mm 0 2mm; page-break-after: avoid; }
+p { margin: 0 0 3mm; }
+ul, ol { margin: 0 0 3mm; padding-left: 6mm; }
+li { margin-bottom: 1mm; }
+li::marker { color: var(--turquesa-500); }
+a { color: var(--indigo-500); }
+strong { color: var(--texto); }
+.tenue { color: var(--texto-tenue); }
+.pequeno { font-size: 8.5pt; }
+
+/* ---------- Código ---------- */
+code { font: 400 8.8pt "IBM Plex Mono"; background: var(--indigo-100); color: var(--indigo-600); padding: 0.3mm 1.2mm; border-radius: 1mm; }
+pre { font: 400 8.6pt/1.45 "IBM Plex Mono"; background: var(--superficie); color: var(--texto); border: 0.6pt solid var(--borde);
+  border-left: 2.5pt solid var(--indigo-300); border-radius: 1.5mm; padding: 3mm 4mm; margin: 0 0 4mm; white-space: pre-wrap; page-break-inside: avoid; }
+pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+pre .k { color: var(--indigo-500); }   /* clave JSON */
+pre .s { color: var(--turquesa-600); } /* cadena */
+pre .n { color: var(--morado-500); }   /* número, true/false/null */
+pre .c { color: var(--texto-tenue); font-style: italic; } /* comentario */
+
+/* ---------- Tablas (formato de referencia de API) ---------- */
+table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9.3pt; page-break-inside: auto; }
+caption { caption-side: top; text-align: left; font: 600 9.5pt "Poppins"; color: var(--indigo-600); padding: 0 0 1.5mm; }
+th { background: var(--indigo-100); color: var(--indigo-600); font: 600 8.8pt "Poppins"; text-align: left; padding: 2mm 2.5mm;
+  border-bottom: 1pt solid var(--indigo-200); }
+td { padding: 2mm 2.5mm; border-bottom: 0.5pt solid var(--borde); vertical-align: top; }
+tr:nth-child(even) td { background: var(--indigo-50); }
+td code { white-space: nowrap; }
+tr { page-break-inside: avoid; }
+
+/* ---------- Cajas de aviso ---------- */
+.caja { border: 0.6pt solid var(--info-borde); border-left: 3pt solid var(--info); background: var(--info-fondo); color: var(--texto);
+  border-radius: 1.5mm; padding: 2.5mm 4mm; margin: 0 0 4mm; page-break-inside: avoid; }
+.caja .etiqueta { font: 600 8.5pt "Poppins"; color: var(--info); text-transform: uppercase; letter-spacing: 0.4pt; display: block; margin-bottom: 0.8mm; }
+.caja.aviso { border-color: var(--aviso-borde); border-left-color: var(--aviso); background: var(--aviso-fondo); }
+.caja.aviso .etiqueta { color: var(--aviso); }
+.caja.error { border-color: var(--error-borde); border-left-color: var(--error); background: var(--error-fondo); }
+.caja.error .etiqueta { color: var(--error); }
+.caja.exito { border-color: var(--exito-borde); border-left-color: var(--exito); background: var(--exito-fondo); }
+.caja.exito .etiqueta { color: var(--exito); }
+.caja p:last-child { margin-bottom: 0; }
+
+/* ---------- Endpoint (método + ruta) ---------- */
+.endpoint { display: flex; align-items: center; gap: 2.5mm; background: var(--superficie); border: 0.6pt solid var(--borde);
+  border-radius: 1.5mm; padding: 2mm 3mm; margin: 0 0 4mm; font: 500 9.5pt "IBM Plex Mono"; color: var(--indigo-700); }
+.metodo { font: 600 8pt "Poppins"; border-radius: 1mm; padding: 0.6mm 2.2mm; letter-spacing: 0.3pt; }
+.metodo.get { color: #085C68; background: #DBEAEC; }
+.metodo.post { color: #FFFFFF; background: #2C2492; }
+.metodo.delete { color: #FFFFFF; background: #B42318; }
+.chip { display: inline-block; font: 600 7.8pt "Poppins"; border-radius: 4mm; padding: 0.4mm 2.4mm; background: var(--morado-100); color: var(--morado-600); }
+.chip.ok { background: var(--exito-fondo); color: var(--exito); }
+.chip.ko { background: var(--error-fondo); color: var(--error); }
+
+/* ---------- Muestras de color (plantilla de marca) ---------- */
+.muestras { display: flex; gap: 0; margin: 0 0 2mm; border-radius: 1.5mm; overflow: hidden; border: 0.6pt solid var(--borde); }
+.muestra { flex: 1; height: 17mm; position: relative; }
+.muestra.base { flex: 2; }
+.etiquetas { display: flex; margin: 0 0 5mm; }
+.etiquetas div { flex: 1; font: 400 7.2pt/1.35 "Lato"; color: var(--texto-2); padding-right: 1mm; }
+.etiquetas div.base { flex: 2; }
+.etiquetas b { font: 600 7.8pt "IBM Plex Mono"; color: var(--texto); display: block; }
+
+/* ---------- Diagrama / figuras ---------- */
+figure { margin: 0 0 5mm; page-break-inside: avoid; }
+figure img { width: 100%; border: 0.6pt solid var(--borde); border-radius: 1.5mm; }
+figcaption { font: 400 8.5pt "Lato"; color: var(--texto-tenue); margin-top: 1.5mm; }
+.capas { display: flex; gap: 3mm; margin: 0 0 4mm; }
+.capa { flex: 1; border-radius: 1.5mm; padding: 3mm; font: 600 9pt "Poppins"; text-align: center; }
+.capa.api { background: var(--indigo-100); color: var(--indigo-600); border: 1pt solid var(--indigo-500); }
+.capa.app { background: var(--morado-100); color: var(--morado-600); border: 1pt solid var(--morado-500); }
+.capa.dom { background: var(--turquesa-100); color: var(--turquesa-600); border: 1pt solid var(--turquesa-500); }
+.capa.inf { background: var(--superficie); color: var(--texto-2); border: 1pt solid var(--texto-tenue); }
+.capa span { display: block; font: 400 7.8pt "Lato"; color: var(--texto-2); margin-top: 1mm; }
+
+.salto { page-break-before: always; }
+.dos-columnas { display: flex; gap: 6mm; }
+.dos-columnas > div { flex: 1; }
+.indice h2::before { content: none; }

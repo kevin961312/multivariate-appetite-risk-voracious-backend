@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Voracious — Plantilla de marca y documentación</title>
+<link rel="stylesheet" href="../marca/voracious.css">
+<style>@page { @top-left { content: "Voracious · Plantilla de marca"; } @top-right { content: "Revisión 1"; } }</style>
+</head>
+<body>
+
+<!-- ============ PORTADA ============ -->
+<section class="portada">
+  <div class="franja"><span class="f1"></span><span class="f2"></span><span class="f3"></span></div>
+  <div class="forma"></div><div class="forma2"></div>
+  <div class="contenido">
+    <div class="logo"><img class="icono" src="../marca/logotipo-icono.svg" alt=""><span class="nombre">voracious</span></div>
+    <p class="titulo">Plantilla de marca<br>y documentación</p>
+    <p class="subtitulo">Colores, tipografía y componentes para las guías de producto</p>
+    <div class="meta">
+      Revisión: 1<br>
+      Fecha: {{FECHA}}<br>
+      Estado: logotipo provisional (de texto) hasta que exista el definitivo
+    </div>
+  </div>
+  <div class="pie">Voracious · Monitoreo robusto del apetito de riesgo multivariado con la carta T²MRCD</div>
+</section>
+
+<!-- ============ ÍNDICE ============ -->
+<section class="indice">
+  <h2 style="counter-increment:none">Contenido</h2>
+  <ol>
+    <li class="n1"><a href="#proposito">1  Propósito y principios</a></li>
+    <li class="n1"><a href="#logotipo">2  Logotipo provisional</a></li>
+    <li class="n1"><a href="#paleta">3  Paleta de colores</a></li>
+    <li class="n2"><a href="#primario">3.1  Color primario: índigo</a></li>
+    <li class="n2"><a href="#secundarios">3.2  Colores secundarios: morado y turquesa</a></li>
+    <li class="n2"><a href="#neutros">3.3  Neutros y estados</a></li>
+    <li class="n2"><a href="#contraste">3.4  Reglas de contraste</a></li>
+    <li class="n1"><a href="#tipografia">4  Tipografía</a></li>
+    <li class="n1"><a href="#componentes">5  Componentes de la guía</a></li>
+    <li class="n2"><a href="#endpoint">5.1  Encabezado de endpoint</a></li>
+    <li class="n2"><a href="#tablas">5.2  Tablas de parámetros</a></li>
+    <li class="n2"><a href="#codigo">5.3  Bloques de código y ejemplos OK / KO</a></li>
+    <li class="n2"><a href="#cajas">5.4  Cajas de aviso</a></li>
+    <li class="n1"><a href="#diagramas">6  Diagramas</a></li>
+    <li class="n1"><a href="#uso">7  Cómo usar la plantilla</a></li>
+  </ol>
+</section>
+
+<!-- ============ 1 ============ -->
+<h1 id="proposito">Propósito y principios</h1>
+<p>Esta plantilla define la identidad visual de la documentación de <strong>Voracious</strong>: guías de integración,
+manuales de operación, informes y diagramas. Toma como referencia la estructura de las guías de producto de la
+industria (portada, índice numerado, descripción, autenticación, un apartado por servicio con su petición, respuesta y
+ejemplos, health checks y notas de versión), con una identidad propia y un <strong>tema claro</strong>.</p>
+<ul>
+  <li><strong>Claro y sobrio.</strong> Fondo siempre blanco; el color se usa para orientar, no para decorar.</li>
+  <li><strong>Los datos primero.</strong> Tablas y ejemplos legibles; ningún color de texto por debajo de 4,5:1 de contraste.</li>
+  <li><strong>Una sola fuente de verdad.</strong> Los colores viven en <code>marca/tokens.json</code>; la hoja
+    <code>voracious.css</code> y los diagramas se derivan de ahí.</li>
+  <li><strong>Reproducible.</strong> Cada PDF se genera desde HTML con <code>docs/guia/build.py</code>; nada se maqueta a mano.</li>
+</ul>
+
+<!-- ============ 2 ============ -->
+<h1 id="logotipo">Logotipo provisional</h1>
+<p>Mientras no exista un logo definitivo se usa un <strong>logotipo de texto</strong>: la palabra
+<em>voracious</em> en Poppins SemiBold índigo, acompañada de un icono que dibuja una carta de control (una serie,
+su límite punteado y una señal en turquesa). Se reemplaza cambiando <code>marca/logotipo-icono.svg</code> y la clase
+<code>.logo</code>.</p>
+<div class="dos-columnas" style="margin:4mm 0 6mm">
+  <div style="border:0.6pt solid var(--borde);border-radius:1.5mm;padding:8mm;text-align:center">
+    <div class="logo"><img class="icono" src="../marca/logotipo-icono.svg" alt=""><span class="nombre">voracious</span></div>
+    <p class="pequeno tenue" style="margin-top:4mm">Sobre blanco (uso principal)</p>
+  </div>
+  <div style="background:var(--indigo-100);border-radius:1.5mm;padding:8mm;text-align:center">
+    <div class="logo"><img class="icono" src="../marca/logotipo-icono.svg" alt=""><span class="nombre">voracious</span></div>
+    <p class="pequeno tenue" style="margin-top:4mm">Sobre tinte índigo 100</p>
+  </div>
+</div>
+<ul>
+  <li><strong>Área de respeto:</strong> alrededor del logotipo, como mínimo la altura del icono.</li>
+  <li><strong>Tamaño mínimo:</strong> icono de 6 mm (versión <code>.logo.pequeno</code> para encabezados).</li>
+  <li><strong>No</strong> usarlo sobre fondos oscuros, no deformarlo ni cambiarle los colores.</li>
+</ul>
+
+<!-- ============ 3 ============ -->
+<h1 id="paleta">Paleta de colores</h1>
+<p>Tres familias de cinco tonos (la paleta original) más sus <strong>tintes mezclados con blanco</strong> (96 %, 92 %,
+85 %, 70 % y 50 % de blanco), que son los que dan el tono claro a fondos, tablas y cajas. El tono base de cada
+familia es el más ancho de la franja.</p>
+{{MUESTRAS}}
+
+<h2 id="contraste">Reglas de contraste</h2>
+<table>
+  <tr><th>Texto</th><th>Sobre</th><th>Contraste</th><th>Uso</th></tr>
+  <tr><td><code>#1E2035</code> texto</td><td>blanco · tinte índigo 50</td><td>16,0 · 14,9</td><td>Cuerpo de texto</td></tr>
+  <tr><td><code>#2C2492</code> índigo 500</td><td>blanco · tinte 100 · tinte 150</td><td>11,8 · 10,2 · 8,9</td><td>Títulos, cabeceras de tabla, enlaces</td></tr>
+  <tr><td><code>#6D168B</code> morado 500</td><td>blanco · tinte 100</td><td>9,8 · 8,5</td><td>Subtítulos (h3), acentos</td></tr>
+  <tr><td><code>#127381</code> turquesa 500</td><td>blanco · tinte 50</td><td>5,5 · 5,2</td><td>Numeración, detalles</td></tr>
+  <tr><td><code>#085C68</code> turquesa 600</td><td>tintes turquesa 100–150</td><td>≥ 8,5</td><td><strong>Obligatorio</strong> sobre fondos turquesa (el 500 baja a 4,5)</td></tr>
+  <tr><td><code>#6B6E86</code> tenue</td><td>blanco</td><td>5,0</td><td>Pies de figura, notas, encabezado y pie de página</td></tr>
+</table>
+<div class="caja aviso"><span class="etiqueta">Regla</span>
+<p>Los tintes 200 y 250 son para bordes, líneas y gráficos, <strong>nunca</strong> como fondo de texto pequeño.</p></div>
+
+<!-- ============ 4 ============ -->
+<h1 id="tipografia">Tipografía</h1>
+<p>Tres familias libres (licencia SIL Open Font License 1.1, incluidas en <code>marca/fuentes/</code>):</p>
+<table>
+  <tr><th>Rol</th><th>Familia</th><th>Muestra</th></tr>
+  <tr><td>Títulos y etiquetas</td><td>Poppins 500 / 600</td><td style="font:600 13pt Poppins;color:var(--indigo-500)">Carta de control T²MRCD</td></tr>
+  <tr><td>Texto</td><td>Lato 400 / 700</td><td>La Fase I estima el modelo con datos históricos; la Fase II vigila las observaciones nuevas.</td></tr>
+  <tr><td>Código y rutas</td><td>IBM Plex Mono 400 / 500</td><td><code>POST /v1/charts/t2mrcd/fits</code></td></tr>
+</table>
+<h2>Escala</h2>
+<table>
+  <tr><th>Elemento</th><th>Tamaño</th><th>Color</th></tr>
+  <tr><td>Título de portada</td><td>30 pt Poppins 600</td><td>índigo 500</td></tr>
+  <tr><td>H1 (capítulo, numerado, empieza página)</td><td>22 pt Poppins 600</td><td>índigo 500; número en turquesa 500</td></tr>
+  <tr><td>H2</td><td>15 pt Poppins 600</td><td>índigo 500</td></tr>
+  <tr><td>H3</td><td>12 pt Poppins 600</td><td>morado 500</td></tr>
+  <tr><td>Texto</td><td>10,5 pt Lato, interlineado 1,5</td><td>texto <code>#1E2035</code></td></tr>
+  <tr><td>Tablas</td><td>9,3 pt Lato; cabecera 8,8 pt Poppins</td><td>cabecera índigo 600 sobre tinte 100</td></tr>
+  <tr><td>Código</td><td>8,6 pt IBM Plex Mono</td><td>sobre superficie <code>#F7F6FB</code></td></tr>
+  <tr><td>Encabezado y pie</td><td>7,5 pt</td><td>tenue; número de página en índigo</td></tr>
+</table>
+
+<!-- ============ 5 ============ -->
+<h1 id="componentes">Componentes de la guía</h1>
+<p>Estos son los bloques con los que se arma la guía de integración. El contenido de este capítulo es un
+<strong>ejemplo de formato</strong>; la guía real toma los contratos del OpenAPI de la API.</p>
+
+<h2 id="endpoint">Encabezado de endpoint</h2>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/fits</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/fits/{fit_id}</div>
+<p>Cada servicio abre con su método y ruta. Debajo van, en este orden: descripción, cabeceras, cuerpo de la
+petición, ejemplo de petición, formato de la respuesta y ejemplos OK y KO.</p>
+
+<h2 id="tablas">Tablas de parámetros</h2>
+<table>
+  <caption>Cabeceras obligatorias</caption>
+  <tr><th style="width:28%">Nombre</th><th>Descripción</th><th style="width:12%">Tipo</th><th style="width:13%">Obligatorio</th></tr>
+  <tr><td><code>Authorization</code></td><td><code>Bearer &lt;token&gt;</code>: JWT firmado con el cliente (tenant) y los roles.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>Content-Type</code></td><td>Debe ser <code>application/json</code>.</td><td>String</td><td>Sí</td></tr>
+</table>
+<table>
+  <caption>Cuerpo de la petición</caption>
+  <tr><th style="width:28%">Campo</th><th>Descripción</th><th style="width:12%">Tipo</th><th style="width:13%">Obligatorio</th></tr>
+  <tr><td><code>dataset_id</code></td><td>Identificador del histórico subido con <code>POST /v1/datasets</code>.</td><td>String (UUID)</td><td>Sí</td></tr>
+  <tr><td><code>alpha</code></td><td>Proporción de observaciones del subconjunto MRCD. Por defecto 0,75.</td><td>Number</td><td>No</td></tr>
+</table>
+
+<h2 id="codigo">Bloques de código y ejemplos OK / KO</h2>
+<h4>Ejemplo de petición</h4>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"19641897-58bb-4eb5-915d-fa2cefee045b"</span>,
+  <span class="k">"alpha"</span>: <span class="n">0.75</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"7c1e…"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  Respuesta 401</h4>
+<pre><code>{
+  <span class="k">"error"</span>: {
+    <span class="k">"code"</span>: <span class="s">"UNAUTHENTICATED"</span>,
+    <span class="k">"message"</span>: <span class="s">"El token ha caducado"</span>,
+    <span class="k">"details"</span>: { <span class="k">"reason"</span>: <span class="s">"expired"</span> }
+  }
+}</code></pre>
+
+<h2 id="cajas">Cajas de aviso</h2>
+<div class="caja"><span class="etiqueta">Nota</span><p>Información complementaria o una referencia a otra sección.</p></div>
+<div class="caja exito"><span class="etiqueta">Correcto</span><p>Confirmación de un comportamiento esperado o una buena práctica.</p></div>
+<div class="caja aviso"><span class="etiqueta">Aviso</span><p>Algo que el integrador debe tener en cuenta (por ejemplo, un endpoint obsoleto o un límite).</p></div>
+<div class="caja error"><span class="etiqueta">Importante</span><p>Una acción irreversible o un error frecuente que hay que evitar.</p></div>
+
+<!-- ============ 6 ============ -->
+<h1 id="diagramas">Diagramas</h1>
+<p>Los diagramas de arquitectura (draw.io) usan un color por capa de la arquitectura hexagonal: relleno en el tinte 100
+de la familia y borde en el tono 500. Las piezas externas (Postgres, Docker, el servidor) van en neutro.</p>
+<div class="capas">
+  <div class="capa api">API<span>FastAPI · rutas por carta · JWT</span></div>
+  <div class="capa app">Aplicación<span>casos de uso · puertos</span></div>
+  <div class="capa dom">Dominio<span>T²MRCD · MRCD (pymrcd)</span></div>
+  <div class="capa inf">Infraestructura<span>Postgres · almacenamiento · cola</span></div>
+</div>
+<ul>
+  <li>Flechas en <code>#4A4D66</code> de 1 pt; las dependencias apuntan hacia el dominio.</li>
+  <li>Texto de las cajas en Poppins 500, en el tono 600 de su familia.</li>
+  <li>Iconos de tecnología en su color original, a 24–32 px, siempre dentro de su caja.</li>
+</ul>
+
+<!-- ============ 7 ============ -->
+<h1 id="uso">Cómo usar la plantilla</h1>
+<table>
+  <tr><th style="width:38%">Archivo</th><th>Para qué</th></tr>
+  <tr><td><code>docs/guia/marca/tokens.json</code></td><td>Colores, tipografía y página: la fuente única.</td></tr>
+  <tr><td><code>docs/guia/marca/voracious.css</code></td><td>Hoja de estilos de todos los PDF (WeasyPrint).</td></tr>
+  <tr><td><code>docs/guia/marca/logotipo-icono.svg</code></td><td>Icono del logotipo provisional.</td></tr>
+  <tr><td><code>docs/guia/marca/fuentes/</code></td><td>Poppins, Lato e IBM Plex Mono (OFL-1.1).</td></tr>
+  <tr><td><code>docs/guia/plantilla/plantilla-marca.html</code></td><td>Este documento.</td></tr>
+  <tr><td><code>docs/guia/build.py</code></td><td>Genera los PDF en <code>docs/guia/salida/</code>.</td></tr>
+</table>
+<pre><code><span class="c"># macOS: brew install pango (una vez)</span>
+DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib \
+  uv run --no-project --with weasyprint==70.0 python docs/guia/build.py plantilla</code></pre>
+<div class="caja"><span class="etiqueta">Nota</span><p>Un documento nuevo es un HTML que enlaza
+<code>../marca/voracious.css</code>, abre con la sección <code>.portada</code> y usa h1/h2/h3 para la numeración
+automática, el índice y el pie de página con la sección.</p></div>
+
+</body>
+</html>
