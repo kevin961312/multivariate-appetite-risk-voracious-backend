@@ -16,6 +16,12 @@ updates:
     schedule:
       interval: weekly
 
+  # Paso E: la base de Caddy del borde (deploy/proxy/Dockerfile, fijada por versión y digest).
+  - package-ecosystem: docker
+    directory: /deploy/proxy
+    schedule:
+      interval: weekly
+
   # Paso 4.2: postgres en docker-compose.yml y compose.test.yaml (también fijado en ci.yml).
   - package-ecosystem: docker-compose
     directory: /

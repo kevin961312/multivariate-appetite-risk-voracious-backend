@@ -161,6 +161,20 @@ class FitRepository(Protocol):
         """
         ...
 
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Ajustes ``queued`` o ``running`` del tenant que no pidió ninguna tubería.
+
+        Lo usa el cupo por tenant (``JobAdmission``): los ajustes con ``pipeline_id`` no cuentan
+        porque su tubería ya ocupa un hueco.
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento (de todas las cartas del tenant).
+        """
+        ...
+
 
 class LimitsRepository(Protocol):
     """Calibraciones de límites (``/limits``)."""
@@ -224,6 +238,20 @@ class LimitsRepository(Protocol):
 
         Returns:
             Los registros, en orden de creación.
+        """
+        ...
+
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Calibraciones ``queued`` o ``running`` del tenant que no pidió ninguna tubería.
+
+        Lo usa el cupo por tenant (``JobAdmission``): las calibraciones con ``pipeline_id`` no
+        cuentan porque su tubería ya ocupa un hueco.
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento (de todas las cartas del tenant).
         """
         ...
 
@@ -380,6 +408,20 @@ class PipelineRepository(Protocol):
 
         Returns:
             Los registros, en orden de creación.
+        """
+        ...
+
+    def count_unfinished(self, tenant_id: str) -> int:
+        """Tuberías ``queued`` o ``running`` del tenant, de Fase I y de recalibración.
+
+        Lo usa el cupo por tenant (``JobAdmission``): cada tubería en curso ocupa un hueco, con
+        independencia de sus pasos.
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento (de todas las cartas del tenant).
         """
         ...
 

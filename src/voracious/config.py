@@ -1,9 +1,12 @@
 """Configuración de Voracious leída exclusivamente de variables de entorno ``VORACIOUS_*``."""
 
+import ipaddress
+import re
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, IPvAnyNetwork, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -11,6 +14,108 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 JwtAlgorithm = Literal["EdDSA", "ES256", "RS256", "PS256"]
 """Algoritmos de firma asimétrica admitidos (D2). Nunca ``none`` ni ``HS*``: una llave
 compartida permitiría firmar a quien solo debe verificar."""
+
+CORS_ANY_ORIGIN: Final = "*"
+"""Valor de ``VORACIOUS_CORS_ALLOWED_ORIGINS`` que admite cualquier origen (va solo, sin otros).
+
+Es seguro porque la API autentica con ``Authorization: Bearer`` y sin credenciales de CORS: el
+navegador nunca manda el token por su cuenta (no hay cookies), así que un origen ajeno no puede
+llamar en nombre del usuario (dueño, 2026-10-20)."""
+
+_LOOPBACK_HOSTS: Final = frozenset({"localhost", "127.0.0.1", "::1"})
+"""Únicos hosts con los que un origen CORS puede ser ``http``: todo origen público va por TLS."""
+
+_DNS_LABEL: Final = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
+"""Etiqueta DNS en minúsculas (un nombre internacional se escribe en punycode, como lo envía el
+navegador en ``Origin``)."""
+
+
+def _split_commas(value: object) -> object:
+    """Admite ``a, b,c`` en una variable de entorno (sin JSON).
+
+    Args:
+        value: Valor crudo (cadena desde el entorno o secuencia desde el código).
+
+    Returns:
+        La secuencia de elementos, sin espacios ni elementos vacíos; cualquier otro valor, intacto.
+    """
+    if isinstance(value, str):
+        return tuple(part.strip() for part in value.split(",") if part.strip())
+    return value
+
+
+def _valid_host(host: str) -> bool:
+    """Indica si ``host`` es una IP o un nombre DNS escrito como lo serializa el navegador.
+
+    Args:
+        host: Host en minúsculas, sin corchetes.
+
+    Returns:
+        ``True`` si es una IPv4, una IPv6 en forma comprimida o un nombre DNS válido.
+    """
+    try:
+        return str(ipaddress.ip_address(host)) == host
+    except ValueError:
+        pass
+    if re.fullmatch(r"[0-9.]+", host) or len(host) > 253:
+        # Solo dígitos y puntos sin ser una IPv4 canónica (``127.1``): el navegador la reescribe.
+        return False
+    return all(_DNS_LABEL.fullmatch(label) for label in host.split("."))
+
+
+def _normalize_origin(raw: str) -> str:
+    """Valida y normaliza un origen CORS (``esquema://host[:puerto]``).
+
+    Args:
+        raw: Origen tal como viene de la configuración.
+
+    Returns:
+        El origen en minúsculas, exactamente como lo envía un navegador en ``Origin``.
+
+    Raises:
+        ValueError: Si es ``*`` o un comodín, ``null``, lleva ruta (también la barra final),
+            query, fragmento o credenciales, el esquema no es ``http``/``https``, el puerto es
+            inválido o el de por defecto, o es ``http`` fuera de ``localhost``, ``127.0.0.1`` y
+            ``[::1]``.
+    """
+    origin = raw.strip().lower()
+    if "*" in origin:
+        msg = (
+            f"origen CORS {raw!r}: no se admiten comodines parciales; usa '*' solo (cualquier "
+            "origen) o lista cada origen"
+        )
+        raise ValueError(msg)
+    if origin == "null":
+        msg = "origen CORS 'null': no se admite (lo envían documentos sin origen propio)"
+        raise ValueError(msg)
+    parts = urlsplit(origin)
+    if parts.scheme not in {"http", "https"}:
+        msg = f"origen CORS {raw!r}: el esquema debe ser http o https"
+        raise ValueError(msg)
+    host = parts.hostname or ""
+    try:
+        port = parts.port
+    except ValueError:
+        port = 0
+    default_port = 443 if parts.scheme == "https" else 80
+    if not _valid_host(host) or port == 0 or port == default_port:
+        msg = (
+            f"origen CORS {raw!r}: debe ser exactamente esquema://host[:puerto], sin puerto "
+            "por defecto"
+        )
+        raise ValueError(msg)
+    netloc = f"[{host}]" if ":" in host else host
+    canonical = f"{parts.scheme}://{netloc}" + (f":{port}" if port is not None else "")
+    if origin != canonical:
+        msg = (
+            f"origen CORS {raw!r}: debe ser exactamente esquema://host[:puerto] (sin ruta ni barra "
+            "final, query, fragmento ni credenciales)"
+        )
+        raise ValueError(msg)
+    if parts.scheme == "http" and host not in _LOOPBACK_HOSTS:
+        msg = f"origen CORS {raw!r}: un origen público debe ser https"
+        raise ValueError(msg)
+    return canonical
 
 
 class Settings(BaseSettings):
@@ -65,6 +170,24 @@ class Settings(BaseSettings):
             ``EdDSA`` por defecto). Al menos uno; solo asimétricos.
         jwt_leeway_seconds: Margen de reloj en segundos al comprobar ``exp``, ``nbf`` e ``iat``
             (``VORACIOUS_JWT_LEEWAY_SECONDS``, 0 a 300; 30 por defecto).
+        trusted_proxies: IP o redes CIDR de los proxies cuyo ``X-Forwarded-For`` y
+            ``X-Forwarded-Proto`` se creen (``VORACIOUS_TRUSTED_PROXIES``, separadas por comas;
+            ``()`` por defecto: no se cree a nadie). Se validan al arrancar: ``*``, ``/0``, un
+            nombre de host o una IP mal escrita fallan (nunca un literal que no coincide, mudo).
+        rate_limit_per_minute: Peticiones por minuto y por IP de cliente
+            (``VORACIOUS_RATE_LIMIT_PER_MINUTE``; 600 por defecto). Operativo, no estadístico.
+        rate_limit_burst: Ráfaga admitida por IP de cliente, capacidad del cubo de fichas
+            (``VORACIOUS_RATE_LIMIT_BURST``; 120 por defecto). Operativo, no estadístico.
+        cors_allowed_origins: Orígenes de navegador admitidos por CORS
+            (``VORACIOUS_CORS_ALLOWED_ORIGINS``, separados por comas; ``()`` por defecto: CORS
+            cerrado). ``*`` solo (``CORS_ANY_ORIGIN``) admite cualquier origen; si no, cada uno
+            exactamente ``esquema://host[:puerto]``, en minúsculas y sin repetidos; ``http`` solo
+            en ``localhost``, ``127.0.0.1`` y ``[::1]``.
+        api_docs: Sirve ``/docs``, ``/redoc`` y ``/openapi.json`` (``VORACIOUS_API_DOCS``; ``True``
+            por defecto). Con ``False`` no existen y solo ``/health`` y ``/ready`` son públicas.
+        max_active_jobs_per_tenant: Trabajos de cómputo en cola o en curso por tenant
+            (``VORACIOUS_MAX_ACTIVE_JOBS_PER_TENANT``; 4 por defecto); por encima,
+            ``429 TOO_MANY_JOBS``. Operativo, no estadístico.
     """
 
     model_config = SettingsConfigDict(
@@ -93,18 +216,62 @@ class Settings(BaseSettings):
         default=("EdDSA",), min_length=1
     )
     jwt_leeway_seconds: int = Field(default=30, ge=0, le=300)
+    trusted_proxies: Annotated[tuple[IPvAnyNetwork, ...], NoDecode] = ()
+    rate_limit_per_minute: int = Field(default=600, ge=1)
+    rate_limit_burst: int = Field(default=120, ge=1)
+    cors_allowed_origins: Annotated[tuple[str, ...], NoDecode] = ()
+    api_docs: bool = True
+    max_active_jobs_per_tenant: int = Field(default=4, ge=1)
 
-    @field_validator("jwt_algorithms", mode="before")
+    @field_validator("jwt_algorithms", "trusted_proxies", "cors_allowed_origins", mode="before")
     @classmethod
-    def _split_algorithms(cls, value: object) -> object:
-        """Admite ``EdDSA,ES256`` en la variable de entorno (sin JSON).
+    def _split_lists(cls, value: object) -> object:
+        """Admite listas separadas por comas en la variable de entorno (sin JSON).
 
         Args:
             value: Valor crudo (cadena desde el entorno o secuencia desde el código).
 
         Returns:
-            La secuencia de nombres, sin espacios ni elementos vacíos.
+            La secuencia de elementos, sin espacios ni elementos vacíos.
         """
-        if isinstance(value, str):
-            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return _split_commas(value)
+
+    @field_validator("trusted_proxies")
+    @classmethod
+    def _no_catch_all_proxy(cls, value: tuple[IPvAnyNetwork, ...]) -> tuple[IPvAnyNetwork, ...]:
+        """Rechaza ``0.0.0.0/0`` y ``::/0``: confiar en todo el mundo equivale a ``*``.
+
+        Args:
+            value: Redes ya validadas.
+
+        Returns:
+            Las mismas redes.
+
+        Raises:
+            ValueError: Si alguna tiene prefijo 0.
+        """
+        if any(network.prefixlen == 0 for network in value):
+            msg = "VORACIOUS_TRUSTED_PROXIES no admite /0: cualquiera podría falsificar su IP"
+            raise ValueError(msg)
         return value
+
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def _normalize_origins(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        """Valida cada origen, lo pasa a minúsculas y quita los repetidos (conserva el orden).
+
+        Args:
+            value: Orígenes crudos.
+
+        Returns:
+            ``("*",)`` si es ``*`` solo; si no, los orígenes normalizados.
+
+        Raises:
+            ValueError: Si ``*`` va con otros valores o algún origen no es válido.
+        """
+        if CORS_ANY_ORIGIN in value:
+            if value != (CORS_ANY_ORIGIN,):
+                msg = "VORACIOUS_CORS_ALLOWED_ORIGINS: '*' (cualquier origen) va solo, sin otros"
+                raise ValueError(msg)
+            return value
+        return tuple(dict.fromkeys(_normalize_origin(origin) for origin in value))

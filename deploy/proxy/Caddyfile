@@ -1,0 +1,146 @@
+# Borde de Voracious (paso E): TLS, límites, cabeceras y rutas públicas delante de la API.
+# Caddy 2 oficial sin plugins; la imagen (deploy/proxy/Dockerfile) incluye este fichero y los dos
+# modos de TLS. docker-compose.yml (servicio proxy, perfil public) le pasa, desde proxy.env:
+#   PROXY_PUBLIC_HOST  nombre público con certificado (demo: api.voracious.cloud)
+#   PROXY_TLS_MODE     acme (Let's Encrypt, tls-acme.caddy) | internal (CA propia: CI y pruebas)
+# Las dos son obligatorias: sin ellas el Caddyfile no se puede leer y el proxy no arranca.
+# Comprobación (CI): caddy validate --config /etc/caddy/Caddyfile y caddy fmt --diff.
+
+# Modo de TLS: define los snippets tls_global (opciones globales) y tls_site (directiva tls del
+# sitio). Un modo vacío o desconocido no encuentra su fichero y el proxy no arranca (falla cerrado).
+import tls-{$PROXY_TLS_MODE}.caddy
+
+# Opciones globales.
+{
+	# Sin API de administración ni configuración guardada: se cambia recreando el contenedor.
+	admin off
+	persist_config off
+	# Solo el 443. Sin redirección en el 80 (queda cerrado: un cliente con http:// mandaría su
+	# token en claro antes de ver la redirección) y sin reto ACME HTTP-01 (tls-acme.caddy).
+	auto_https disable_redirects
+	import tls_global
+
+	servers {
+		# Sin HTTP/3: solo se publica 443/TCP.
+		protocols h1 h2
+		# Del lado del cliente: read_header contra slowloris; read_body para 50 MiB a >= 0.5 MB/s;
+		# write cuenta desde las cabeceras e incluye leer el cuerpo y procesar.
+		timeouts {
+			read_header 10s
+			read_body 2m
+			write 5m
+			idle 2m
+		}
+	}
+
+	# No hay registro de acceso (ningún sitio declara «log»): solo el de errores y el de Caddy, sin
+	# la query de la URI (podría llevar un token) ni las cabeceras de la petición.
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "[?].*" ""
+				request>headers delete
+			}
+		}
+	}
+}
+
+# Cabeceras de seguridad de toda respuesta, también de los errores del borde (handle_errors no hereda
+# las del sitio). Borrar una cabecera difiere el bloque: se aplica al escribir y pisa lo que mande la
+# API. Sin Server ni Via (no se anuncia el software). Sin CORS aquí: Origin, Access-Control-* y Vary
+# pasan intactos y los decide la API.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Cache-Control "no-store"
+		X-Frame-Options "DENY"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		-Server
+		-Via
+	}
+}
+
+# Error del borde con el formato uniforme de la API: import json_error CÓDIGO "mensaje" ESTADO.
+(json_error) {
+	header Content-Type "application/json"
+	respond `{"code":"{args[0]}","message":"{args[1]}","details":{}}` {args[2]}
+}
+
+{$PROXY_PUBLIC_HOST} {
+	import tls_site
+
+	# Tope del cuerpo en todo el sitio: VORACIOUS_MAX_UPLOAD_MB (50) + 1 MiB de margen para el
+	# multipart, así entre 50 y 51 MiB responde la API con su 413 detallado. Es también el único
+	# tope de las rutas con cuerpo JSON. tests/unit/test_proxy_config.py vigila la coherencia.
+	request_body {
+		max_size 51MiB
+	}
+
+	import security_headers
+
+	# Solo /health y la API de negocio (cualquier método: el preflight OPTIONS lo resuelve la API).
+	# /ready (estado de la base) y la documentación no salen a internet: el operador las usa por el
+	# túnel en 127.0.0.1:8000.
+	@api path /health /v1/*
+	handle @api {
+		reverse_proxy api:8000 {
+			# keepalive por debajo del --timeout-keep-alive 75 de uvicorn (sin 502 por reutilizar una
+			# conexión ya cerrada); max_conns_per_host como contrapresión hacia el único worker;
+			# response_header_timeout cubre el parseo de un CSV grande y el paso síncrono /extension.
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 2m
+				keepalive 60s
+				max_conns_per_host 64
+			}
+		}
+	}
+
+	handle {
+		import json_error ROUTE_NOT_FOUND "la ruta no existe" 404
+	}
+
+	handle_errors 413 {
+		import security_headers
+		import json_error PAYLOAD_TOO_LARGE "el cuerpo supera el máximo del borde" 413
+	}
+
+	handle_errors 502 503 {
+		import security_headers
+		import json_error UPSTREAM_UNAVAILABLE "la API no está disponible; reintenta con espera" {err.status_code}
+	}
+
+	handle_errors 504 {
+		import security_headers
+		import json_error UPSTREAM_TIMEOUT "la API no respondió a tiempo" 504
+	}
+
+	handle_errors {
+		import security_headers
+		import json_error EDGE_ERROR "el borde no pudo atender la petición" {err.status_code}
+	}
+}
+
+# Cualquier otro Host que llegue por TLS con el SNI del sitio (sin SNI o con otro nombre no hay
+# certificado y la conexión TLS falla antes): el mismo 404 que el resto de rutas, sin proxy.
+https:// {
+	import security_headers
+	import json_error ROUTE_NOT_FOUND "la ruta no existe" 404
+}
+
+# Salud del propio Caddy para el healthcheck de Compose: solo en el bucle local del contenedor.
+http://127.0.0.1:8081 {
+	bind 127.0.0.1
+
+	handle /caddy-health {
+		respond 200
+	}
+
+	handle {
+		respond 404
+	}
+}

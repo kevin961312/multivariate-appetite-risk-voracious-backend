@@ -1,7 +1,10 @@
-# Voracious con Docker Compose (Paso 4.2; secretos y JWT desde «seguridad mínima», ADR 0012):
-# API + Postgres 17 + migraciones + copia de seguridad.
-#   scripts/deploy.sh          # descifra los secretos (SOPS + age), valida y despliega
+# Voracious con Docker Compose (Paso 4.2; secretos y JWT desde «seguridad mínima», ADR 0012; borde
+# público en el paso E): API + Postgres 17 + migraciones + copia de seguridad y, en el perfil
+# «public», el proxy Caddy que publica la API en https://<PROXY_PUBLIC_HOST> (deploy/proxy).
+#   scripts/deploy.sh          # descifra los secretos (SOPS + age), valida, despliega y, si existe
+#                              # DEPLOY_DIR/proxy.env, abre el 443 solo tras comprobar la API
 #   docker compose ps          # salud de los servicios (migrate termina con «exited (0)»)
+#   docker compose --profile public ps proxy
 # Los secretos NO llegan por variables de entorno (se verían en docker inspect): son Compose
 # secrets, ficheros que deploy.sh descifra en DEPLOY_SECRETS_DIR (0700, fuera del repo, ficheros
 # 0444) y que aquí se montan en /run/secrets/<nombre>. Las imágenes los leen con *_FILE. Sin
@@ -9,11 +12,16 @@
 # niega a desplegar si los trae): solo POSTGRES_USER/POSTGRES_DB y ajustes de rendimiento.
 # El JWKS público y la configuración pública del JWT (iss, aud) vienen de DEPLOY_DIR
 # (deploy/demo por defecto), versionados en claro.
-# La API escucha solo en 127.0.0.1 del anfitrión: no se expone a la red. Para usarla desde otra
-# máquina, túnel SSH (ssh -L 8000:127.0.0.1:8000 usuario@servidor). Postgres no publica ningún
-# puerto: solo lo ven los servicios de esta red.
+# Redes: «backend» es interna (sin salida a internet): postgres, migrate, backup y api. «edge»
+# (subred fija DEPLOY_EDGE_SUBNET) une api y proxy, que tiene la IP fija DEPLOY_PROXY_IP: es la única
+# en la que la API cree X-Forwarded-For (VORACIOUS_TRUSTED_PROXIES). El proxy no ve Postgres.
+# Puertos: el proxy publica solo 443/TCP (ni 80 ni HTTP/3); la API sigue en 127.0.0.1:8000 del
+# anfitrión para el operador (túnel SSH: ssh -L 8000:127.0.0.1:8000 usuario@servidor), con /ready y
+# la documentación, que el borde no publica. Postgres no publica ningún puerto.
+# El perfil «public» no se activa nunca con COMPOSE_PROFILES: lo arranca deploy.sh tras su puerta.
 # La imagen se construye en local y no se publica en ningún registro (pymrcd es GPL-3.0-or-later).
-# Nunca «docker compose down -v»: borra los volúmenes (la base de la demo).
+# Nunca «docker compose down -v»: borra los volúmenes (la base de la demo y los certificados del
+# proxy, con su límite de emisiones en Let's Encrypt).
 
 name: voracious
 
@@ -65,7 +73,9 @@ services:
       - postgres_password
     volumes:
       - pgdata:/var/lib/postgresql/data
-    # Sin «ports»: solo accesible desde la red interna de compose.
+    # Sin «ports» y solo en la red interna: accesible para migrate, api y backup.
+    networks:
+      - backend
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
@@ -85,6 +95,8 @@ services:
     <<: *voracious-image
     command: ["python", "-m", "voracious.cli", "migrate"]
     restart: "no"
+    networks:
+      - backend
     environment:
       VORACIOUS_REPOSITORY: postgres
       VORACIOUS_DATABASE_URL_FILE: /run/secrets/database_url
@@ -104,18 +116,26 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8000:8000"
-    # .env (rendimiento) y la configuración pública del JWT (VORACIOUS_JWT_ISSUER, _AUDIENCE y
-    # _JWKS_FILE=/etc/voracious/jwks.json). Sin ella la API no arranca (falla cerrado).
+    networks:
+      - backend
+      - edge
+    # .env (rendimiento), la configuración pública del JWT (VORACIOUS_JWT_ISSUER, _AUDIENCE y
+    # _JWKS_FILE=/etc/voracious/jwks.json; sin ella la API no arranca: falla cerrado) y la pública de
+    # la API (api.env: VORACIOUS_CORS_ALLOWED_ORIGINS), las dos versionadas en DEPLOY_DIR.
     env_file:
       - path: .env
         required: false
       - path: ${DEPLOY_DIR:-./deploy/demo}/auth.env
+        required: true
+      - path: ${DEPLOY_DIR:-./deploy/demo}/api.env
         required: true
     environment:
       VORACIOUS_REPOSITORY: postgres
       VORACIOUS_STORAGE: local
       VORACIOUS_STORAGE_DIR: /data/datasets
       VORACIOUS_DATABASE_URL_FILE: /run/secrets/database_url
+      # Solo el proxy (IP fija en edge) puede fijar la IP del cliente con X-Forwarded-For.
+      VORACIOUS_TRUSTED_PROXIES: ${DEPLOY_PROXY_IP:-172.29.80.10}
     secrets:
       - database_url
     configs:
@@ -163,6 +183,8 @@ services:
       - postgres_password
     volumes:
       - pgbackups:/backups
+    networks:
+      - backend
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -190,13 +212,74 @@ services:
     cpus: 0.25
     pids_limit: 64
 
+  # Paso E: el borde público (Caddy 2, deploy/proxy). Solo con «--profile public», que activa
+  # scripts/deploy.sh después de comprobar que ninguna ruta de negocio responde sin token. TLS,
+  # tope del cuerpo, cabeceras de seguridad y rutas públicas (/health y /v1/*) en deploy/proxy/Caddyfile.
+  proxy:
+    profiles: [public]
+    build:
+      context: ./deploy/proxy
+    image: voracious-proxy:local
+    restart: unless-stopped
+    ports:
+      - "443:443/tcp"
+    networks:
+      edge:
+        ipv4_address: ${DEPLOY_PROXY_IP:-172.29.80.10}
+    # PROXY_PUBLIC_HOST y PROXY_TLS_MODE (públicos, versionados). «required: false» para que en modo
+    # privado (sin proxy.env) deploy.sh pueda parar el proxy con --profile public; para arrancarlo,
+    # deploy.sh exige y valida proxy.env, y sin esas variables Caddy no lee su configuración.
+    env_file:
+      - path: ${DEPLOY_DIR:-./deploy/demo}/proxy.env
+        required: false
+    environment:
+      GOMEMLIMIT: 160MiB
+      GOMAXPROCS: "1"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      # Certificados y llave de la cuenta ACME: sobreviven a cada despliegue (nunca «down -v»).
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "-T", "3", "http://127.0.0.1:8081/caddy-health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+    logging: *logging
+    mem_limit: 192m
+    memswap_limit: 192m
+    cpus: 0.5
+    pids_limit: 128
+
   # --- Después (ADR 0001: un adaptador nuevo + una variable de configuración) ---------------
   # redis:         # broker de la cola distribuida (CeleryJobQueue).
   #   image: redis:<versión fijada por digest>
   # worker:        # workers de Celery con la misma imagen runtime.
   #   command: [celery, ...]
 
+networks:
+  # Sin salida a internet: Postgres y lo que habla con él.
+  backend:
+    internal: true
+  # API y proxy; la subred es fija para que la IP del proxy (DEPLOY_PROXY_IP) lo sea.
+  edge:
+    ipam:
+      config:
+        - subnet: ${DEPLOY_EDGE_SUBNET:-172.29.80.0/24}
+
 volumes:
   datasets:
   pgdata:
   pgbackups:
+  caddy_data:
+  caddy_config:

@@ -1,8 +1,9 @@
 """Repositorios en memoria de los pasos de Fase I: datasets, exclusiones, ajustes y límites.
 
 Los registros de trabajo tienen clave (tenant, carta, id) y ``claim`` (``queued → running``
-atómico); las tuberías además ``append_step`` (comparar-y-cambiar sobre el número de pasos). Los
-datasets tienen clave (tenant, dataset): no pertenecen a ninguna carta.
+atómico); las tuberías además ``append_step`` (comparar-y-cambiar sobre el número de pasos).
+Ajustes, límites y tuberías cuentan además sus trabajos en curso por tenant (cupo M1,
+``JobAdmission``). Los datasets tienen clave (tenant, dataset): no pertenecen a ninguna carta.
 """
 
 from collections.abc import Callable
@@ -52,6 +53,11 @@ class _StepRecord(Protocol):
     @property
     def status(self) -> JobStatus:
         """Estado."""
+        ...
+
+    @property
+    def pipeline_id(self) -> str | None:
+        """Tubería que lo pidió (en una tubería, su propia clave: nunca ``None``)."""
         ...
 
 
@@ -134,6 +140,27 @@ class _StepStore[R: _StepRecord]:
             Los registros, en orden de inserción.
         """
         return self.store.where(lambda r: r.status in _IN_PROGRESS)
+
+    def count_unfinished(self, tenant_id: str, *, standalone: bool) -> int:
+        """Registros ``queued`` o ``running`` de un tenant (cupo por tenant, ``JobAdmission``).
+
+        Lee bajo el cerrojo del almacén (``select``) solo las claves del tenant.
+
+        Args:
+            tenant_id: Tenant.
+            standalone: Solo los que no pidió ninguna tubería (``pipeline_id`` nulo). En las
+                tuberías ``pipeline_id`` es la propia clave, así que su repositorio pasa
+                ``False``.
+
+        Returns:
+            El recuento.
+        """
+        records = self.store.select(lambda k: k[0] == tenant_id)
+        return sum(
+            1
+            for r in records
+            if r.status in _IN_PROGRESS and (not standalone or r.pipeline_id is None)
+        )
 
     def claim(self, key: StepKey, started_at: datetime) -> R | None:
         """Pasa un registro de ``queued`` a ``running`` de forma atómica.
@@ -264,6 +291,17 @@ class InMemoryFitRepository:
         """
         return self._steps.unfinished()
 
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Ajustes ``queued`` o ``running`` del tenant sin tubería.
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._steps.count_unfinished(tenant_id, standalone=True)
+
 
 class InMemoryLimitsRepository:
     """``LimitsRepository`` en memoria."""
@@ -332,6 +370,17 @@ class InMemoryLimitsRepository:
             Los registros, en orden de inserción.
         """
         return self._steps.unfinished()
+
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Calibraciones ``queued`` o ``running`` del tenant sin tubería.
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._steps.count_unfinished(tenant_id, standalone=True)
 
 
 class InMemoryExclusionRepository:
@@ -470,6 +519,17 @@ class InMemoryPipelineRepository:
             Los registros, en orden de inserción.
         """
         return self._steps.unfinished()
+
+    def count_unfinished(self, tenant_id: str) -> int:
+        """Tuberías ``queued`` o ``running`` del tenant (de Fase I y de recalibración).
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._steps.count_unfinished(tenant_id, standalone=False)
 
     def append_step(
         self,

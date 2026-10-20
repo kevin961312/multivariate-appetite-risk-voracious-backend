@@ -92,4 +92,10 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # cuando llegue la cola distribuida.
 # --no-access-log: el registro de acceso de uvicorn escribe la ruta cruda con la query (p. ej.
 # ?access_token=...) y duplica el propio (AccessLogMiddleware, M2: plantilla, sin query ni token).
-CMD ["uvicorn", "voracious.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]
+# --no-proxy-headers (paso E): de X-Forwarded-For/-Proto decide solo la app, con la lista validada
+# de VORACIOUS_TRUSTED_PROXIES (la IP fija de Caddy); uvicorn confiaría además en 127.0.0.1 y
+# convertiría sin avisar en literal lo que no fuera una IP.
+# --no-server-header: no anuncia «server: uvicorn» (tampoco directo a 127.0.0.1:8000).
+# --timeout-keep-alive 75: por encima de los 60 s con que Caddy reutiliza una conexión hacia la API;
+# si uvicorn la cerrara antes, Caddy podría reutilizar una ya cerrada y responder 502.
+CMD ["uvicorn", "voracious.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log", "--no-proxy-headers", "--no-server-header", "--timeout-keep-alive", "75"]

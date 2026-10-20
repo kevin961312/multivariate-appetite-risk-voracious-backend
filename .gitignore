@@ -27,13 +27,20 @@ htmlcov/
 *.pem
 keys.txt
 # deploy/ es una lista blanca: solo se versionan los cifrados con SOPS (*.enc.yaml), el JWKS
-# público (jwks.json) y la configuración pública del JWT (auth.env); todo lo demás, p. ej. un
-# secrets.yaml en claro, queda ignorado. «!deploy/**/» deja a git entrar en los subdirectorios.
+# público (jwks.json), la configuración pública del JWT (auth.env), de la API (api.env) y del
+# proxy (proxy.env), y la imagen del borde (Dockerfile, Caddyfile y modos de TLS *.caddy); todo
+# lo demás, p. ej. un secrets.yaml en claro, queda ignorado. «!deploy/**/» deja a git entrar en
+# los subdirectorios.
 deploy/**
 !deploy/**/
 !deploy/**/*.enc.yaml
 !deploy/**/jwks.json
 !deploy/**/auth.env
+!deploy/**/api.env
+!deploy/**/proxy.env
+!deploy/proxy/Dockerfile
+!deploy/proxy/Caddyfile
+!deploy/proxy/*.caddy
 
 # Plantilla de agentes de otro proyecto (solo referencia local, no se sube)
 plantilla-agentes/

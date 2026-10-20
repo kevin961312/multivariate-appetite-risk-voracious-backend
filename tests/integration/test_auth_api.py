@@ -342,7 +342,10 @@ def test_access_log_has_identity_and_route_templates_but_never_the_token() -> No
     raw = token(subject="auditor", roles=(Role.ANALYST,))
     forged = forge(key=OTHER_KEY_PEM)
     authorization = {"Authorization": f"Bearer {raw}"}
-    debug = TestClient(create_app(build_container(auth_settings(log_level="DEBUG"))))
+    debug = TestClient(
+        create_app(build_container(auth_settings(log_level="DEBUG"))),
+        client=("198.51.100.4", 43210),
+    )
     with structlog.testing.capture_logs() as logs:
         debug.get(f"{DATASETS}/id-secreto-1", headers=authorization)
         debug.get(f"{DATASETS}/id-secreto-2")
@@ -360,6 +363,8 @@ def test_access_log_has_identity_and_route_templates_but_never_the_token() -> No
     assert ok["jti"]
     assert isinstance(ok["duration_ms"], float)
     assert "auth_failure" not in ok
+    # Paso E (E3): la IP del cliente, sin puerto, en todas las líneas (también en los 401).
+    assert {entry["client"] for entry in access} == {"198.51.100.4"}
     assert (anonymous["status"], anonymous["auth_failure"]) == (401, "missing_token")
     assert anonymous["route"] == f"{DATASETS}/{{dataset_id}}"
     assert "sub" not in anonymous
@@ -370,6 +375,7 @@ def test_access_log_has_identity_and_route_templates_but_never_the_token() -> No
     assert by_id["route"] == "/v1/charts/t2mrcd/pipelines/{pipeline_id}"
     text = json.dumps(logs, default=str)
     assert "id-secreto" not in text  # plantilla, nunca la ruta cruda
+    assert "43210" not in text  # ni el puerto del cliente
     for secret in (raw, forged):
         for part in secret.split(".")[1:]:
             assert part not in text
@@ -390,7 +396,7 @@ def test_access_log_records_a_500_when_the_app_raises() -> None:
 
     with structlog.testing.capture_logs() as logs, pytest.raises(RuntimeError):
         asyncio.run(middleware(scope, receive, send))
-    assert [(e["status"], e["route"]) for e in logs] == [(500, UNMATCHED_ROUTE)]
+    assert [(e["status"], e["route"], e["client"]) for e in logs] == [(500, UNMATCHED_ROUTE, None)]
     lifespan: Scope = {"type": "lifespan"}
     with pytest.raises(RuntimeError):
         asyncio.run(middleware(lifespan, receive, send))

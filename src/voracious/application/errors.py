@@ -26,6 +26,7 @@ __all__ = [
     "RecalibrationMismatchError",
     "RecalibrationNotFoundError",
     "RecalibrationNotInProgressError",
+    "TooManyJobsError",
     "UnknownChartError",
     "VariablesMismatchError",
     "VersionInputsMismatchError",
@@ -249,3 +250,21 @@ class VariablesMismatchError(ApplicationError):
     """
 
     code = "VARIABLES_MISMATCH"
+
+
+class TooManyJobsError(ApplicationError):
+    """El tenant ya tiene su cupo de trabajos de cómputo en cola o en curso (``TOO_MANY_JOBS``).
+
+    Mejora M1 del paso E: lo lanza solo ``use_cases.admission.JobAdmission``, con el mensaje fijo
+    ``MESSAGE`` y ``details = {"max_active_jobs": cupo, "active_jobs": trabajos activos al
+    comprobarlo}`` (``429``). Se vuelve a pedir cuando termine alguno. Conserva el constructor
+    común ``(message, details)`` de todos los errores de aplicación.
+    """
+
+    code = "TOO_MANY_JOBS"
+
+    MESSAGE = (
+        "el tenant tiene demasiados trabajos de cómputo en cola o en curso; "
+        "espera a que termine alguno"
+    )
+    """Mensaje fijo: lo variable va en ``details``."""

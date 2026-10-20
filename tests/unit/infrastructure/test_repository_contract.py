@@ -27,6 +27,7 @@ from voracious.application.ports import (
 )
 from voracious.application.records import (
     JobStatus,
+    PipelineKind,
     PipelineStep,
     ProposalRequest,
     RecalibrationMode,
@@ -565,6 +566,43 @@ def test_annotations_latest_wins_and_events_sorted(backend: Backend) -> None:
     events.add(rec.event(rid="early"))
     events.add(rec.event(rid="early2"))
     assert [e.event_id for e in events.list("t", "c", "m")] == ["early", "early2", "late"]
+
+
+def test_unfinished_counts_per_tenant_for_the_job_quota(backend: Backend) -> None:
+    """Cupo M1: ajustes y límites sueltos y todas las tuberías ``queued``/``running`` del tenant."""
+    fits, limits, pipelines = backend.fits(), backend.limits(), backend.pipelines()
+    fits.add(rec.fit(rid="f1"))
+    fits.add(rec.fit(rid="f2", status=JobStatus.RUNNING))
+    fits.add(replace(rec.fit(rid="f3"), pipeline_id="p1"))  # hijo de una tubería: no cuenta
+    fits.add(rec.fit(rid="f4", status=JobStatus.SUCCEEDED))
+    fits.add(rec.fit(tenant="otro", rid="f1"))
+    limits.add(rec.limits(rid="l1"))
+    limits.add(replace(rec.limits(rid="l2", status=JobStatus.RUNNING), pipeline_id="p1"))
+    limits.add(rec.limits(rid="l3", status=JobStatus.FAILED))
+    pipelines.add(rec.pipeline(rid="p1", status=JobStatus.RUNNING))
+    pipelines.add(replace(rec.pipeline(rid="p2"), kind=PipelineKind.RECALIBRATION))
+    pipelines.add(rec.pipeline(rid="p3", status=JobStatus.SUCCEEDED))
+    pipelines.add(rec.pipeline(tenant="otro", rid="p1", status=JobStatus.FAILED))
+    counts = (
+        fits.count_unfinished_standalone("t"),
+        limits.count_unfinished_standalone("t"),
+        pipelines.count_unfinished("t"),
+    )
+    assert counts == (2, 1, 2)
+    assert fits.count_unfinished_standalone("otro") == 1
+    assert limits.count_unfinished_standalone("otro") == 0
+    assert pipelines.count_unfinished("otro") == 0
+    assert fits.count_unfinished_standalone("nadie") == 0
+    # Al cerrarse (también ``JOB_INTERRUPTED`` en la recuperación) dejan de contar.
+    for repo, rid in ((fits, "f1"), (fits, "f2"), (limits, "l1")):
+        record = repo.get("t", "c", rid)
+        repo.update(replace(record, status=JobStatus.FAILED, error=rec.FAILED))
+    for rid in ("p1", "p2"):
+        record = pipelines.get("t", "c", rid)
+        pipelines.update(replace(record, status=JobStatus.FAILED, error=rec.FAILED))
+    assert fits.count_unfinished_standalone("t") == 0
+    assert limits.count_unfinished_standalone("t") == 0
+    assert pipelines.count_unfinished("t") == 0
 
 
 def test_pipeline_append_step_is_compare_and_set(backend: Backend) -> None:

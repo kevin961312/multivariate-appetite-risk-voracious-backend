@@ -1,13 +1,16 @@
 """Registro de acceso por petición (mejora M2): quién, qué ruta, con qué resultado y cuánto tardó.
 
 Una línea JSON ``http_request`` por petición HTTP con ``method``, ``route`` (la **plantilla**,
-p. ej. ``/v1/charts/t2mrcd/models/{model_id}``: sin identificadores), ``status`` y
-``duration_ms``; si el token fue válido, ``sub``, ``tenant`` y ``jti``, y si no, ``auth_failure``
-con el motivo del ``401``. Nunca el token, la query, las cabeceras ni los cuerpos. Es una
-auditoría ligera, no la auditoría completa del paso de seguridad grande.
+p. ej. ``/v1/charts/t2mrcd/models/{model_id}``: sin identificadores), ``status``,
+``duration_ms`` y ``client`` (la IP del cliente sin puerto, la real si llegó por el proxy de
+confianza; paso E); si el token fue válido, ``sub``, ``tenant`` y ``jti``, y si no,
+``auth_failure`` con el motivo del ``401``. Nunca el token, la query, las cabeceras ni los
+cuerpos. Es una auditoría ligera, no la auditoría completa del paso de seguridad grande. La IP es
+un dato personal: la retención la acota la rotación de logs del despliegue.
 
-Las rutas públicas (``/health``, ``/ready`` y la documentación) van a nivel ``debug``: el
-``HEALTHCHECK`` de Docker pide ``/health`` cada 30 s y llenaría el registro.
+Las rutas públicas (``/health``, ``/ready`` y la documentación) y los *preflight* de CORS van a
+nivel ``debug``: el ``HEALTHCHECK`` de Docker pide ``/health`` cada 30 s y un front en navegador
+manda un *preflight* antes de casi cada petición; llenarían el registro.
 """
 
 import re
@@ -22,7 +25,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from voracious.api.auth import AUTH_FAILURE_STATE, PRINCIPAL_STATE, PUBLIC_PATHS
 from voracious.application.auth import Principal
 
-__all__ = ["ACCESS_EVENT", "UNMATCHED_ROUTE", "AccessLogMiddleware", "RouteTable"]
+__all__ = ["ACCESS_EVENT", "UNMATCHED_ROUTE", "AccessLogMiddleware", "RouteTable", "is_preflight"]
 
 _log = structlog.get_logger(__name__)
 
@@ -38,6 +41,22 @@ RouteTable = Callable[[], Mapping[str, Collection[str]]]
 _SERVER_ERROR: Final = 500
 
 
+def is_preflight(scope: Scope) -> bool:
+    """Indica si la petición es un *preflight* de CORS.
+
+    Args:
+        scope: Scope HTTP.
+
+    Returns:
+        ``True`` si es ``OPTIONS`` con ``Origin`` y ``Access-Control-Request-Method`` (el criterio
+        de ``CORSMiddleware``).
+    """
+    if scope.get("method") != "OPTIONS":
+        return False
+    names = {name.lower() for name, _ in scope.get("headers", ())}
+    return b"origin" in names and b"access-control-request-method" in names
+
+
 class AccessLogMiddleware:
     """Middleware ASGI exterior que registra cada petición HTTP al terminar.
 
@@ -46,16 +65,21 @@ class AccessLogMiddleware:
     (la de OpenAPI) y no con el enrutado, porque un ``401`` responde antes de enrutar.
     """
 
-    def __init__(self, app: ASGIApp, routes: RouteTable) -> None:
+    def __init__(
+        self, app: ASGIApp, routes: RouteTable, public_paths: frozenset[str] = PUBLIC_PATHS
+    ) -> None:
         """Construye el middleware.
 
         Args:
             app: Aplicación ASGI interior.
             routes: Tabla de rutas (plantilla → métodos); se lee y compila en la primera
                 petición, cuando ya están registrados todos los routers.
+            public_paths: Rutas públicas (las de ``AuthenticationMiddleware``): se registran tal
+                cual y a nivel ``debug``.
         """
         self.app = app
         self._routes = routes
+        self._public_paths = public_paths
         self._compiled: list[tuple[re.Pattern[str], str, frozenset[str]]] | None = None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -115,7 +139,7 @@ class AccessLogMiddleware:
         path = scope.get("path")
         if not isinstance(path, str):
             return UNMATCHED_ROUTE
-        if path in PUBLIC_PATHS:
+        if path in self._public_paths:
             return path
         method = scope.get("method")
         other_method: str | None = None
@@ -136,11 +160,13 @@ class AccessLogMiddleware:
             elapsed: Segundos transcurridos.
         """
         state = scope.get("state", {})
+        client = scope.get("client")
         fields: dict[str, object] = {
             "method": scope.get("method"),
             "route": self._route(scope),
             "status": status,
             "duration_ms": round(elapsed * 1000, 1),
+            "client": str(client[0]) if client else None,
         }
         principal = state.get(PRINCIPAL_STATE)
         if isinstance(principal, Principal):
@@ -148,7 +174,7 @@ class AccessLogMiddleware:
         failure = state.get(AUTH_FAILURE_STATE)
         if isinstance(failure, str):
             fields["auth_failure"] = failure
-        if scope.get("path") in PUBLIC_PATHS:
+        if scope.get("path") in self._public_paths or is_preflight(scope):
             _log.debug(ACCESS_EVENT, **fields)
         else:
             _log.info(ACCESS_EVENT, **fields)

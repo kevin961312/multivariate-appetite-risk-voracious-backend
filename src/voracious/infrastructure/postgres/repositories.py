@@ -181,6 +181,17 @@ class PostgresFitRepository:
         """
         return self._t.unfinished()
 
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Ajustes ``queued`` o ``running`` del tenant sin tubería (``pipeline_id IS NULL``).
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._t.count_unfinished(tenant_id, standalone=True)
+
 
 class PostgresLimitsRepository:
     """``LimitsRepository`` en la tabla ``limits``."""
@@ -262,6 +273,17 @@ class PostgresLimitsRepository:
             Los registros.
         """
         return self._t.unfinished()
+
+    def count_unfinished_standalone(self, tenant_id: str) -> int:
+        """Calibraciones ``queued`` o ``running`` del tenant sin tubería (``pipeline_id IS NULL``).
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._t.count_unfinished(tenant_id, standalone=True)
 
 
 class PostgresExclusionRepository:
@@ -454,6 +476,17 @@ class PostgresPipelineRepository:
             Los registros.
         """
         return self._t.unfinished()
+
+    def count_unfinished(self, tenant_id: str) -> int:
+        """Tuberías ``queued`` o ``running`` del tenant (de Fase I y de recalibración).
+
+        Args:
+            tenant_id: Tenant.
+
+        Returns:
+            El recuento.
+        """
+        return self._t.count_unfinished(tenant_id, standalone=False)
 
 
 # --- modelos, puntuaciones, recalibraciones y comparaciones -----------------------------------

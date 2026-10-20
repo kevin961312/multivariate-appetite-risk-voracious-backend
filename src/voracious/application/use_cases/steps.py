@@ -19,6 +19,10 @@ que ``fit_phase1`` (``tests/integration/test_phase1_chain.py``).
 Cada ``Run…Job`` es idempotente (``claim``) y, si el recurso lo pidió una tubería, la avisa al
 terminar (bien o mal) encolando su trabajo ``pipeline``.
 
+Un ajuste o una calibración sueltos pasan por el cupo del tenant (``JobAdmission``, mejora M1 del
+paso E) tras sus validaciones síncronas; los que crea una tubería no, porque la tubería ya ocupa
+su hueco.
+
 Recalibración por pasos (vuelta 3.4): los mismos pasos sirven para las filas nuevas. Si la raíz del
 dataset es ``recalibration_candidates``, los límites heredan los parámetros de la versión base
 (``recalibration_id``, operación ``NEW_ROWS``) y la exclusión humana sale de las anotaciones (no
@@ -87,6 +91,7 @@ from voracious.application.records import (
     ModelRecord,
     RecalibrationRecord,
 )
+from voracious.application.use_cases.admission import JobAdmission
 from voracious.application.use_cases.common import INTERNAL_ERROR, get_model
 from voracious.application.use_cases.training import initial_version
 from voracious.domain.common import (
@@ -894,6 +899,7 @@ class RequestFit:
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
+        admission: Cupo por tenant de trabajos de cómputo activos (solo el ajuste suelto).
         recalibration: Enlaces con la recalibración por pasos (``None``: solo Fase I).
     """
 
@@ -903,6 +909,7 @@ class RequestFit:
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
+    admission: JobAdmission
     recalibration: RecalibrationLinks | None = None
 
     def execute(self, tenant_id: str, chart_id: str, dataset_id: str, fit_params: object) -> str:
@@ -926,6 +933,7 @@ class RequestFit:
                 (``check_recalibration_operation``).
             RecalibrationNotInProgressError: Si el dataset es de una recalibración que ya no
                 admite pasos.
+            TooManyJobsError: Si el tenant ya tiene su cupo de trabajos activos.
         """
         steps = resolve_steps(self.steps, chart_id)
         return self.create(
@@ -945,6 +953,9 @@ class RequestFit:
     ) -> str:
         """Crea el ajuste con parámetros ya codificados (lo usa también la tubería).
 
+        Un ajuste suelto (sin ``pipeline_id``) pasa por el cupo del tenant tras las validaciones
+        síncronas; el de una tubería no, porque la tubería ya ocupa su hueco.
+
         Args:
             tenant_id: Tenant.
             chart_id: Carta.
@@ -956,6 +967,9 @@ class RequestFit:
 
         Returns:
             El ``fit_id``.
+
+        Raises:
+            TooManyJobsError: Si es un ajuste suelto y el tenant ya tiene su cupo lleno.
         """
         resolved = steps if steps is not None else resolve_steps(self.steps, chart_id)
         dataset = get_dataset(self.datasets, tenant_id, dataset_id)
@@ -964,6 +978,8 @@ class RequestFit:
         session = recalibration_session(self.recalibration, tenant_id, chart_id, chain)
         if session is not None:
             check_recalibration_operation(session, stage_kind(chain), {"dataset_id": dataset_id})
+        if pipeline_id is None:
+            self.admission.check(tenant_id)
         record = FitRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -1091,6 +1107,7 @@ class RequestLimits:
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
+        admission: Cupo por tenant de trabajos de cómputo activos (solo la calibración suelta).
         recalibration: Enlaces con la recalibración por pasos (``None``: solo Fase I).
     """
 
@@ -1101,6 +1118,7 @@ class RequestLimits:
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
+    admission: JobAdmission
     recalibration: RecalibrationLinks | None = None
 
     def execute(
@@ -1137,6 +1155,7 @@ class RequestLimits:
             DomainError: Si hay decisiones pendientes (``T2MRCD_DECISION_PENDING``) o los
                 parámetros de su estimador no son los que usará la carta
                 (``T2MRCD_FIT_PARAMS_MISMATCH`` en T²MRCD).
+            TooManyJobsError: Si el tenant ya tiene su cupo de trabajos activos.
         """
         steps = resolve_steps(self.steps, chart_id)
         if params is not None and recalibration_id is not None:
@@ -1167,7 +1186,9 @@ class RequestLimits:
         dataset de recalibración los parámetros son los heredados de la sesión (``params`` se
         ignora) y, sobre las candidatas, se exige antes la exclusión humana si hay anotaciones
         con causa asignable. En la Fase I, ``params`` es obligatorio. Las decisiones pendientes
-        de la carta se comprueban aquí, antes de encolar.
+        de la carta se comprueban aquí, antes de encolar. Una calibración suelta (sin
+        ``pipeline_id``) pasa después por el cupo del tenant; la de una tubería no, porque la
+        tubería ya ocupa su hueco.
 
         Args:
             tenant_id: Tenant.
@@ -1187,6 +1208,7 @@ class RequestLimits:
             InvalidInputError: Si falta la exclusión humana de las candidatas o faltan los
                 parámetros.
             DomainError: Si hay decisiones pendientes o el ajuste no casa con los parámetros.
+            TooManyJobsError: Si es una calibración suelta y el tenant ya tiene su cupo lleno.
         """
         resolved = steps if steps is not None else resolve_steps(self.steps, chart_id)
         fit = ready_fit(self.fits, tenant_id, chart_id, fit_id)
@@ -1225,6 +1247,8 @@ class RequestLimits:
             )
         resolved.check_params(params)
         resolved.check_fit_params(fit.params, params)
+        if pipeline_id is None:
+            self.admission.check(tenant_id)
         kind = stage_kind(chain)
         record = LimitsRecord(
             tenant_id=tenant_id,

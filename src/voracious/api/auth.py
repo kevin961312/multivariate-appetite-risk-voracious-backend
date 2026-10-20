@@ -3,7 +3,8 @@
 ``AuthenticationMiddleware`` es ASGI puro (no ``BaseHTTPMiddleware``): verifica el token **antes de
 leer el cuerpo** y antes del enrutado, así que una subida de 50 MB o un JSON malformado sin token
 responden ``401`` sin consumir nada, y toda ruta nueva queda protegida aunque nadie se acuerde. Solo
-quedan libres ``PUBLIC_PATHS`` (y solo por HTTP) y el ``lifespan``. Un WebSocket exige el mismo
+quedan libres las rutas públicas (``PUBLIC_PATHS``, o solo ``PROBE_PATHS`` con
+``VORACIOUS_API_DOCS=false``; y solo por HTTP) y el ``lifespan``. Un WebSocket exige el mismo
 token y, si falta o no vale, se cierra con ``1008`` (violación de política) antes de aceptarlo; un
 scope de otro tipo no llega a la aplicación. El token se lee únicamente de ``Authorization:
 Bearer`` (nunca de la query) y nunca se registra.
@@ -43,8 +44,10 @@ from voracious.application.ports import TokenVerifier
 __all__ = [
     "AUTH_FAILURE_STATE",
     "BEARER_SCHEME",
+    "DOCS_PATHS",
     "FORBIDDEN",
     "PRINCIPAL_STATE",
+    "PROBE_PATHS",
     "PUBLIC_PATHS",
     "WWW_AUTHENTICATE",
     "AuthenticationMiddleware",
@@ -55,10 +58,14 @@ __all__ = [
     "require_roles",
 ]
 
-PUBLIC_PATHS: Final = frozenset(
-    {"/health", "/ready", "/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"}
-)
-"""Rutas sin token (coincidencia exacta): salud y documentación de la API."""
+PROBE_PATHS: Final = frozenset({"/health", "/ready"})
+"""Rutas de salud y disponibilidad: siempre sin token."""
+
+DOCS_PATHS: Final = frozenset({"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"})
+"""Rutas de la documentación interactiva (solo existen con ``VORACIOUS_API_DOCS=true``)."""
+
+PUBLIC_PATHS: Final = PROBE_PATHS | DOCS_PATHS
+"""Rutas sin token por defecto (coincidencia exacta): salud y documentación de la API."""
 
 FORBIDDEN: Final = "FORBIDDEN"
 """Código de error: el token es válido pero sus roles no permiten la operación (``403``)."""
@@ -132,7 +139,7 @@ def bearer_token(scope: Scope) -> str:
 
 
 class AuthenticationMiddleware:
-    """Middleware ASGI que exige un token válido salvo en ``lifespan`` y en HTTP a ``PUBLIC_PATHS``.
+    """Middleware ASGI que exige un token válido salvo en ``lifespan`` y en HTTP a rutas públicas.
 
     Con éxito deja el ``Principal`` en ``scope["state"]["principal"]`` y liga ``sub``, ``tenant`` y
     ``jti`` a las contextvars de structlog durante la petición. Si falla, sin llamar a la
@@ -141,15 +148,22 @@ class AuthenticationMiddleware:
     que no es ``http``, ``websocket`` ni ``lifespan`` se descarta (falla cerrado).
     """
 
-    def __init__(self, app: ASGIApp, verifier: TokenVerifier) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        verifier: TokenVerifier,
+        public_paths: frozenset[str] = PUBLIC_PATHS,
+    ) -> None:
         """Construye el middleware.
 
         Args:
             app: Aplicación ASGI interior.
             verifier: Verificador de tokens.
+            public_paths: Rutas sin token (coincidencia exacta; solo por HTTP).
         """
         self.app = app
         self.verifier = verifier
+        self.public_paths = public_paths
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Atiende una conexión ASGI.
@@ -160,7 +174,7 @@ class AuthenticationMiddleware:
             send: Canal de salida.
         """
         kind = scope["type"]
-        if kind == "lifespan" or (kind == "http" and scope["path"] in PUBLIC_PATHS):
+        if kind == "lifespan" or (kind == "http" and scope["path"] in self.public_paths):
             await self.app(scope, receive, send)
             return
         if kind not in {"http", "websocket"}:

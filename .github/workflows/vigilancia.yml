@@ -1,0 +1,32 @@
+# Vigilancia externa del borde público (paso E, M4): cada 3 horas, desde fuera del servidor, la misma
+# comprobación que tras un despliegue (scripts/check_public.sh) contra https://api.voracious.cloud:
+# /health (3 intentos con 20 s de espera, para no avisar por un reinicio de despliegue), TLS y su
+# caducidad (falla con menos de 14 días: Caddy renueva unos 30 antes, así que la renovación estaría
+# atascada), cabeceras, rutas cerradas, CORS y puertos. Sin token: esa comprobación se omite y se dice.
+# Un fallo programado lo notifica GitHub por correo a quien editó por última vez la línea «cron»
+# (hay que tener activadas las notificaciones de Actions). Solo corre en la rama por defecto.
+name: vigilancia
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vigilancia
+  cancel-in-progress: false
+
+jobs:
+  public:
+    name: borde público (api.voracious.cloud)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: scripts/check_public.sh
+        run: scripts/check_public.sh --cors-origin http://localhost:5173 https://api.voracious.cloud

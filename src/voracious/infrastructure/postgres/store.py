@@ -321,3 +321,27 @@ class Table[R]:
             Los registros, en orden de inserción.
         """
         return self.select(sql.SQL("status IN ('queued', 'running')"), ())
+
+    def count_unfinished(self, tenant_id: str, *, standalone: bool) -> int:
+        """Registros ``queued`` o ``running`` de un tenant (cupo por tenant, ``JobAdmission``).
+
+        ``SELECT count(*) … WHERE tenant_id = %s AND status IN ('queued', 'running')``: el índice
+        parcial ``<tabla>_unfinished`` de la migración 0001 mantiene barato el recuento (solo
+        recorre los trabajos en curso), sin migración nueva.
+
+        Args:
+            tenant_id: Tenant.
+            standalone: Añade ``AND pipeline_id IS NULL`` (solo los que no pidió ninguna
+                tubería). En ``pipelines`` esa columna es la clave, así que su repositorio pasa
+                ``False``.
+
+        Returns:
+            El recuento.
+        """
+        condition: sql.Composable = sql.SQL("tenant_id = %s AND status IN ('queued', 'running')")
+        if standalone:
+            condition = sql.SQL("{} AND pipeline_id IS NULL").format(condition)
+        query = sql.SQL("SELECT count(*) FROM {} WHERE {}").format(self._ident(), condition)
+        with self.pool.connection() as conn:
+            row = conn.execute(query, (tenant_id,)).fetchone()
+        return 0 if row is None else int(str(row[0]))

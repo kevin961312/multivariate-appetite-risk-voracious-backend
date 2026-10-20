@@ -1,0 +1,16 @@
+# Modo acme (PROXY_TLS_MODE=acme, la demo): Let's Encrypt de producción, solo por TLS-ALPN-01 en el
+# 443 (el 80 está cerrado: sin reto HTTP-01) y sin email (ningún dato personal en el repositorio).
+# Si una emisión falla, Caddy reintenta contra staging para no gastar el límite de producción. El
+# CAA de api.voracious.cloud solo admite letsencrypt.org. Certificados y cuenta: volumen caddy_data.
+# Sin opciones globales: este modo no carga la CA local de Caddy.
+(tls_global) {
+}
+
+(tls_site) {
+	tls {
+		issuer acme {
+			dir https://acme-v02.api.letsencrypt.org/directory
+			disable_http_challenge
+		}
+	}
+}

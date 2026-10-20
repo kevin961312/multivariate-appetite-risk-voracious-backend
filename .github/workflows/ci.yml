@@ -92,65 +92,22 @@ jobs:
           retention-days: 14
 
   image:
-    # Seguridad mínima (T13): la imagen real con la pila Compose completa, secretos de PRUEBA en
-    # ficheros (Compose secrets + *_FILE) y una llave JWT efímera. Nada de esto es un secreto real:
-    # la contraseña es aleatoria por ejecución y la llave muere con el runner.
-    name: imagen runtime y pila Compose (sin publicar)
+    # Seguridad mínima (T13) y borde público (paso E): la imagen real con la pila Compose completa
+    # desplegada con scripts/deploy.sh en modo público (Caddy con «tls internal» y el host
+    # api.voracious.test), secretos de PRUEBA cifrados con una llave age efímera y una llave JWT
+    # efímera. Nada de esto es un secreto real: la contraseña es aleatoria por ejecución y las llaves
+    # mueren con el runner. Todo lo del borde se comprueba a través del proxy (--resolve a 127.0.0.1 y
+    # la raíz de la CA interna; nunca -k).
+    name: imagen runtime, pila Compose y borde (sin publicar)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Secretos de PRUEBA en ficheros (0444 dentro de un directorio 0700)
-        run: |
-          secrets="${RUNNER_TEMP}/secrets"
-          deploy="${RUNNER_TEMP}/deploy"
-          install -d -m 700 "${secrets}"
-          install -d -m 755 "${deploy}"
-          password=$(openssl rand -hex 24)
-          echo "::add-mask::${password}"
-          (
-            umask 077
-            printf '%s' "${password}" > "${secrets}/postgres_password"
-            printf 'postgresql://voracious:%s@postgres:5432/voracious' "${password}" > "${secrets}/database_url"
-          )
-          chmod 0444 "${secrets}/postgres_password" "${secrets}/database_url"
-          cp deploy/demo/auth.env "${deploy}/auth.env"
-          {
-            echo "DEPLOY_SECRETS_DIR=${secrets}"
-            echo "DEPLOY_DIR=${deploy}"
-          } >> "${GITHUB_ENV}"
-      - name: docker-compose.yml y compose.test.yaml válidos
-        # Sin DEPLOY_SECRETS_DIR Compose no debe arrancar (falla cerrado); con él, valida.
-        run: |
-          if env -u DEPLOY_SECRETS_DIR docker compose config --quiet 2> /dev/null; then
-            echo "docker compose config debe fallar sin DEPLOY_SECRETS_DIR"
-            exit 1
-          fi
-          docker compose config --quiet
-          docker compose -f compose.test.yaml config --quiet
-      - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
-        # Hasta 3 intentos: un 504 pasajero de Docker Hub se reintenta; un fallo real del build
-        # (p. ej. FMA en el binario) falla los 3 y el job sale en rojo igual.
-        run: |
-          for i in 1 2 3; do
-            docker build --progress=plain --target runtime -t voracious:local . && exit 0
-            echo "build falló (intento $i de 3)"
-            [ "$i" -lt 3 ] && sleep 30
-          done
-          exit 1
-      - name: Sin autenticación configurada la API no arranca
-        run: |
-          if timeout 60 docker run --rm --read-only --tmpfs /tmp voracious:local \
-              > "${RUNNER_TEMP}/noauth.log" 2>&1; then
-            echo "la imagen no debe arrancar sin VORACIOUS_JWT_*"
-            exit 1
-          fi
-          grep -q VORACIOUS_JWT_JWKS_FILE "${RUNNER_TEMP}/noauth.log"
       - name: sops y age con una llave age efímera (la vía del servidor)
         # sops y age solo viven en el servidor (decisión del dueño, 2026-10-20); aquí se prueba esa
-        # vía: jwt_keygen.sh e issue_token.sh --via docker, sin uv. sops es el binario oficial
-        # fijado por versión y SHA-256 (como en el trabajo gate); age, el paquete de Ubuntu. La
-        # llave age es de PRUEBA y muere con el runner.
+        # vía: deploy.sh descifra, jwt_keygen.sh e issue_token.sh --via docker, sin uv. sops es el
+        # binario oficial fijado por versión y SHA-256 (como en el trabajo gate); age, el paquete de
+        # Ubuntu. La llave age es de PRUEBA y muere con el runner.
         env:
           SOPS_VERSION: "3.13.3"
           SOPS_SHA256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
@@ -171,6 +128,114 @@ jobs:
             echo "SOPS_AGE_KEY_FILE=${key}"
             echo "SOPS_CONFIG=${RUNNER_TEMP}/sops.yaml"
           } >> "${GITHUB_ENV}"
+      - name: Configuración de PRUEBA del despliegue (secretos cifrados, api.env y proxy.env)
+        # DEPLOY_DIR y DEPLOY_SECRETS_DIR fuera del repositorio. auth.env y api.env son los de la
+        # demo; proxy.env pone el modo público con la CA interna de Caddy y un host .test. Se cifra
+        # SIEMPRE con la configuración temporal de este trabajo (--config "${SOPS_CONFIG}", receptor
+        # de PRUEBA), nunca con el .sops.yaml del repositorio (receptor: el servidor), que sops
+        # encontraría desde la raíz; deploy/demo/*.enc.yaml no se usan.
+        run: |
+          deploy="${RUNNER_TEMP}/deploy"
+          install -d -m 755 "${deploy}"
+          cp deploy/demo/auth.env deploy/demo/api.env "${deploy}/"
+          printf 'PROXY_PUBLIC_HOST=api.voracious.test\nPROXY_TLS_MODE=internal\n' > "${deploy}/proxy.env"
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::${password}"
+          printf '{"postgres_password": "%s", "database_url": "postgresql://voracious:%s@postgres:5432/voracious"}' \
+            "${password}" "${password}" |
+            sops --disable-version-check --config "${SOPS_CONFIG}" encrypt \
+              --filename-override "${deploy}/secrets.enc.yaml" \
+              --input-type json --output-type yaml /dev/stdin > "${RUNNER_TEMP}/secrets.enc.yaml"
+          mv "${RUNNER_TEMP}/secrets.enc.yaml" "${deploy}/secrets.enc.yaml"
+          grep -q '^sops:' "${deploy}/secrets.enc.yaml"
+          # Cifrado para el receptor de PRUEBA y no para el del .sops.yaml del repositorio.
+          grep -qF "$(age-keygen -y "${SOPS_AGE_KEY_FILE}")" "${deploy}/secrets.enc.yaml"
+          if [ -f .sops.yaml ]; then
+            grep -oE 'age1[0-9a-z]{58}' .sops.yaml > "${RUNNER_TEMP}/repo-recipients" || true
+            if [ -s "${RUNNER_TEMP}/repo-recipients" ] &&
+                grep -qF -f "${RUNNER_TEMP}/repo-recipients" "${deploy}/secrets.enc.yaml"; then
+              echo "los secretos de CI quedaron cifrados para el receptor del repositorio"
+              exit 1
+            fi
+          fi
+          if grep -qF "${password}" "${deploy}/secrets.enc.yaml"; then
+            echo "secrets.enc.yaml no está cifrado"
+            exit 1
+          fi
+          {
+            echo "DEPLOY_DIR=${deploy}"
+            echo "DEPLOY_SECRETS_DIR=${RUNNER_TEMP}/secrets"
+          } >> "${GITHUB_ENV}"
+      - name: docker-compose.yml y compose.test.yaml válidos
+        # Sin DEPLOY_SECRETS_DIR Compose no debe arrancar (falla cerrado); con él, valida. El proxy
+        # solo existe con --profile public; postgres solo en la red interna y el proxy solo en edge.
+        run: |
+          if env -u DEPLOY_SECRETS_DIR docker compose config --quiet 2> /dev/null; then
+            echo "docker compose config debe fallar sin DEPLOY_SECRETS_DIR"
+            exit 1
+          fi
+          docker compose config --quiet
+          docker compose -f compose.test.yaml config --quiet
+          test "$(docker compose config --services | sort | tr '\n' ' ')" = "api backup migrate postgres "
+          test "$(docker compose --profile public config --services | sort | tr '\n' ' ')" = "api backup migrate postgres proxy "
+          docker compose --profile public config --format json > "${RUNNER_TEMP}/model.json"
+          python3 - "${RUNNER_TEMP}/model.json" <<'PY'
+          import json, sys
+          services = json.load(open(sys.argv[1]))["services"]
+          networks = {name: sorted(s.get("networks", {})) for name, s in services.items()}
+          assert networks == {"api": ["backend", "edge"], "backup": ["backend"], "migrate": ["backend"],
+                              "postgres": ["backend"], "proxy": ["edge"]}, networks
+          ports = [(p.get("host_ip"), p["published"], p["target"], p["protocol"]) for p in services["proxy"]["ports"]]
+          assert ports == [(None, "443", 443, "tcp")], ports
+          proxy_ip = services["proxy"]["networks"]["edge"]["ipv4_address"]
+          assert services["api"]["environment"]["VORACIOUS_TRUSTED_PROXIES"] == proxy_ip
+          print("redes, puertos y proxy de confianza: bien")
+          PY
+      - name: Borde - imagen del proxy, caddy validate y caddy fmt
+        # La imagen (Caddy oficial fijado por digest) arranca sin root, con cap_drop ALL y raíz de
+        # solo lectura; validate en los dos modos de TLS (provisiona sin red); fmt sin diferencias.
+        # Sin modo de TLS el Caddyfile no se puede leer (falla cerrado).
+        run: |
+          for i in 1 2 3; do
+            docker build --progress=plain -t voracious-proxy:local deploy/proxy && break
+            echo "build del proxy falló (intento $i de 3)"
+            [ "$i" -lt 3 ] && sleep 30 || exit 1
+          done
+          run_caddy() {
+            docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+              --tmpfs /tmp --tmpfs /data:uid=10002 --tmpfs /config:uid=10002 \
+              -e PROXY_PUBLIC_HOST=api.voracious.test "$@"
+          }
+          for mode in acme internal; do
+            run_caddy -e PROXY_TLS_MODE="${mode}" voracious-proxy:local \
+              caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          done
+          for file in Caddyfile tls-acme.caddy tls-internal.caddy; do
+            docker run --rm --network none voracious-proxy:local caddy fmt --diff "/etc/caddy/${file}"
+          done
+          if run_caddy voracious-proxy:local caddy adapt --config /etc/caddy/Caddyfile > /dev/null 2>&1; then
+            echo "sin PROXY_TLS_MODE el Caddyfile no debe poder leerse"
+            exit 1
+          fi
+          test "$(docker run --rm --network none voracious-proxy:local id -u)" = 10002
+      - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
+        # Hasta 3 intentos: un 504 pasajero de Docker Hub se reintenta; un fallo real del build
+        # (p. ej. FMA en el binario) falla los 3 y el job sale en rojo igual.
+        run: |
+          for i in 1 2 3; do
+            docker build --progress=plain --target runtime -t voracious:local . && exit 0
+            echo "build falló (intento $i de 3)"
+            [ "$i" -lt 3 ] && sleep 30
+          done
+          exit 1
+      - name: Sin autenticación configurada la API no arranca
+        run: |
+          if timeout 60 docker run --rm --read-only --tmpfs /tmp voracious:local \
+              > "${RUNNER_TEMP}/noauth.log" 2>&1; then
+            echo "la imagen no debe arrancar sin VORACIOUS_JWT_*"
+            exit 1
+          fi
+          grep -q VORACIOUS_JWT_JWKS_FILE "${RUNNER_TEMP}/noauth.log"
       - name: Llave JWT efímera (scripts/jwt_keygen.sh --via docker; solo para este trabajo)
         run: |
           scripts/jwt_keygen.sh --via docker ci
@@ -184,15 +249,14 @@ jobs:
             echo "la llave de firma no está cifrada"
             exit 1
           fi
-      - name: Pila Compose completa (postgres, migrate, api, backup)
+      - name: scripts/deploy.sh en modo público (puerta, proxy y comprobaciones propias)
+        # El despliegue real: descifra, construye, para el proxy, levanta la pila, espera a migrate
+        # y a /ready, prueba la superficie de autenticación y solo entonces abre el 443.
         run: |
-          docker compose up -d --no-build
-          for _ in $(seq 1 90); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/ready || true)
-            [ "${code}" = 200 ] && break
-            sleep 2
-          done
-          test "${code}" = 200
+          scripts/deploy.sh | tee "${RUNNER_TEMP}/deploy.log"
+          grep -q 'público en https://api.voracious.test$' "${RUNNER_TEMP}/deploy.log"
+          test "$(stat -c %a "${DEPLOY_SECRETS_DIR}")" = 700
+          test -n "$(docker compose --profile public ps --status running -q proxy)"
       - name: /health, /ready, 401, token, docker inspect, backup, usuario, compilador y HEALTHCHECK
         run: |
           base=http://127.0.0.1:8000
@@ -222,8 +286,8 @@ jobs:
             echo "el registro de la API contiene la query de la petición"
             exit 1
           fi
-          # Ningún valor secreto en docker inspect (ni la contraseña ni la URL).
-          docker compose ps -aq | xargs docker inspect > "${RUNNER_TEMP}/inspect.json"
+          # Ningún valor secreto en docker inspect (ni la contraseña ni la URL), proxy incluido.
+          docker compose --profile public ps -aq | xargs docker inspect > "${RUNNER_TEMP}/inspect.json"
           for name in postgres_password database_url; do
             cat "${DEPLOY_SECRETS_DIR}/${name}"
             echo
@@ -256,11 +320,286 @@ jobs:
           done
           echo "HEALTHCHECK: ${status}"
           test "${status}" = healthy
+      - name: Ayudantes de las comprobaciones del borde (sin secretos)
+        run: |
+          docker compose --profile public exec -T proxy cat /data/caddy/pki/authorities/local/root.crt \
+            > "${RUNNER_TEMP}/caddy-root.crt"
+          grep -q 'BEGIN CERTIFICATE' "${RUNNER_TEMP}/caddy-root.crt"
+          cat > "${RUNNER_TEMP}/edge.sh" <<'SH'
+          # Ayudantes de los pasos «Borde - …»: curl al proxy local con el nombre público y la raíz
+          # de la CA interna (verificación TLS real), lectura de cabeceras y del código de error.
+          host=api.voracious.test
+          base="https://${host}"
+          edge() {
+            curl -sS --resolve "${host}:443:127.0.0.1" --cacert "${RUNNER_TEMP}/caddy-root.crt" "$@"
+          }
+          header() {  # header FICHERO NOMBRE: valor (HTTP/2: nombres en minúsculas)
+            tr -d '\r' < "$1" | sed -n "s/^$2: //p" | tail -n 1
+          }
+          json_code() {  # json_code FICHERO: campo «code» del formato uniforme de error
+            sed -n 's/.*"code" *: *"\([A-Z_]*\)".*/\1/p' "$1" | head -n 1
+          }
+          list_has() {  # list_has "A, b" "a b": todos los elementos están en la lista (sin mayúsculas)
+            local list item
+            list=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+            for item in $2; do
+              case ",${list}," in *",${item},"*) ;; *) return 1 ;; esac
+            done
+          }
+          check_headers() {  # check_headers FICHERO DESCRIPCIÓN: cabeceras del borde, sin Server ni Via
+            local name expected
+            while IFS='|' read -r name expected; do
+              if [ "$(header "$1" "${name}")" != "${expected}" ]; then
+                echo "${2}: ${name}='$(header "$1" "${name}")' (se esperaba '${expected}')"
+                return 1
+              fi
+            done <<'EOF'
+          strict-transport-security|max-age=31536000; includeSubDomains
+          x-content-type-options|nosniff
+          referrer-policy|no-referrer
+          cache-control|no-store
+          x-frame-options|DENY
+          content-security-policy|default-src 'none'; frame-ancestors 'none'
+          EOF
+            if tr -d '\r' < "$1" | grep -qiE '^(server|via|alt-svc):'; then
+              echo "${2}: anuncia Server, Via o Alt-Svc"
+              return 1
+            fi
+          }
+          client_of() {  # client_of MÉTODO RUTA: «client» de la última línea http_request de la API
+            docker compose logs --no-color api | sed 's/^[^|]*| //' | python3 -c '
+          import json, sys
+          client = "sin-linea"
+          for line in sys.stdin:
+              try:
+                  entry = json.loads(line)
+              except ValueError:
+                  continue
+              if entry.get("event") == "http_request" and [entry.get("method"), entry.get("route")] == sys.argv[1:]:
+                  client = str(entry.get("client"))
+          print(client)' "$1" "$2"
+          }
+          SH
+      - name: Borde - TLS, HTTP/2, puertos, cabeceras, rutas, 401 y usuario (a, b, c, d, j)
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          # a) TLS 1.2 y 1.3 con h2; TLS <= 1.1 falla; en el anfitrión nada escucha en UDP 443 ni en
+          #    TCP 80, y dentro del proxy solo 443/TCP y el 8081 del bucle local (healthcheck).
+          test "$(edge -o /dev/null -w '%{http_code}' --tlsv1.2 --tls-max 1.2 "${base}/health")" = 200
+          test "$(edge -o /dev/null -w '%{http_code}' --tlsv1.3 "${base}/health")" = 200
+          test "$(edge -o /dev/null -w '%{http_version}' "${base}/health")" = 2
+          if edge -o /dev/null --tlsv1.0 --tls-max 1.1 "${base}/health" 2> /dev/null; then
+            echo "TLS <= 1.1 aceptado"
+            exit 1
+          fi
+          if ss -Hlun 'sport = :443' | grep -q .; then echo "algo escucha en UDP 443"; exit 1; fi
+          if ss -Hltn 'sport = :80' | grep -q .; then echo "algo escucha en TCP 80"; exit 1; fi
+          docker compose --profile public exec -T proxy netstat -tlnu > "${RUNNER_TEMP}/proxy-listen"
+          cat "${RUNNER_TEMP}/proxy-listen"
+          if grep -vE '127\.0\.0\.11:|^Proto|^Active' "${RUNNER_TEMP}/proxy-listen" |
+              grep -vE '^tcp +[0-9]+ +[0-9]+ +(:::443|0\.0\.0\.0:443|127\.0\.0\.1:8081) '; then
+            echo "el proxy escucha en algo más que 443/TCP y 127.0.0.1:8081"
+            exit 1
+          fi
+          # b) sin token 401 con WWW-Authenticate; con token 404 DATASET_NOT_FOUND (por el proxy).
+          code=$(edge -D "${RUNNER_TEMP}/b.h" -o "${RUNNER_TEMP}/b.b" -w '%{http_code}' "${base}/v1/datasets/nope")
+          test "${code}" = 401
+          case "$(header "${RUNNER_TEMP}/b.h" www-authenticate)" in
+            'Bearer realm="voracious"'*) ;;
+            *) echo "el 401 por el proxy no trae WWW-Authenticate: Bearer realm=\"voracious\""; exit 1 ;;
+          esac
+          token=$(scripts/issue_token.sh --via docker --tenant ci --roles analyst --subject ci-edge --ttl 10m)
+          echo "::add-mask::${token}"
+          code=$(edge -o "${RUNNER_TEMP}/b2.b" -w '%{http_code}' -H "Authorization: Bearer ${token}" "${base}/v1/datasets/nope")
+          test "${code}" = 404
+          test "$(json_code "${RUNNER_TEMP}/b2.b")" = DATASET_NOT_FOUND
+          # c) cabeceras de seguridad, sin Server ni Via, en /health, en un 401 de la API y en un 404 del borde.
+          edge -D "${RUNNER_TEMP}/c.h" -o /dev/null "${base}/health"
+          check_headers "${RUNNER_TEMP}/c.h" /health
+          check_headers "${RUNNER_TEMP}/b.h" "401 de la API"
+          # d) /ready, la documentación y / dan el 404 JSON del borde; /ready sigue en 127.0.0.1:8000.
+          for path in /ready /docs /redoc /docs/oauth2-redirect /openapi.json /; do
+            code=$(edge -D "${RUNNER_TEMP}/d.h" -o "${RUNNER_TEMP}/d.b" -w '%{http_code}' "${base}${path}")
+            test "${code}" = 404
+            test "$(json_code "${RUNNER_TEMP}/d.b")" = ROUTE_NOT_FOUND
+            test "$(header "${RUNNER_TEMP}/d.h" content-type)" = application/json
+          done
+          check_headers "${RUNNER_TEMP}/d.h" "404 del borde"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/ready)" = 200
+          # Otro Host con el SNI del sitio: el mismo 404 (no llega a la API).
+          code=$(edge -o "${RUNNER_TEMP}/d2.b" -w '%{http_code}' -H 'Host: otro.example' "${base}/health")
+          test "${code}" = 404
+          test "$(json_code "${RUNNER_TEMP}/d2.b")" = ROUTE_NOT_FOUND
+          # j) el proxy corre sin root, sin capacidades, sin nuevos privilegios y en solo lectura.
+          proxy=$(docker compose --profile public ps -q proxy)
+          test "$(docker compose --profile public exec -T proxy id -u)" != 0
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}}' "${proxy}")" \
+            = "true [ALL] [no-new-privileges:true]"
+      - name: Borde - subidas y tope del cuerpo (e)
+        # Un CSV de ~1 MiB pasa (201). Caddy no mira Content-Length: corta al leer el cuerpo pasados
+        # 51 MiB, así que su 413 propio aparece en las rutas con cuerpo JSON (la API lo lee entero; el
+        # borde es su único tope). En /v1/datasets la API rechaza antes por el Content-Length
+        # declarado: entre 50 y 51 MiB responde su 413 detallado (details.max_bytes = 50 MiB).
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          token=$(scripts/issue_token.sh --via docker --tenant ci --roles analyst --subject ci-upload --ttl 10m)
+          echo "::add-mask::${token}"
+          awk 'BEGIN { srand(7); for (i = 0; i < 23000; i++) printf "%.6f,%.6f,%.6f,%.6f,%.6f\n", rand(), rand(), rand(), rand(), rand() }' \
+            > "${RUNNER_TEMP}/small.csv"
+          ls -l "${RUNNER_TEMP}/small.csv"
+          code=$(edge -o "${RUNNER_TEMP}/e1.b" -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H 'Content-Type: text/csv' --data-binary @"${RUNNER_TEMP}/small.csv" "${base}/v1/datasets")
+          test "${code}" = 201
+          head -c $((51 * 1024 * 1024 + 1)) /dev/zero > "${RUNNER_TEMP}/big.bin"
+          code=$(edge -D "${RUNNER_TEMP}/e2.h" -o "${RUNNER_TEMP}/e2.b" -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H 'Content-Type: application/json' --data-binary @"${RUNNER_TEMP}/big.bin" "${base}/v1/charts/t2mrcd/fits")
+          test "${code}" = 413
+          cat "${RUNNER_TEMP}/e2.b"
+          echo
+          grep -q '"details":{}' "${RUNNER_TEMP}/e2.b"
+          test "$(json_code "${RUNNER_TEMP}/e2.b")" = PAYLOAD_TOO_LARGE
+          check_headers "${RUNNER_TEMP}/e2.h" "413 del borde"
+          head -c $((50 * 1024 * 1024 + 512 * 1024)) /dev/zero > "${RUNNER_TEMP}/mid.bin"
+          code=$(edge -o "${RUNNER_TEMP}/e3.b" -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            -H 'Content-Type: text/csv' --data-binary @"${RUNNER_TEMP}/mid.bin" "${base}/v1/datasets" || true)
+          cat "${RUNNER_TEMP}/e3.b"
+          echo
+          test "${code}" = 413
+          grep -q '"max_bytes": *52428800' "${RUNNER_TEMP}/e3.b"
+      - name: Borde - IP del cliente y X-Forwarded-For (f)
+        # Caddy no tiene trusted_proxies: reescribe X-Forwarded-For con la IP real del cliente, así que
+        # ni una IP inventada ni 127.0.0.1 (que el límite de peticiones exime) llegan a la API como
+        # cliente. Directo a 127.0.0.1:8000 la API ignora la cabecera (no viene del proxy).
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          proxy_ip=$(docker inspect --format '{{(index .NetworkSettings.Networks "voracious_edge").IPAddress}}' \
+            "$(docker compose --profile public ps -q proxy)")
+          edge -o /dev/null -H 'X-Forwarded-For: 203.0.113.7' "${base}/v1/datasets/xff-check"
+          edge -o /dev/null -X POST -H 'X-Forwarded-For: 127.0.0.1' "${base}/v1/datasets"
+          sleep 1
+          via_proxy_get=$(client_of GET '/v1/datasets/{dataset_id}')
+          via_proxy_post=$(client_of POST /v1/datasets)
+          echo "cliente por el proxy: ${via_proxy_get} y ${via_proxy_post} (proxy ${proxy_ip})"
+          for client in "${via_proxy_get}" "${via_proxy_post}"; do
+            case "${client}" in
+              203.0.113.7 | 127.0.0.1 | "${proxy_ip}" | None | sin-linea)
+                echo "la API registró como cliente ${client}"
+                exit 1
+                ;;
+            esac
+          done
+          curl -s -o /dev/null -X POST -H 'X-Forwarded-For: 203.0.113.7' http://127.0.0.1:8000/v1/datasets
+          sleep 1
+          direct=$(client_of POST /v1/datasets)
+          echo "cliente directo: ${direct}"
+          case "${direct}" in
+            203.0.113.7 | None | sin-linea) echo "directo, la API creyó X-Forwarded-For"; exit 1 ;;
+          esac
+      - name: Borde - CORS con cualquier origen (k, l, m)
+        # api.env de la demo: VORACIOUS_CORS_ALLOWED_ORIGINS=* (sin credenciales).
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          for origin in http://localhost:5173 https://front.example; do
+            # k) preflight: 200, Allow-Origin *, métodos y cabeceras, Max-Age 600, sin credenciales.
+            code=$(edge -D "${RUNNER_TEMP}/k.h" -o /dev/null -w '%{http_code}' -X OPTIONS -H "Origin: ${origin}" \
+              -H 'Access-Control-Request-Method: POST' \
+              -H 'Access-Control-Request-Headers: authorization,content-type' "${base}/v1/datasets")
+            test "${code}" = 200
+            test "$(header "${RUNNER_TEMP}/k.h" access-control-allow-origin)" = '*'
+            list_has "$(header "${RUNNER_TEMP}/k.h" access-control-allow-methods)" "get post"
+            list_has "$(header "${RUNNER_TEMP}/k.h" access-control-allow-headers)" "authorization content-type"
+            test "$(header "${RUNNER_TEMP}/k.h" access-control-max-age)" = 600
+            test -z "$(header "${RUNNER_TEMP}/k.h" access-control-allow-credentials)"
+            check_headers "${RUNNER_TEMP}/k.h" "preflight"
+            # m) GET sin token: 401 con Allow-Origin * y las cabeceras que el front necesita leer.
+            code=$(edge -D "${RUNNER_TEMP}/m.h" -o /dev/null -w '%{http_code}' -H "Origin: ${origin}" "${base}/v1/datasets/nope")
+            test "${code}" = 401
+            test "$(header "${RUNNER_TEMP}/m.h" access-control-allow-origin)" = '*'
+            list_has "$(header "${RUNNER_TEMP}/m.h" access-control-expose-headers)" "www-authenticate retry-after"
+          done
+          # l) preflight con una cabecera no admitida: 400.
+          code=$(edge -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: https://front.example' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization,x-foo' "${base}/v1/datasets")
+          test "${code}" = 400
+      - name: Borde - scripts/check_public.sh desde la IP del runner (i)
+        # Desde la IP de salida del runner (no el bucle local): 443 abierto y 80, 8000, 5432 y 2019
+        # cerrados. --min-days 0: el certificado de la CA interna dura horas.
+        run: |
+          ip=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+          echo "IP del runner: ${ip}"
+          VORACIOUS_API_TOKEN=$(scripts/issue_token.sh --via docker --tenant ci --roles analyst --subject ci-check --ttl 10m)
+          echo "::add-mask::${VORACIOUS_API_TOKEN}"
+          export VORACIOUS_API_TOKEN
+          scripts/check_public.sh --resolve "${ip}" --cacert "${RUNNER_TEMP}/caddy-root.crt" --min-days 0 \
+            --cors-origin http://localhost:5173 https://api.voracious.test
+      - name: Borde - límite de peticiones por el proxy, también con X-Forwarded-For 127.0.0.1 (g, n)
+        # Hasta 300 peticiones sin token por el proxy: con ráfaga de 120 llega el 429 RATE_LIMITED con
+        # Retry-After, también si el cliente dice ser 127.0.0.1, y con Origin lleva Allow-Origin *.
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          code=""
+          for i in $(seq 1 300); do
+            code=$(edge -D "${RUNNER_TEMP}/g.h" -o "${RUNNER_TEMP}/g.b" -w '%{http_code}' \
+              -H 'Origin: https://front.example' -H 'X-Forwarded-For: 127.0.0.1' "${base}/v1/datasets/rate-check")
+            [ "${code}" = 429 ] && break
+          done
+          echo "429 en la petición ${i}"
+          test "${code}" = 429
+          test "$(json_code "${RUNNER_TEMP}/g.b")" = RATE_LIMITED
+          retry=$(header "${RUNNER_TEMP}/g.h" retry-after)
+          test "${retry}" -ge 1
+          test "$(header "${RUNNER_TEMP}/g.h" access-control-allow-origin)" = '*'
+          check_headers "${RUNNER_TEMP}/g.h" 429
+          sleep 15  # el cubo se rellena (10 fichas/s) para los pasos siguientes
+      - name: Borde - API parada, 502 JSON y la query fuera de los registros (h)
+        run: |
+          . "${RUNNER_TEMP}/edge.sh"
+          marker="marca-borde-$(openssl rand -hex 8)"
+          docker compose stop api
+          code=$(edge -D "${RUNNER_TEMP}/h.h" -o "${RUNNER_TEMP}/h.b" -w '%{http_code}' \
+            "${base}/v1/datasets/x?access_token=${marker}")
+          test "${code}" = 502
+          test "$(json_code "${RUNNER_TEMP}/h.b")" = UPSTREAM_UNAVAILABLE
+          check_headers "${RUNNER_TEMP}/h.h" "502 del borde"
+          sleep 1
+          docker compose --profile public logs --no-color proxy api > "${RUNNER_TEMP}/edge.log"
+          if grep -F -q "${marker}" "${RUNNER_TEMP}/edge.log"; then
+            echo "los registros del proxy o de la API contienen la query"
+            exit 1
+          fi
+          docker compose start api
+      - name: Un despliegue fallido deja el 443 cerrado (puerta)
+        # Con un api.env que la API rechaza al arrancar (un origen http público), deploy.sh falla
+        # antes de la puerta: el proxy, parado al empezar, sigue parado y el 443 no responde.
+        run: |
+          bad="${RUNNER_TEMP}/deploy-bad"
+          cp -R "${DEPLOY_DIR}" "${bad}"
+          printf 'VORACIOUS_CORS_ALLOWED_ORIGINS=http://front.example\n' > "${bad}/api.env"
+          status=0
+          DEPLOY_DIR="${bad}" DEPLOY_TIMEOUT=60 scripts/deploy.sh > "${RUNNER_TEMP}/deploy-bad.log" 2>&1 || status=$?
+          cat "${RUNNER_TEMP}/deploy-bad.log"
+          test "${status}" = 1
+          test -z "$(docker compose --profile public ps --status running -q proxy)"
+          if curl -s -o /dev/null --connect-timeout 5 --resolve api.voracious.test:443:127.0.0.1 \
+              --cacert "${RUNNER_TEMP}/caddy-root.crt" https://api.voracious.test/health; then
+            echo "el 443 responde tras un despliegue fallido"
+            exit 1
+          fi
+      - name: El trabajo no tocó la configuración versionada de la demo
+        # Todo lo de este trabajo vive en RUNNER_TEMP: ni .sops.yaml ni deploy/demo cambian, ni
+        # aparecen ficheros nuevos allí (git diff no ve los que no tienen seguimiento).
+        run: |
+          changes=$(git status --porcelain --untracked-files=all -- .sops.yaml deploy/demo)
+          if [ -n "${changes}" ]; then
+            echo "${changes}"
+            exit 1
+          fi
       - name: Logs y limpieza
         if: always()
         run: |
-          docker compose logs --no-color || true
-          docker compose down -v --remove-orphans || true
+          docker compose --profile public logs --no-color || true
+          docker compose --profile public down -v --remove-orphans || true
 
   sanitizers:
     # M2: la extensión C de pymrcd con ASan y UBSan; cualquier aviso aborta (-fno-sanitize-recover).

@@ -11,6 +11,10 @@ ajuste → límites → modelo con ese ajuste y esos límites. Sin depuración a
 tubería falla con su error (``details.step`` y ``details.step_id``). Las decisiones pendientes se
 comprueban antes del primer paso.
 
+Cupo por tenant (``JobAdmission``, mejora M1 del paso E): la tubería ocupa un hueco desde que se
+pide hasta que termina; sus pasos no pasan por el cupo ni cuentan, así que una tubería admitida
+nunca se queda a medias por el cupo.
+
 El avance es atómico (``PipelineRepository.append_step`` con el número de pasos esperado): si dos
 avisos llegan a la vez, solo uno crea el paso siguiente.
 """
@@ -42,6 +46,7 @@ from voracious.application.records import (
     PipelineRecord,
     PipelineStep,
 )
+from voracious.application.use_cases.admission import JobAdmission
 from voracious.application.use_cases.common import INTERNAL_ERROR
 from voracious.application.use_cases.steps import (
     RequestExclusion,
@@ -105,6 +110,7 @@ class RequestPhase1Pipeline:
         queue: Cola.
         ids: Identificadores.
         clock: Reloj.
+        admission: Cupo por tenant de trabajos de cómputo activos (la tubería ocupa un hueco).
     """
 
     steps: Phase1StepsRegistry
@@ -113,6 +119,7 @@ class RequestPhase1Pipeline:
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
+    admission: JobAdmission
 
     def execute(
         self,
@@ -140,6 +147,8 @@ class RequestPhase1Pipeline:
             UnknownChartError: Si la carta no expone pasos.
             DatasetNotFoundError: Si el dataset no existe.
             InvalidInputError: Si la carta no admite el dataset o una fila es inválida.
+            TooManyJobsError: Si el tenant ya tiene su cupo de trabajos activos (se comprueba
+                tras las validaciones síncronas).
         """
         steps = resolve_steps(self.steps, chart_id)
         dataset = get_dataset(self.datasets, tenant_id, dataset_id)
@@ -151,6 +160,8 @@ class RequestPhase1Pipeline:
                 "la exclusión humana no puede quitar todas las filas",
                 details={"field": "assignable_cause", "n": int(human.size)},
             )
+        encoded = steps.encode_params(params)
+        self.admission.check(tenant_id)
         record = PipelineRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -158,7 +169,7 @@ class RequestPhase1Pipeline:
             kind=PipelineKind.PHASE1,
             status=JobStatus.QUEUED,
             dataset_id=dataset_id,
-            params=steps.encode_params(params),
+            params=encoded,
             assignable_cause=causes,
             lifecycle_policy=lifecycle_policy
             if lifecycle_policy is not None

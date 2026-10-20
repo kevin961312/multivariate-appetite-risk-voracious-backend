@@ -3,6 +3,11 @@
 ``CODE_TO_STATUS`` es la tabla única código → estado HTTP. Los errores síncronos (validación,
 estado, recurso inexistente) se responden aquí; los fallos de dominio de un **trabajo** no son
 errores HTTP: quedan en el registro ``failed`` y se devuelven en el cuerpo del ``GET`` con 200.
+
+Una excepción inesperada no la atiende un manejador de FastAPI sino ``ErrorBoundaryMiddleware``:
+Starlette instala el manejador de ``Exception`` en ``ServerErrorMiddleware``, **fuera** de los
+middlewares de usuario, y ese ``500`` saldría sin las cabeceras de CORS. La barrera va dentro de
+``CORSMiddleware`` (paso E, E14).
 """
 
 from collections.abc import Mapping
@@ -14,6 +19,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from voracious.application.auth import UNAUTHENTICATED
 from voracious.application.errors import ApplicationError
@@ -23,7 +29,9 @@ from voracious.domain.common import DomainError, InvalidInputError
 __all__ = [
     "CODE_TO_STATUS",
     "DEFAULT_DOMAIN_STATUS",
+    "UNHANDLED_EXCEPTION_EVENT",
     "ApiError",
+    "ErrorBoundaryMiddleware",
     "error_response",
     "handle_error",
     "install_error_handlers",
@@ -31,6 +39,9 @@ __all__ = [
 ]
 
 _log = structlog.get_logger(__name__)
+
+UNHANDLED_EXCEPTION_EVENT = "unhandled_exception"
+"""Evento del log de una excepción inesperada (con la traza; nunca va al cuerpo)."""
 
 CODE_TO_STATUS: Mapping[str, int] = {
     # 401: falta el token o no es válido (``details.reason``; con ``WWW-Authenticate``).
@@ -75,6 +86,10 @@ CODE_TO_STATUS: Mapping[str, int] = {
     "RECALIBRATION_MISMATCH": 422,
     "VERSION_INPUTS_MISMATCH": 422,
     "VARIABLES_MISMATCH": 422,
+    # 429: demasiadas peticiones por IP (``Retry-After``) o demasiados trabajos de cómputo en
+    # cola o en curso para el tenant (``details.max_active_jobs``).
+    "RATE_LIMITED": 429,
+    "TOO_MANY_JOBS": 429,
     # 500: fallo inesperado (el detalle va al log, nunca al cuerpo).
     INTERNAL_ERROR: 500,
     # 503: el servicio se reinició con el trabajo en curso (Paso 4.2). Solo aparece en el cuerpo
@@ -218,14 +233,18 @@ def _http(exc: StarletteHTTPException) -> JSONResponse:
 
 
 async def handle_error(request: Request, exc: Exception) -> JSONResponse:
-    """Manejador único: traduce cualquier excepción al formato ``{code, message, details}``.
+    """Manejador de los errores conocidos: los traduce al formato ``{code, message, details}``.
 
     Args:
         request: Petición.
-        exc: Excepción.
+        exc: Excepción (de uno de los tipos que registra ``install_error_handlers``).
 
     Returns:
         La respuesta de error.
+
+    Raises:
+        Exception: La propia ``exc`` si no es de un tipo conocido, para que la atienda
+            ``ErrorBoundaryMiddleware``.
     """
     if isinstance(exc, ApplicationError | ApiError):
         return _coded(request, exc.code, exc.message, exc.details)
@@ -236,14 +255,13 @@ async def handle_error(request: Request, exc: Exception) -> JSONResponse:
         return _validation(exc)
     if isinstance(exc, StarletteHTTPException):
         return _http(exc)
-    _log.error(
-        "unhandled_exception", path=request.url.path, exc_info=(type(exc), exc, exc.__traceback__)
-    )
-    return _internal()
+    raise exc
 
 
 def install_error_handlers(app: FastAPI) -> None:
-    """Registra los manejadores de error en la aplicación.
+    """Registra los manejadores de los errores conocidos en la aplicación.
+
+    Las excepciones inesperadas no tienen manejador aquí: las atiende ``ErrorBoundaryMiddleware``.
 
     Args:
         app: Aplicación.
@@ -254,6 +272,56 @@ def install_error_handlers(app: FastAPI) -> None:
         ApiError,
         RequestValidationError,
         StarletteHTTPException,
-        Exception,
     ):
         app.add_exception_handler(kind, handle_error)
+
+
+class ErrorBoundaryMiddleware:
+    """Middleware ASGI que convierte una excepción inesperada en ``500 INTERNAL_ERROR``.
+
+    Registra ``unhandled_exception`` con la traza (una vez) y, si la respuesta aún no empezó,
+    responde en el formato uniforme sin detalles; si ya empezó, relanza la excepción (no se puede
+    cambiar un estado ya enviado). Solo ``http``: ``lifespan`` y WebSocket pasan intactos.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        """Construye el middleware.
+
+        Args:
+            app: Aplicación ASGI interior.
+        """
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Atiende una conexión ASGI.
+
+        Args:
+            scope: Scope.
+            receive: Canal de entrada.
+            send: Canal de salida.
+
+        Raises:
+            Exception: La excepción de la aplicación si la respuesta ya había empezado.
+        """
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        started = False
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal started
+            if message["type"] == "http.response.start":
+                started = True
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracking_send)
+        except Exception as exc:
+            _log.error(
+                UNHANDLED_EXCEPTION_EVENT,
+                path=scope.get("path"),
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
+            if started:
+                raise
+            await _internal()(scope, receive, send)

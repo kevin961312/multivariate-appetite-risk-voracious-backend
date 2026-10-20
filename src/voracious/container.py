@@ -80,6 +80,7 @@ from voracious.application.use_cases import (
     RunVersionProposalJob,
     UploadDataset,
 )
+from voracious.application.use_cases.admission import JobAdmission
 from voracious.config import Settings
 from voracious.domain.charts.t2mrcd import CHART_ID as T2MRCD_CHART_ID
 from voracious.domain.charts.t2mrcd import T2MRCDChart
@@ -790,8 +791,11 @@ def build_container(
         },
     )
     chain = RecalibrationChain(rsteps, recalibrations, versions, annotations, clock)
-    request_fit = RequestFit(steps, datasets, fits, queue, ids, clock, chain)
-    request_limits = RequestLimits(steps, datasets, fits, limits, queue, ids, clock, chain)
+    admission = JobAdmission(fits, limits, pipelines, resolved.max_active_jobs_per_tenant)
+    request_fit = RequestFit(steps, datasets, fits, queue, ids, clock, admission, chain)
+    request_limits = RequestLimits(
+        steps, datasets, fits, limits, queue, ids, clock, admission, chain
+    )
     request_exclusion = RequestExclusion(steps, datasets, exclusions, queue, ids, clock, chain)
     request_model = RequestModel(steps, datasets, fits, limits, models, queue, ids, clock)
     request_extension = RequestRecalibrationExtension(
@@ -876,7 +880,9 @@ def build_container(
         request_exclusion=request_exclusion,
         get_exclusion=GetExclusion(steps, exclusions),
         request_model=request_model,
-        request_pipeline=RequestPhase1Pipeline(steps, datasets, pipelines, queue, ids, clock),
+        request_pipeline=RequestPhase1Pipeline(
+            steps, datasets, pipelines, queue, ids, clock, admission
+        ),
         get_pipeline=GetPipeline(steps, pipelines),
         get_model=GetModel(registry, models),
         monitor=MonitorObservations(registry, models, versions, monitorings, queue, ids, clock),
@@ -903,6 +909,7 @@ def build_container(
             queue,
             ids,
             clock,
+            admission,
         ),
         get_recalibration=GetRecalibration(registry, recalibrations),
         cancel_recalibration=CancelRecalibration(registry, recalibrations, clock),

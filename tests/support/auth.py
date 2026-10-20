@@ -39,13 +39,27 @@ OTHER_KEY_PEM, _ = generate_ed25519_key(TEST_KID)
 JWKS_FILE = _DIR / "jwks.json"
 JWKS_FILE.write_text(add_public_key(None, PUBLIC_JWK), encoding="utf-8")
 
+TEST_RATE_LIMIT = 1_000_000
+"""Límite de peticiones (por minuto y ráfaga) de los tests de la API (SOLO TEST).
+
+``TestClient`` llama siempre como el cliente ``testclient`` (no es loopback, así que no está
+exento) y una suite dispara cientos de peticiones por segundo contra la misma aplicación: con los
+valores por defecto (600/min, ráfaga de 120) acabaría en ``429``. El limitador se prueba con sus
+valores por defecto en ``tests/unit/test_rate_limit.py`` (se pasan explícitos a ``auth_settings``).
+"""
+
 
 def auth_settings(**overrides: object) -> Settings:
-    """``Settings`` con la autenticación de prueba (JWKS temporal, emisor y audiencia de test)."""
+    """``Settings`` con la autenticación de prueba (JWKS temporal, emisor y audiencia de test).
+
+    El límite de peticiones queda en ``TEST_RATE_LIMIT`` salvo que se pase otro en ``overrides``.
+    """
     values: dict[str, Any] = {
         "jwt_jwks_file": JWKS_FILE,
         "jwt_issuer": TEST_ISSUER,
         "jwt_audience": TEST_AUDIENCE,
+        "rate_limit_per_minute": TEST_RATE_LIMIT,
+        "rate_limit_burst": TEST_RATE_LIMIT,
         **overrides,
     }
     return Settings(**values)

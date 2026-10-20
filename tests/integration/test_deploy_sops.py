@@ -4,6 +4,11 @@ Todo en directorios temporales con una llave age de PRUEBA: ``deploy.sh --decryp
 directorio 0700 con ficheros 0444, rechaza llaves abiertas, directorios dentro del repo y ``.env``
 con secretos; ``jwt_keygen.sh`` + ``issue_token.sh --via uv`` emiten un token que verifica con el
 JWKS generado. Ningún valor secreto aparece en la salida.
+
+Las precondiciones del paso E (``api.env`` obligatorio, ``proxy.env`` con host y modo de TLS
+válidos, ``COMPOSE_PROFILES`` prohibido en ``.env``) se prueban sin Docker: ``deploy.sh`` sale con 2
+antes de descifrar nada. El camino completo, con Docker y el proxy, lo prueba el trabajo ``image``
+de CI.
 """
 
 import json
@@ -60,14 +65,21 @@ def age(tmp_path: Path) -> Age:
 
 
 def _encrypt(age: Age, target: Path, plaintext: str) -> None:
+    """Cifra para la llave de PRUEBA con una configuración propia (``--config``).
+
+    Nunca con el ``.sops.yaml`` del repositorio: sops lo buscaría desde el directorio de trabajo
+    (la raíz), ninguna de sus reglas casa con ``/dev/stdin`` y además cifraría para el servidor.
+    """
     assert SOPS is not None
+    config = age.key_file.with_name("sops-test.yaml")
+    config.write_text(f"creation_rules:\n  - age: {age.recipient}\n", encoding="utf-8")
     result = run_tool(
         [
             SOPS,
             "--disable-version-check",
+            "--config",
+            str(config),
             "encrypt",
-            "--age",
-            age.recipient,
             "--input-type",
             "yaml",
             "--output-type",
@@ -92,6 +104,33 @@ def deploy_dir(tmp_path: Path, age: Age) -> Path:
 def _deploy(*args: str, env: Mapping[str, str]) -> CompletedProcess[str]:
     assert BASH is not None
     return _run([BASH, str(ROOT / "scripts" / "deploy.sh"), *args], env)
+
+
+def _public_files(directory: Path) -> None:
+    """Ficheros públicos que ``deploy.sh`` exige antes de desplegar (valores de PRUEBA)."""
+    (directory / "jwks.json").write_text('{"keys": []}', encoding="utf-8")
+    (directory / "auth.env").write_text("VORACIOUS_JWT_ISSUER=i\n", encoding="utf-8")
+    (directory / "api.env").write_text("VORACIOUS_CORS_ALLOWED_ORIGINS=*\n", encoding="utf-8")
+
+
+def _refusal(
+    deploy_dir: Path, age: Age, tmp_path: Path, env_text: str = ""
+) -> CompletedProcess[str]:
+    """Despliega con un ``.env`` propio y ``COMPOSE_PROFILES=public`` en el entorno (se ignora)."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(env_text, encoding="utf-8")
+    env = {
+        "DEPLOY_DIR": str(deploy_dir),
+        "SOPS_AGE_KEY_FILE": str(age.key_file),
+        "DEPLOY_ENV_FILE": str(env_file),
+        "XDG_STATE_HOME": str(tmp_path / "state"),
+        "COMPOSE_PROFILES": "public",
+    }
+    return _deploy(env=env)
+
+
+NO_DOCKER_OR_CURL = shutil.which("docker") is None or shutil.which("curl") is None
+"""Sin Docker o sin curl la precondición que falla antes es otra (también con salida 2)."""
 
 
 def test_the_encrypted_file_passes_the_repository_check(deploy_dir: Path) -> None:
@@ -160,8 +199,7 @@ def test_decrypt_only_with_the_wrong_key_fails_without_showing_values(
 def test_deploy_refuses_an_env_file_with_secrets(
     deploy_dir: Path, age: Age, tmp_path: Path
 ) -> None:
-    (deploy_dir / "jwks.json").write_text('{"keys": []}', encoding="utf-8")
-    (deploy_dir / "auth.env").write_text("VORACIOUS_JWT_ISSUER=i\n", encoding="utf-8")
+    _public_files(deploy_dir)
     env_file = tmp_path / ".env"
     env_file.write_text(
         f"POSTGRES_USER=voracious\nPOSTGRES_PASSWORD={FAKE_PG_CREDENTIAL}\n"
@@ -183,6 +221,66 @@ def test_deploy_refuses_an_env_file_with_secrets(
     assert "VORACIOUS_DATABASE_URL" not in result.stderr  # vacía: no es un secreto
     assert FAKE_PG_CREDENTIAL not in result.stdout + result.stderr
     assert not (tmp_path / "state").exists()  # no descifra nada si se niega
+
+
+def test_deploy_refuses_without_api_env(deploy_dir: Path, age: Age, tmp_path: Path) -> None:
+    _public_files(deploy_dir)
+    (deploy_dir / "api.env").unlink()
+    result = _refusal(deploy_dir, age, tmp_path)
+    assert result.returncode == 2
+    if NO_DOCKER_OR_CURL:
+        return
+    assert "api.env" in result.stderr
+    assert not (tmp_path / "state").exists()
+
+
+def test_deploy_refuses_compose_profiles_in_the_env_file(
+    deploy_dir: Path, age: Age, tmp_path: Path
+) -> None:
+    _public_files(deploy_dir)
+    result = _refusal(
+        deploy_dir, age, tmp_path, "POSTGRES_USER=voracious\nCOMPOSE_PROFILES=public\n"
+    )
+    assert result.returncode == 2
+    if NO_DOCKER_OR_CURL:
+        return
+    assert "COMPOSE_PROFILES" in result.stderr
+    assert not (tmp_path / "state").exists()
+
+
+@pytest.mark.parametrize(
+    ("proxy_env", "message"),
+    [
+        ("PROXY_TLS_MODE=internal\n", "no define PROXY_PUBLIC_HOST"),
+        ("PROXY_PUBLIC_HOST=\nPROXY_TLS_MODE=acme\n", "no define PROXY_PUBLIC_HOST"),
+        ("PROXY_PUBLIC_HOST=api.voracious.cloud {\nPROXY_TLS_MODE=acme\n", "nombre DNS"),
+        ("PROXY_PUBLIC_HOST=API.voracious.cloud\nPROXY_TLS_MODE=acme\n", "nombre DNS"),
+        ("PROXY_PUBLIC_HOST=localhost\nPROXY_TLS_MODE=acme\n", "nombre DNS"),
+        ("PROXY_PUBLIC_HOST=api.voracious.cloud\n", "acme o internal"),
+        ("PROXY_PUBLIC_HOST=api.voracious.cloud\nPROXY_TLS_MODE=off\n", "acme o internal"),
+    ],
+    ids=[
+        "sin-host",
+        "host-vacio",
+        "host-con-llave",
+        "mayusculas",
+        "sin-punto",
+        "sin-modo",
+        "modo-off",
+    ],
+)
+def test_deploy_refuses_an_invalid_proxy_env(
+    deploy_dir: Path, age: Age, tmp_path: Path, proxy_env: str, message: str
+) -> None:
+    _public_files(deploy_dir)
+    (deploy_dir / "proxy.env").write_text(proxy_env, encoding="utf-8")
+    result = _refusal(deploy_dir, age, tmp_path)
+    assert result.returncode == 2
+    if NO_DOCKER_OR_CURL:
+        return
+    assert "proxy.env" in result.stderr
+    assert message in result.stderr
+    assert not (tmp_path / "state").exists()
 
 
 @pytest.mark.skipif(UV is None, reason="sin uv")

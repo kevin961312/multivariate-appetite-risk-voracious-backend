@@ -1,0 +1,11 @@
+# Modo internal (PROXY_TLS_MODE=internal: CI y pruebas locales): certificado de la CA propia de Caddy,
+# sin contactar con ninguna autoridad. La raíz queda en /data/caddy/pki/authorities/local/root.crt;
+# deploy.sh y CI la usan con curl --cacert (nunca -k). Su certificado dura horas, no semanas.
+# La raíz no se instala en el almacén del sistema (no root, raíz de solo lectura).
+(tls_global) {
+	skip_install_trust
+}
+
+(tls_site) {
+	tls internal
+}

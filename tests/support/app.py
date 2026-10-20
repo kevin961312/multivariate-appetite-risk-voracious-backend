@@ -72,9 +72,14 @@ from voracious.application.use_cases import (
     RunVersionProposalJob,
     UploadDataset,
 )
+from voracious.application.use_cases.admission import JobAdmission
+from voracious.config import Settings
 from voracious.domain.charts.t2mrcd import T2MRCDChart
 from voracious.domain.common import SerialTaskMapper
 from voracious.infrastructure.charts import T2MRCDPhase1Steps, T2MRCDRecalibrationSteps
+
+DEFAULT_MAX_ACTIVE_JOBS: int = Settings.model_fields["max_active_jobs_per_tenant"].default
+"""Cupo por defecto de ``VORACIOUS_MAX_ACTIVE_JOBS_PER_TENANT`` (el de ``config.Settings``)."""
 
 
 @dataclass
@@ -105,6 +110,13 @@ class App:
     limits: InMemoryLimitsRepository = field(default_factory=InMemoryLimitsRepository)
     exclusions: InMemoryExclusionRepository = field(default_factory=InMemoryExclusionRepository)
     pipelines: InMemoryPipelineRepository = field(default_factory=InMemoryPipelineRepository)
+    max_active_jobs: int = DEFAULT_MAX_ACTIVE_JOBS
+    """Cupo por tenant de trabajos de cómputo activos (el de producción si no se pide otro)."""
+
+    @property
+    def admission(self) -> JobAdmission:
+        """Cupo por tenant sobre los repositorios de la app (como ``build_container``)."""
+        return JobAdmission(self.fits, self.limits, self.pipelines, self.max_active_jobs)
 
     @property
     def steps(self) -> dict[str, Phase1Steps]:
@@ -145,7 +157,14 @@ class App:
 
     def request_fit(self) -> RequestFit:
         return RequestFit(
-            self.steps, self.datasets, self.fits, self.queue, self.ids, self.clock, self.chain
+            self.steps,
+            self.datasets,
+            self.fits,
+            self.queue,
+            self.ids,
+            self.clock,
+            self.admission,
+            self.chain,
         )
 
     def get_fit(self) -> GetFit:
@@ -163,6 +182,7 @@ class App:
             self.queue,
             self.ids,
             self.clock,
+            self.admission,
             self.chain,
         )
 
@@ -231,7 +251,13 @@ class App:
 
     def request_pipeline(self) -> RequestPhase1Pipeline:
         return RequestPhase1Pipeline(
-            self.steps, self.datasets, self.pipelines, self.queue, self.ids, self.clock
+            self.steps,
+            self.datasets,
+            self.pipelines,
+            self.queue,
+            self.ids,
+            self.clock,
+            self.admission,
         )
 
     def get_pipeline(self) -> GetPipeline:
@@ -342,6 +368,7 @@ class App:
             self.queue,
             self.ids,
             self.clock,
+            self.admission,
         )
 
     def run_recalibration(self) -> RunRecalibrationJob:

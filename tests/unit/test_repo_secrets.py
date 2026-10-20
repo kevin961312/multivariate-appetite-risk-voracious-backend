@@ -102,9 +102,14 @@ def _ignored_by_git(paths: Sequence[str]) -> set[str]:
 def test_deploy_is_an_allowlist_in_gitignore() -> None:
     kept = [
         "deploy/demo/auth.env",
+        "deploy/demo/api.env",
+        "deploy/demo/proxy.env",
         "deploy/demo/jwks.json",
         "deploy/demo/x.enc.yaml",
         "deploy/otro/sub/secrets.enc.yaml",
+        "deploy/proxy/Dockerfile",
+        "deploy/proxy/Caddyfile",
+        "deploy/proxy/tls-acme.caddy",
     ]
     dropped = [
         "deploy/demo/secrets.yaml",
@@ -113,6 +118,9 @@ def test_deploy_is_an_allowlist_in_gitignore() -> None:
         "deploy/demo/keys.txt",
         "deploy/demo/notas.txt",
         "deploy/otro/sub/.env",
+        "deploy/proxy/root.crt",
+        "deploy/proxy/notas.txt",
+        "deploy/proxy/.env",
     ]
     assert _ignored_by_git([*kept, *dropped]) == set(dropped)
 

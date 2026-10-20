@@ -413,6 +413,7 @@ def test_recalibration_datasets_need_the_links() -> None:
         app.queue,
         app.ids,
         app.clock,
+        app.admission,
     )
     with pytest.raises(RecalibrationMismatchError) as info:
         unwired.execute(TENANT, CHART, fit_id, None, recalibration_id=session.recalibration_id)
@@ -424,7 +425,9 @@ def test_recalibration_datasets_need_the_links() -> None:
 def test_fit_on_recalibration_datasets_needs_the_links() -> None:
     app, model_id = _scored_app()
     session = _open(app, model_id, force_replace=True)
-    unwired = RequestFit(app.steps, app.datasets, app.fits, app.queue, app.ids, app.clock)
+    unwired = RequestFit(
+        app.steps, app.datasets, app.fits, app.queue, app.ids, app.clock, app.admission
+    )
     with pytest.raises(RecalibrationMismatchError) as info:
         unwired.execute(TENANT, CHART, session.candidates_dataset_id or "", None)
     assert info.value.details == {"reason": "not_wired"}

@@ -63,6 +63,28 @@ def test_container_wires_use_cases_and_handlers() -> None:
         container.shutdown()
 
 
+def test_job_admission_is_shared_and_uses_the_configured_quota() -> None:
+    default = build_container(Settings())
+    custom = build_container(Settings(max_active_jobs_per_tenant=7))
+    try:
+        assert default.use_cases.request_fit.admission.max_active == 4
+        uc = custom.use_cases
+        admissions = [
+            uc.request_fit.admission,
+            uc.request_limits.admission,
+            uc.request_pipeline.admission,
+            uc.request_recalibration.admission,
+        ]
+        assert all(a is admissions[0] for a in admissions)  # un solo cupo por proceso
+        assert admissions[0].max_active == 7
+        assert admissions[0].fits is uc.request_fit.fits
+        assert admissions[0].limits is uc.request_limits.limits
+        assert admissions[0].pipelines is uc.request_pipeline.pipelines
+    finally:
+        default.shutdown()
+        custom.shutdown()
+
+
 def test_mapper_is_serial_or_processes() -> None:
     serial = build_container(Settings())
     procs = build_container(Settings(replicate_processes=2, mrcd_threads=1))

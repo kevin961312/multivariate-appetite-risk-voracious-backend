@@ -16,6 +16,9 @@ Sin comparación de bases (decisión del dueño, 2026-10-14): la recalibración 
 por defecto (``EXTEND``) y la reemplaza (``REPLACE``) solo con ``force_replace`` o tras un evento
 estructural sin resolver, que además solo admite observaciones posteriores al evento (D5). Como
 máximo hay una propuesta pendiente y una recalibración en curso por carta (D6).
+
+En modo ``pipeline`` la petición pasa por el cupo de trabajos del tenant (``JobAdmission``,
+mejora M1 del paso E): su tubería ocupa un hueco y sus pasos no cuentan.
 """
 
 from collections.abc import Sequence
@@ -83,6 +86,7 @@ from voracious.application.records import (
     RecalibrationMode,
     RecalibrationRecord,
 )
+from voracious.application.use_cases.admission import JobAdmission
 from voracious.application.use_cases.common import (
     INTERNAL_ERROR,
     ready_model,
@@ -170,6 +174,8 @@ class RequestRecalibration:
         queue: Cola de trabajos.
         ids: Generador de identificadores.
         clock: Reloj.
+        admission: Cupo por tenant de trabajos de cómputo activos (solo el modo ``pipeline``:
+            su tubería ocupa un hueco).
     """
 
     charts: ChartRegistry
@@ -184,6 +190,7 @@ class RequestRecalibration:
     queue: JobQueue
     ids: IdGenerator
     clock: Clock
+    admission: JobAdmission
 
     def execute(
         self,
@@ -208,7 +215,9 @@ class RequestRecalibration:
         al menos ``min_observations`` candidatas. Los parámetros se guardan codificados (M1).
 
         ``stepwise`` deja la recalibración ``running`` (sesión abierta, sin trabajo encolado);
-        ``pipeline`` la deja ``queued`` y encola su tubería.
+        ``pipeline`` la deja ``queued`` y encola su tubería. Solo ``pipeline`` pasa por el cupo
+        del tenant, tras todas las validaciones y antes de guardar nada: una sesión
+        ``stepwise`` no es un trabajo (cuentan sus ajustes y límites sueltos).
 
         Args:
             tenant_id: Tenant.
@@ -237,6 +246,8 @@ class RequestRecalibration:
             RecalibrationInsufficientObservationsError: Menos candidatas que el mínimo.
             VariablesMismatchError: Si alguna candidata no tiene el número de variables de la
                 base vigente (los nombres ya se comprobaron al puntuarla).
+            TooManyJobsError: En modo ``pipeline``, si el tenant ya tiene su cupo de trabajos
+                activos.
         """
         chart = resolve_chart(self.charts, chart_id)
         steps = resolve_recalibration_steps(self.recalibration_steps, chart_id)
@@ -296,8 +307,11 @@ class RequestRecalibration:
                 details={"available": len(fresh), "required": view.min_observations},
             )
         mode = RecalibrationMode(mode)
-        now = self.clock.now()
         stepwise = mode is RecalibrationMode.STEPWISE
+        inherited = steps.inherited_params(active.model, encoded)
+        if not stepwise:
+            self.admission.check(tenant_id)
+        now = self.clock.now()
         record = RecalibrationRecord(
             tenant_id=tenant_id,
             chart_id=chart_id,
@@ -314,7 +328,7 @@ class RequestRecalibration:
             actor=actor,
             started_at=now if stepwise else None,
             mode=mode,
-            inherited_params=steps.inherited_params(active.model, encoded),
+            inherited_params=inherited,
             candidate_ids=tuple(r.observation_id for r in fresh),
             already_in_base_ids=tuple(r.observation_id for r in already),
             candidates_dataset_id=self.ids.new_id(),

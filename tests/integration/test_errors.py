@@ -8,7 +8,12 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
-from voracious.api.errors import CODE_TO_STATUS, ApiError, install_error_handlers
+from voracious.api.errors import (
+    CODE_TO_STATUS,
+    ApiError,
+    ErrorBoundaryMiddleware,
+    install_error_handlers,
+)
 from voracious.application import errors as app_errors
 from voracious.application.errors import ApplicationError
 from voracious.domain.common import DomainError, InvalidInputError
@@ -36,6 +41,8 @@ class _Body(BaseModel):
 def client() -> Iterator[TestClient]:
     app = FastAPI()
     install_error_handlers(app)
+    # Las excepciones inesperadas las atiende la barrera, no un manejador (paso E, E14).
+    app.add_middleware(ErrorBoundaryMiddleware)
 
     @app.get("/raise/{key}")
     def raise_it(key: str) -> None:
