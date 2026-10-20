@@ -94,3 +94,12 @@ Por qué: la comparación de bases se eliminó (ADR 0008, enmienda 2026-10-14). 
 `recalibrate`. Cadena EXTEND: `[exclusión] → extension → fit → limits → version`; forzada: `[exclusión] → fit →
 limits → version`. La equivalencia en bits se conserva (EXTEND, REPLACE forzado e INSUFFICIENT). Contratos y
 códigos en la enmienda del ADR 0005.
+
+## Enmienda 2026-10-20 (seguridad mínima): identidad por token
+
+Por qué: el punto 7 («`X-Tenant-ID` obligatorio») dejó de ser cierto. Sigue habiendo errores uniformes
+`{code, message, details}` para todos los pasos, pero el tenant ya no llega en una cabecera sin autenticar: sale del
+claim `tenant` de un JWT (`Authorization: Bearer`), y los pasos se reparten en tres niveles de rol (lectura,
+operación, decisión). Ver la enmienda del [ADR 0005](0005-api-fase-i-fase-ii.md) y el
+[ADR 0012](0012-seguridad-minima-sops-jwt.md). La equivalencia en bits entre cadena de pasos, tubería y
+`fit_phase1`/`recalibrate` no cambia.

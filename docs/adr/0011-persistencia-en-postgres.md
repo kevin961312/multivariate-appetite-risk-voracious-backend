@@ -168,3 +168,21 @@ el id de comparación; con `kept_dataset_id` y `extension_dataset_id`). Por la r
 **Guarda:** antes de borrar, `0002` aborta sin aplicar nada si existe cualquier fila en `comparisons` o
 `recalibrations`, o en `model_versions` con `number > 0`. Decisión del dueño: no se escribe lector del formato
 viejo; si la demo tuviera datos viejos se recrea su base. Una base solo con Fase I migra sin pérdida.
+
+## Enmienda 2026-10-20 (seguridad mínima): secretos de Compose
+
+Por qué: el punto 9 decía que los secretos (`POSTGRES_PASSWORD`, `VORACIOUS_DATABASE_URL`) vivían solo en el `.env`
+del servidor, y por `env_file` acababan en `docker inspect`. Sustituye a ese punto en lo que choque
+([ADR 0012](0012-seguridad-minima-sops-jwt.md)):
+
+- Son **Compose secrets** (ficheros descifrados por `scripts/deploy.sh` en `DEPLOY_SECRETS_DIR`, fuera del repo) y
+  se leen con `POSTGRES_PASSWORD_FILE` (Postgres) y `VORACIOUS_DATABASE_URL_FILE` (`migrate` y `api`).
+  `VORACIOUS_DATABASE_URL` directa y `_FILE` son excluyentes; la directa queda para desarrollo, CI y tests.
+- **`backup` lee el secreto** dentro de su `sh -c` (`PGPASSWORD="$(cat /run/secrets/postgres_password)"`): ya no está en
+  su entorno. Restaurar: `docker compose exec backup sh -c 'PGPASSWORD="$(cat /run/secrets/postgres_password)" pg_restore …'`.
+- **El `.env` del servidor ya no lleva secretos:** `deploy.sh` se niega a desplegar si trae `POSTGRES_PASSWORD`,
+  `VORACIOUS_DATABASE_URL`, `PGPASSWORD` o algo `*PRIVATE*` con valor.
+- `POSTGRES_PASSWORD_FILE` solo se usa al crear la base (`initdb`): con un `pgdata` existente el secreto cifrado debe
+  ser la contraseña actual.
+- Siguen sin cambio: la base no publica puertos y la API solo está en `127.0.0.1`. Los volcados siguen en el mismo
+  servidor (deuda M8).

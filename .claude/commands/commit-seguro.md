@@ -23,6 +23,15 @@ para archivos nuevos, `Read`).
   `api_key`, `PRIVATE KEY`, `AKIA`, `sk-`, `ghp_`, cadenas de conexión con credenciales (`://user:pass@`).
   `.env.example` solo puede tener valores de ejemplo vacíos o ficticios.
 - Archivos grandes o binarios no esperados.
+- **Cifrados con SOPS:** `deploy/**/*.enc.yaml` (y `.sops.yaml`, `deploy/demo/jwks.json`, `deploy/demo/auth.env`) se
+  aceptan **solo si `tests/unit/test_repo_secrets.py` está en verde** (comprueba que cada valor es `ENC[AES256_GCM,…]` con
+  MAC, que el JWKS no tiene miembros privados, que `.sops.yaml` solo tiene receptores `age1…` y que no hay llaves privadas
+  en el árbol). Una llave age privada (`AGE-SECRET-KEY-`), un `keys.txt`, un PEM privado o un `*.dec.*` bloquean siempre.
+- **Falsos positivos conocidos** (no bloquean, pero se mira que siga siendo lo mismo): `tests/integration/test_deploy_sops.py`
+  (credencial y URL falsas de prueba y el literal `"PRIVATE KEY"`), el `printf` con `%s` de `ci.yml` (contraseña de
+  prueba aleatoria y enmascarada), `compose.test.yaml` (credenciales de un contenedor efímero) y los **nombres de clave en
+  claro** de los ficheros SOPS (`postgres_password`, `database_url`, `jwt_private_key`: el valor va cifrado).
+- **`docs/guia/` va en su propio commit** (documentación de marca), nunca mezclada con el de seguridad.
 
 ## 3. Compuerta
 

@@ -31,3 +31,12 @@ justamente la parte más cara de validar (fidelidad a `rrcov`).
   reescribir al introducir workers.
 - **Construir ya Celery/Postgres:** infraestructura sin uso real todavía; retrasa el cascarón y añade
   superficie de fallo.
+
+## Enmienda 2026-10-20 (seguridad mínima): `TenantContext` nunca existió
+
+Por qué: la lista de puertos de la «Decisión» nombra `TenantContext`, pero ese puerto no llegó a crearse; el tenant
+era una dependencia de FastAPI (`api/tenant.py`) que pasaba un `str` a los casos de uso. No se reescribe el texto
+original: el puerto real es **`TokenVerifier`** (`application/ports.py`, `verify(token) -> Principal`), cuyo
+adaptador es `JwtTokenVerifier` en `infrastructure/auth/` y cuyo tipo `Principal` (sujeto, tenant, roles,
+caducidad, `jti`) vive en `application/auth.py`. El tenant de todo caso de uso sale de `Principal.tenant_id`.
+Decisiones y alternativas en el [ADR 0012](0012-seguridad-minima-sops-jwt.md).

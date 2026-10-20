@@ -255,3 +255,25 @@ Por qué: se elimina la comparación de bases (ADR 0008, enmienda 2026-10-14). S
   `[exclusión] → fit → limits → version`. Una sesión usa una sola operación (M3): NEW_ROWS si es forzada,
   EXTENSION si no; `/fits` y `/limits` lo comprueban.
 - **Pasos de tubería:** `exclusion, fit, limits, model, version` (más `extension` en EXTEND). Informe en formato 3.
+
+## Enmienda 2026-10-20 (seguridad mínima): autenticación, 401/403 y matriz de roles
+
+El texto original no se reescribe. Sustituye a lo anterior en lo que choque; decisiones y alternativas en el
+[ADR 0012](0012-seguridad-minima-sops-jwt.md).
+
+- **`X-Tenant-ID` desaparece.** Las menciones de la enmienda del Paso 3 («Todas exigen `X-Tenant-ID`») y la fila
+  `400 TENANT_REQUIRED` del catálogo quedan sustituidas: **toda ruta de negocio exige `Authorization: Bearer <JWT>`**
+  y el tenant sale del claim `tenant`. Un recurso de otro tenant sigue respondiendo como inexistente. La cabecera, si
+  llega, se ignora. `TENANT_REQUIRED` sale del catálogo.
+- **Códigos nuevos:** `401 UNAUTHENTICATED` con `details.reason` en {`missing_token`, `malformed`, `unknown_key`,
+  `algorithm_not_allowed`, `bad_signature`, `expired`, `not_yet_valid`, `wrong_issuer`, `wrong_audience`,
+  `missing_claim`, `invalid_claim`, `lifetime_too_long`} y `WWW-Authenticate: Bearer realm="voracious"` (más
+  `error="invalid_token"` si se presentó un token); `403 FORBIDDEN` con `details.required_roles`.
+- **Rutas públicas** (solo por HTTP): `/health`, `/ready`, `/docs`, `/docs/oauth2-redirect`, `/redoc` y
+  `/openapi.json`. Una ruta inexistente responde `401` sin token y `404 ROUTE_NOT_FOUND` con él.
+- **Matriz de roles:** lectura (todos los `GET` de negocio) = analyst, approver, admin; operación (todos los `POST`
+  salvo la decisión, incluida la propuesta de versión) = analyst, admin; decisión (`…/versions/{n}/approve` y
+  `…/reject`) = approver, admin. La autorización por rol se evalúa después de leer el cuerpo en las rutas con
+  cuerpo Pydantic: con un JSON mal formado responde `422` antes que `403`.
+- **`actor` fuera de los cuerpos:** anotaciones, eventos estructurales, aprobación, rechazo y recalibración ya no
+  aceptan `actor`; enviarlo da `422` (campo extra). El actor y `decided_by` son el `sub` del token.

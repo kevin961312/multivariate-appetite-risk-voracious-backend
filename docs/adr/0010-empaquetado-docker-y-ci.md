@@ -122,3 +122,26 @@ Decisiones de fondo en el [ADR 0011](0011-persistencia-en-postgres.md); aquí so
   solo para interpolar.
 - **Credenciales de prueba** en `compose.test.yaml` y en `ci.yml`: no son secretos (contenedor efímero). Las reales
   están únicamente en el `.env` del servidor.
+
+## Enmienda 2026-10-20 (seguridad mínima): secretos, trabajo `image` y shellcheck
+
+Por qué: con secretos en ficheros cifrados (Compose secrets, [ADR 0012](0012-seguridad-minima-sops-jwt.md)) el
+trabajo `image` ya no puede arrancar la imagen «sin configuración» ni validar Compose con un valor de relleno de
+`POSTGRES_PASSWORD`. Sustituye lo anterior en lo que choque.
+
+- **CI instala sops, age y shellcheck** en el trabajo `gate` (sops 3.13.3 fijado por versión y SHA-256; age y
+  shellcheck por `apt`). Con ellos corre `tests/integration/test_deploy_sops.py` (que sin sops ni age se salta; en CI
+  corre) y la etapa `shellcheck` de la compuerta.
+- **Trabajo `image` con la pila completa:** secretos de **prueba** en ficheros (contraseña aleatoria por ejecución),
+  `docker compose config` que debe fallar sin `DEPLOY_SECRETS_DIR`, la imagen que no arranca sin `VORACIOUS_JWT_*`,
+  llave age y llave JWT efímeras generadas por la vía del servidor (`jwt_keygen.sh` e `issue_token.sh --via docker`),
+  y la pila `postgres`, `migrate`, `api` y `backup`. Comprueba: `/health` y `/ready` sin token (que `/ready` dé 200
+  prueba que la API leyó `_FILE` y conectó); 401 con `WWW-Authenticate`; un token emitido por la CLI de la imagen da
+  `404 DATASET_NOT_FOUND`; **ningún log con query** (marca en `?access_token=`); `docker inspect` sin la contraseña ni
+  la URL; el registro de `backup` con un volcado hecho (prueba la contraseña leída del fichero); uid distinto de 0,
+  sin compilador y `HEALTHCHECK` sano. La imagen se etiqueta `voracious:local` (la que usan los scripts).
+- **Etapa `shellcheck` en `scripts/gate.sh`** y shellcheck en la etapa `gate` de la imagen. Sin shellcheck en el
+  `PATH`, la compuerta usa la imagen oficial fijada por digest con Docker.
+- `gate.sh` termina con `[ "${failed}" -eq 0 ]` en lugar de `exit "${failed}"`: así la trampa `EXIT` sigue bajando
+  Postgres sin cambiar el código y shellcheck ve que las funciones de arriba se usan (SC2329).
+- El `CMD` de la imagen lleva `--no-access-log` (ADR 0012).

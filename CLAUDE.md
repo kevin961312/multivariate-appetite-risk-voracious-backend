@@ -6,7 +6,7 @@ otra fuente, manda este archivo; si está desactualizado, se corrige aquí prime
 ## Qué es
 
 Backend SaaS para monitorear el **apetito de riesgo multivariado** de portafolios financieros con la carta
-de control robusta **T²MRCD**. Hoy tiene el núcleo (`pymrcd`), la carta T²MRCD con su ciclo de vida, la API por pasos, Docker y CI; el estado persiste en Postgres (Paso 4.2, [ADR 0011](docs/adr/0011-persistencia-en-postgres.md)); la cola sigue en el proceso (la cola distribuida llega después).
+de control robusta **T²MRCD**. Hoy tiene el núcleo (`pymrcd`), la carta T²MRCD con su ciclo de vida, la API por pasos, Docker y CI; el estado persiste en Postgres (Paso 4.2, [ADR 0011](docs/adr/0011-persistencia-en-postgres.md)); la cola sigue en el proceso (la cola distribuida llega después). **La API ya exige JWT** (seguridad mínima, [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md), propuesto): `Authorization: Bearer` en toda ruta de negocio, tenant y roles del token, y secretos cifrados con SOPS + age; sigue sin exponerse (`127.0.0.1` y túnel SSH) hasta tener HTTPS y el login del banco.
 Tiene que poder crecer a la arquitectura distribuida **sin reescribir el dominio ni los casos de uso**.
 
 ## 1. Lo que no se negocia (producto)
@@ -67,13 +67,13 @@ Detalle en [`docs/arquitectura.md`](docs/arquitectura.md). Cada pieza distribuid
 | Versiones, observaciones, anotaciones, eventos y recalibraciones | `ModelVersionRepository`, `ObservationRepository`, `SignalAnnotationRepository`, `StructuralEventRepository`, `RecalibrationRepository` | `memory` (altas atómicas) o Postgres (índices únicos parciales) | Postgres con TimescaleDB |
 | Pasos por carta | `Phase1Steps`, `RecalibrationSteps` | `infrastructure/charts/t2mrcd_*.py` | un adaptador por carta |
 | Reparto de réplicas | `TaskMapper` | `SerialTaskMapper` o `ProcessPoolTaskMapper` | Celery/Dask |
-| Tenant | `TenantContext` | cabecera `X-Tenant-ID` (`400 TENANT_REQUIRED`) | JWT/OIDC |
+| Identidad y tenant | `TokenVerifier` | `JwtTokenVerifier`, JWKS en fichero | JWKS del IdP |
 
 Puertos auxiliares: `IdGenerator` y `Clock` (`UuidIdGenerator`, `SystemClock`). El `JobQueue` recibe un
 `JobRequest` con solo identificadores. Variables: `VORACIOUS_LOG_LEVEL`, `_MRCD_THREADS`, `_JOB_BACKEND`,
 `_REPOSITORY` (`memory|postgres`), `_DATABASE_URL` (secreto) y `_DATABASE_POOL_SIZE`, `_STORAGE` (`memory|local`; `postgres` exige `local`), `_STORAGE_DIR`, `_REPLICATE_PROCESSES`,
 `_QUEUE_WORKERS_{ESTIMATION,CALIBRATION,LIGHT,ORCHESTRATION}` y `_MAX_UPLOAD_MB` (tabla en
-[`docs/arquitectura.md`](docs/arquitectura.md)).
+[`docs/arquitectura.md`](docs/arquitectura.md)). Seguridad mínima ([ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md)), de la app: `VORACIOUS_DATABASE_URL_FILE` (excluyente con `_DATABASE_URL`, que queda para desarrollo, CI y tests), `_JWT_JWKS_FILE`, `_JWT_ISSUER`, `_JWT_AUDIENCE` (la API **no arranca** sin estas tres), `_JWT_ALGORITHMS` (`EdDSA` por defecto) y `_JWT_LEEWAY_SECONDS` (30). De despliegue (**no** de la app: los leen `docker-compose.yml` y los scripts): `DEPLOY_SECRETS_DIR`, `DEPLOY_DIR`, `DEPLOY_TIMEOUT`, `DEPLOY_API_URL`, `DEPLOY_ENV_FILE`, `SOPS_AGE_KEY_FILE`, `SOPS_CONFIG` y `VORACIOUS_IMAGE`; `demo_seed.py` lee `VORACIOUS_API_TOKEN`.
 
 API **por pasos independientes, encadenables por id** ([ADR 0009](docs/adr/0009-api-por-pasos-encadenables.md);
 rutas y catálogo de códigos en la enmienda del Paso 3 del [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md)),
@@ -99,7 +99,7 @@ Dominio extensible ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md
 | `voracious.config` | stdlib, `pydantic-settings` | cualquier capa del proyecto |
 
 Orden real de capas (contrato `layers`): `api | workers | cli` → `container` → `infrastructure` → `application`
-→ `domain`; `config` queda fuera del orden. Hay **16 contratos vigentes** en `pyproject.toml`
+→ `domain`; `config` queda fuera del orden. Hay **17 contratos vigentes** en `pyproject.toml`
 (`[tool.importlinter]`):
 
 1. capas;
@@ -118,10 +118,11 @@ Orden real de capas (contrato `layers`): `api | workers | cli` → `container` �
 13. solo `domain.estimators.mrcd` importa `pymrcd`;
 14. `workers ↛ infrastructure|config` (solo vía `container`);
 15. `api ↛ psycopg|psycopg_pool` (el driver solo vive en `infrastructure/postgres`);
-16. `cli ↛ infrastructure|config` (solo vía `container`).
+16. `cli ↛ infrastructure|config` (solo vía `container`);
+17. `jwt` y `cryptography` solo en `infrastructure/auth` (`api|workers|cli|container|config` no los importan).
 
-Además `psycopg` y `psycopg_pool` están prohibidos en `domain` (2), `application` (3) y `pymrcd` (8).
-Los contratos 5, 6, 13, 14, 15 y 16 usan `allow_indirect_imports` porque `api|workers|cli → container → config|infrastructure`,
+Además `psycopg`, `psycopg_pool`, `jwt` y `cryptography` están prohibidos en `domain` (2), `application` (3) y `pymrcd` (8).
+Los contratos 5, 6, 13, 14, 15, 16 y 17 usan `allow_indirect_imports` porque `api|workers|cli → container → config|infrastructure`,
 `api → container → infrastructure.postgres → psycopg` y
 `charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos.
 
@@ -140,10 +141,12 @@ Flujo: `api|workers|cli → container → infrastructure → application → dom
 | `src/voracious/domain/common/` | [ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md) (sin lógica estadística de ningún método), [`docs/arquitectura.md`](docs/arquitectura.md) |
 | `src/voracious/application/` | [`docs/arquitectura.md`](docs/arquitectura.md), [ADR 0001](docs/adr/0001-hexagonal.md) |
 | `src/voracious/infrastructure/` | [`docs/arquitectura.md`](docs/arquitectura.md) (tabla de puertos), [ADR 0001](docs/adr/0001-hexagonal.md) |
-| `src/voracious/api/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md), [`docs/arquitectura.md`](docs/arquitectura.md) |
+| `src/voracious/api/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md), [`docs/arquitectura.md`](docs/arquitectura.md); `api/auth.py` y `api/access_log.py`: [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md) |
+| `src/voracious/application/auth.py`, `src/voracious/infrastructure/auth/` | [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md) (verificador, claims, motivos de 401, roles) |
+| `deploy/`, `scripts/{deploy,issue_token,jwt_keygen}.sh`, `.sops.yaml` | [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md), [`docs/despliegue.md`](docs/despliegue.md); un `*.enc.yaml` solo se versiona con `tests/unit/test_repo_secrets.py` en verde |
 | `src/voracious/workers/` | [ADR 0003](docs/adr/0003-api-asincrona.md), [ADR 0005](docs/adr/0005-api-fase-i-fase-ii.md) |
 | `src/voracious/infrastructure/postgres/`, migraciones | [ADR 0011](docs/adr/0011-persistencia-en-postgres.md), [`docs/arquitectura.md`](docs/arquitectura.md) (sección «Persistencia»); una migración aplicada no se edita |
-| `src/voracious/cli.py` | [ADR 0011](docs/adr/0011-persistencia-en-postgres.md) |
+| `src/voracious/cli.py` | [ADR 0011](docs/adr/0011-persistencia-en-postgres.md) (`migrate`), [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md) (`issue-token`, `jwt-keygen`) |
 | `src/voracious/config.py`, `container.py` | [`docs/arquitectura.md`](docs/arquitectura.md) (variables `VORACIOUS_*`) |
 | `tests/golden/`, `tools/r/` | `docs/metodos/<método>.md` del método probado ([índice](docs/metodos/README.md)) |
 | `docs/` | [`docs/README.md`](docs/README.md) |
@@ -153,7 +156,7 @@ Flujo: `api|workers|cli → container → infrastructure → application → dom
 ## 4. Stack y compuerta
 
 Python 3.12, `uv`, FastAPI, Pydantic v2, pydantic-settings, numpy, scipy, structlog (JSON),
-pytest + pytest-cov + httpx, ruff, mypy `--strict` sobre `src/`, import-linter. Versiones en `uv.lock`.
+pytest + pytest-cov + httpx, ruff, mypy `--strict` sobre `src/`, import-linter, PyJWT (`pyjwt[crypto]`). Versiones en `uv.lock`.
 
 Compuerta local (= CI = pre-commit):
 
@@ -161,7 +164,7 @@ Compuerta local (= CI = pre-commit):
 scripts/gate.sh; echo "EXIT=$?"
 ```
 
-`scripts/gate.sh` corre todas las etapas (`postgres-up`, `build-pymrcd`, `fma-pymrcd`, ruff, format, mypy, import-linter, pytest
+`scripts/gate.sh` corre todas las etapas (`postgres-up`, `build-pymrcd`, `fma-pymrcd`, ruff, format, `shellcheck`, mypy, import-linter, pytest
 con cobertura ≥ 80 %, `mypy-pymrcd` y `pytest-pymrcd`) aunque falle alguna y deja cada salida en `.gates/<etapa>.log`; el `EXIT` final es 0 solo si todas pasan.
 Las dos primeras etapas compilan y comprueban la extensión C de `pymrcd` ([ADR 0006](docs/adr/0006-libreria-pymrcd.md),
 enmienda 2026-10-07): `build-pymrcd` (`uv sync --reinstall-package pymrcd`) y `fma-pymrcd`
@@ -171,6 +174,7 @@ enmienda 2026-10-07): `build-pymrcd` (`uv sync --reinstall-package pymrcd`) y `f
 definida (CI: `services: postgres:17`) y, si no, levanta uno desechable con Docker (`compose.test.yaml`, puerto
 aleatorio de `127.0.0.1`, se destruye al terminar). Sin la variable ni Docker, `postgres-up` sale en rojo y los
 tests de Postgres fallan: no se saltan.
+La etapa `shellcheck` analiza `scripts/*.sh` con el `shellcheck` del PATH y, si no está (el Mac del dueño no lo instala), con la imagen oficial fijada por digest vía Docker (`--network none --read-only --cap-drop ALL`); sin ninguno de los dos sale en rojo. Única excepción a «no se saltan»: `tests/integration/test_deploy_sops.py` se salta sin `sops` ni `age` (solo existen en el servidor y en CI, donde sí corre); la parte sin herramientas, `tests/unit/test_repo_secrets.py`, corre siempre. `scripts/gate.sh` termina con `[ "${failed}" -eq 0 ]` y no con `exit` para que la trampa `EXIT` baje Postgres sin cambiar el código y shellcheck vea las funciones usadas (SC2329). Detalle en el [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md) y el [ADR 0010](docs/adr/0010-empaquetado-docker-y-ci.md).
 Variable de rendimiento `VORACIOUS_MRCD_THREADS` (hilos de `pymrcd`; vacío = no definida; no cambia resultados).
 Por clon hay que activar el hook: `git config core.hooksPath .githooks`. Siempre `uv run …` para ejecutar
 Python o herramientas sueltas (el `python` del PATH es de pyenv, no el del proyecto).
@@ -210,8 +214,8 @@ Cada paso termina en commit + push a `main` (tras el «sí» del dueño) y **par
    `docs/metodos/<método>.md`, sus golden tests y su API ([ADR 0004](docs/adr/0004-cartas-y-estimadores-extensibles.md)).
 3. Ningún default estadístico sin cita a su referencia (`rrcov` archivo:línea y versión, o artículo) en
    `docs/metodos/<método>.md`.
-4. Ningún secreto en el repo; configuración solo por variables `VORACIOUS_*`; `.env.example` sin valores reales.
-5. Cada endpoint nuevo lleva test, schema Pydantic y respeta el aislamiento por tenant.
+4. Ningún secreto **en claro** en el repo ni en la imagen; los cifrados con SOPS + age (`deploy/**/*.enc.yaml`) sí se versionan; las llaves age privadas nunca; en el servidor, Compose secrets y `*_FILE`, nunca variables de entorno. Configuración solo por variables `VORACIOUS_*`; `.env.example` sin valores reales.
+5. Cada endpoint nuevo lleva test, schema Pydantic, respeta el aislamiento por tenant (el tenant sale del token, nunca de una cabecera ni del cuerpo) y declara su rol de la matriz (`Reader`, `Operator` o `Decider`; [ADR 0012](docs/adr/0012-seguridad-minima-sops-jwt.md), D7).
 6. Compuerta roja → no hay commit. Se informa con `archivo:línea`, no se desactivan reglas.
 7. Nunca `git push --force`, nunca push sin confirmación del dueño, nunca reescribir historia publicada.
    Nunca `git reset --hard`, `git stash`, `git clean`. Nunca commitear `.env` ni `plantilla-agentes/`.

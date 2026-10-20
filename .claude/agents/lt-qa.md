@@ -27,6 +27,14 @@ Eres la última revisión antes del commit. **No editas archivos.** Puedes deleg
 - **Tests faltantes:** endpoints sin test, ramas de error sin cubrir, aislamiento por tenant.
 - **Reglas duras:** sin secretos, sin `.env`, sin `plantilla-agentes/`, sin sustitutos de MRCD,
   sin `# type: ignore`/`# noqa` nuevos injustificados.
+- **Seguridad (cuando el diff toca autenticación, secretos o despliegue):**
+  - `tests/unit/test_repo_secrets.py` en verde; sin llaves privadas ni `*.dec.*` en el árbol.
+  - `docker inspect` limpio: ningún valor secreto en el entorno de los contenedores (lo comprueban `deploy.sh` y el trabajo
+    `image` de CI).
+  - La matriz de roles contra el OpenAPI: cada operación de negocio declara `bearerAuth`, las rutas públicas no, y el rol
+    exigido de cada una coincide con el ADR 0012 (D7).
+  - Ningún log con query ni token (`--no-access-log`; el registro de acceso solo escribe la plantilla de la ruta).
+  - Integridad de las huellas y de las pruebas de equivalencia en bits: pasar a JWT no cambia ningún resultado.
 - **Docs:** lo que el documentador tiene que actualizar.
 
 ## Formato de salida obligatorio

@@ -1,15 +1,21 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-14 (eliminada la comparación de bases de la recalibración: EXTEND por defecto y paso `/extension`; P6 cerrada con la tesis). Antes, 2026-10-09: Paso 4 hecho (4.0, 4.1 y 4.2 — Docker, CI y Postgres; sin depuración automática).
+Última actualización: 2026-10-20 (seguridad mínima hecha, pendiente de commit; demo desplegada sobre `ec05eee`). Antes, 2026-10-14 (eliminada la comparación de bases de la recalibración: EXTEND por defecto y paso `/extension`; P6 cerrada con la tesis). Antes, 2026-10-09: Paso 4 hecho (4.0, 4.1 y 4.2 — Docker, CI y Postgres; sin depuración automática).
 
-**Siguiente hito:** despliegue en el servidor de demo (Compose con Postgres, `.env` del servidor, `migrate`, `scripts/demo_seed.py`).
+**Despliegue de la demo (2026-10-20):** hecho sobre `ec05eee` en `~/voracious-demo` del servidor (Compose con Postgres,
+`.env` del servidor, `migrate`, `scripts/demo_seed.py`). Hay un modelo sembrado, `1f573da9-554c-42e2-b961-683048c30e3c`,
+del tenant `demo`. Esa demo corre **sin autenticación y con secretos en el `.env`**: el código nuevo no está desplegado.
+
+**Siguiente hito:** T16, el redespliegue de la demo con secretos cifrados y JWT, entero en el servidor y con `--via docker`
+([`despliegue.md`](despliegue.md)). Después, la guía de integración y el diagrama de arquitectura (`docs/guia/`, en su
+propio commit).
 
 **Siguientes pasos acordados por el dueño (en este orden):**
 
-1. **Paso de seguridad, antes de vender:** login OIDC/SSO del banco, roles (analista, aprobador, administrador),
-   Row-Level Security en Postgres, HTTPS, auditoría y tablas `users`/`memberships`; decidir **instalación dedicada por
-   banco vs. SaaS compartido**. Hoy el tenant es una cabecera sin autenticar: no es apto para exponerse. La base de
-   datos nunca se expone.
+1. **Paso de seguridad, antes de vender:** login OIDC/SSO del banco, Row-Level Security en Postgres, HTTPS, auditoría
+   completa y tablas `users`/`memberships`; decidir **instalación dedicada por banco vs. SaaS compartido**. La parte de
+   JWT propio, roles y secretos cifrados ya está hecha (ver «Seguridad mínima»); **sigue sin ser apto para exponerse**
+   hasta tener HTTPS y el login del banco. La base de datos nunca se expone.
 2. **Cartas nuevas** (MEWMA, CUSUM…) como cartas propias, cada una con su API, reutilizando lo común (ADR 0004). Las
    cartas con memoria necesitan estado y orden temporal: se diseñará con la primera de ellas.
 3. **Paso 5:** golden por método.
@@ -32,6 +38,7 @@ cada señal. Sin fecha.
 | M5 | Optimizar `pymrcd`: `Qn` y pares de OGK en C ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07; [especificación §3.12.9](metodos/mrcd-especificacion.md)) | **hecho.** Validador: APROBADO CON OBSERVACIONES. Criterio «≥ 10× con 1 hilo» **no cumplido** (4.1×); ver abajo |
 | 3 | Adaptadores, `container.py`, tenant, errores uniformes y API por pasos independientes encadenables por id ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); 3.1 infraestructura, 3.2 dominio en piezas, 3.3 Fase I por API, 3.4 Fase II y recalibración por API | **hecho** (14 contratos de import-linter). Validador: APROBADO CON OBSERVACIONES en 3.2 y 3.4, ya aplicadas. Ver «Paso 3» abajo |
 | 4 | Docker, CI y Postgres. 4.0 y 4.1 (Dockerfile, compose, CI, validación en Linux; [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)); 4.2 (Postgres 17, migraciones, recuperación tras reinicio, `/ready`, backup, fechas y nombres de variables, demo; [ADR 0011](adr/0011-persistencia-en-postgres.md)) | **hecho** |
+| S | Seguridad mínima: secretos con SOPS + age y Compose secrets; JWT propio (EdDSA, JWKS en fichero) con roles ([ADR 0012](adr/0012-seguridad-minima-sops-jwt.md), propuesto) | **hecho, pendiente de commit** (LT-QA: LISTO CON DEUDA). T16 (redespliegue) por ejecutar |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
 
 ## Paso 4: Docker, CI y validación en Linux (2026-10-09)
@@ -78,8 +85,49 @@ recalibración (que recalcula con la base más lo observado) no tenían sentido.
   contratos de import-linter. CI con `services: postgres:17`.
 - **Demo:** `scripts/demo_seed.py` (datos simulados, solo API).
 - **Deuda de 4.2:** TimescaleDB (sin volumen que lo pida), cola distribuida (Celery; hasta entonces un solo worker),
-  backup que corre como root y vive en el mismo servidor, `dataset_rows.external_ref` sin uso, y toda la seguridad
-  (paso siguiente 1). Sin medir: coste de la Fase I extremo a extremo con Postgres.
+  backup que corre como root y vive en el mismo servidor, `dataset_rows.external_ref` sin uso, y la seguridad (secretos
+  y JWT: ver «Seguridad mínima»; el resto, paso siguiente 1). Sin medir: coste de la Fase I extremo a extremo con Postgres.
+
+## Seguridad mínima (2026-10-20) — hecha, pendiente de commit
+
+Por qué: la demo ya estaba desplegada con el tenant en una cabecera sin autenticar y los secretos en un `.env`
+visibles en `docker inspect`. Decisiones D1–D15, amenazas (SOPS protege el repo y el traslado, **no** un servidor
+comprometido) y alternativas en el [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md) (**propuesto**: lo acepta el dueño);
+operación en [`despliegue.md`](despliegue.md).
+
+- **Hecho en código:** puerto `TokenVerifier` y `JwtTokenVerifier` (PyJWT 2.15.1, cryptography 50.0.2); middleware JWT
+  de falla cerrada con 12 motivos de 401; matriz de roles (`Reader`, `Operator`, `Decider`); la cabecera de tenant y `actor` en el
+  cuerpo eliminados (M1); registro de acceso con identidad (M2); TTL máximo de 7 días y `jti` obligatorio (M4); CLI
+  `issue-token` y `jwt-keygen`; Compose secrets con `*_FILE`; `deploy.sh`, `issue_token.sh`, `jwt_keygen.sh`; CI con
+  sops, age y shellcheck y trabajo `image` con la pila completa (M7); 17 contratos de `import-linter`.
+- **Decisión del dueño posterior al plan:** sops, age y shellcheck **no** van en su Mac. sops y age, solo en el servidor
+  y en CI (`.sops.yaml` con un único receptor); shellcheck en la compuerta, por Docker si no está en el `PATH`.
+- **Por ejecutar (T16):** redespliegue con secretos cifrados y JWT en el servidor ([`despliegue.md`](despliegue.md)).
+  Hasta entonces `deploy/demo/` solo tiene `auth.env`: `jwks.json`, `secrets.enc.yaml`, `jwt-signing.enc.yaml` y
+  `.sops.yaml` nacen en el servidor y se traen al repo después.
+- **La API sigue sin exponerse** (`127.0.0.1` y túnel SSH) hasta tener HTTPS y el login del banco.
+
+**Deuda de este paso:**
+- Tres versiones de shellcheck (0.9.0 en CI, 0.10.0 en la imagen `gate`, 0.11.0 por Docker).
+- `docker run` de `issue_token.sh` y `jwt_keygen.sh` sin endurecer del todo: montar solo `scripts/`, `--user`,
+  `no-new-privileges` y `--cap-drop ALL` en keygen y emisión de tokens.
+- Actualizaciones manuales: el digest de shellcheck en `gate.sh` (Dependabot no lo ve) y la versión y el SHA-256 de sops
+  (repetidos en dos sitios de `ci.yml`).
+- Longitud mínima de llaves RSA al cargar el JWKS (hoy solo la comprueba PyJWT al verificar): nivel B.
+- La autorización por rol ocurre después de leer el cuerpo en las rutas con cuerpo Pydantic (422 antes que 403).
+- `mv` no atómicos entre los dos ficheros de `jwt_keygen.sh`.
+- El trabajo `image` de CI aún no se ha ejecutado en GitHub.
+- SC2155 previo en el trabajo `sanitizers` de `ci.yml`.
+- Sin revocación por token: solo rotar la llave.
+- Perder la llave age del servidor sin copia fuera es perder los secretos cifrados (`despliegue.md`, «Recuperación»).
+
+**Lo que queda del paso grande de seguridad:** login OIDC/SSO del banco, Row-Level Security, HTTPS, auditoría completa,
+tablas `users`/`memberships` y decidir instalación dedicada por banco vs. SaaS compartido.
+
+**Mejoras propuestas y no aprobadas:** M3 (cuatro ojos: quien aprueba no es quien pidió la recalibración), M5 (secretos
+descifrados en tmpfs con unidad systemd), M6 (recargar el JWKS sin reiniciar; requisito del nivel B con JWKS remoto), M8
+(backup cifrado con age y copiado fuera del servidor; cierra la deuda de 4.2), M9 (`/docs`, `/redoc` y `/openapi.json`
+tras autenticación o desactivables) y M10 (firma cosign del binario de sops).
 
 ## Sin depuración automática y tiempos medidos (2026-10-09)
 
@@ -139,7 +187,7 @@ rutas y códigos en la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md); 
 - **Pool de procesos por llamada** en `ProcessPoolTaskMapper`: el coste del `spawn` se paga en cada calibración.
 - **Huellas de composición solo en Darwin arm64** (el C de `pymrcd` ya se validó en Linux en el Paso 4.1).
 - (Cerrado en 4.2) `/ready` con checks de base y almacenamiento y `503` cuando falle; sigue sin check de cola.
-- **Autenticación real** (OIDC/SSO), roles, Row-Level Security, HTTPS y auditoría (M4 antiguo; ver «Siguientes pasos acordados»); hoy solo `X-Tenant-ID`.
+- **OIDC/SSO, Row-Level Security, HTTPS y auditoría completa** (M4 antiguo; ver «Siguientes pasos acordados»). La autenticación por JWT y los roles se hicieron en «Seguridad mínima».
 - **Coste no medido de extremo a extremo** de la Fase I con réplicas en procesos sobre la API.
 
 ## Ajuste de plan aprobado: ADR 0004 y 0005

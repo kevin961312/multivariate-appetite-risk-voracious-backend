@@ -24,15 +24,15 @@ Ver [ADR 0001](adr/0001-hexagonal.md).
 
 ## Arquitectura de hoy (Pasos 1 a 4.2)
 
-Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, tenant), `workers`
-(punto de entrada sin lógica), `cli` (`python -m voracious.cli migrate`, sin lógica), `infrastructure` (cola en hilos
+Existe todo lo que sigue: `config`, `container`, `api` (rutas por pasos, errores uniformes, autenticación JWT y matriz de roles, registro de acceso), `workers`
+(punto de entrada sin lógica), `cli` (`migrate`, `issue-token` y `jwt-keygen`, sin lógica), `infrastructure` (cola en hilos
 por carriles, repositorios en memoria **o en Postgres**, almacenamiento, `ProcessPoolTaskMapper`, reloj, ids, logging),
 `application` (casos de uso, puertos, registros, recuperación al arrancar) y el dominio. Siguen siendo **objetivo**:
-Celery, TimescaleDB, S3 y JWT/OIDC con roles y Row-Level Security (Docker y CI existen desde el Paso 4.1; Postgres
+Celery, TimescaleDB, S3, el login OIDC del banco y Row-Level Security (el JWT propio con roles existe desde la seguridad mínima, [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md)) (Docker y CI existen desde el Paso 4.1; Postgres
 desde el 4.2, [ADR 0011](adr/0011-persistencia-en-postgres.md)).
 
 ```
- HTTP ─▶ api/ (routers por paso y por carta, schemas, errores, tenant por X-Tenant-ID)
+ HTTP ─▶ api/ (routers por paso y por carta, schemas, errores; middleware JWT y registro de acceso; tenant y rol del token)
  workers/ (run.handle; Celery después) · cli.py (migrate)│
             └────────┬────────────────┘
                      ▼ ambos usan
@@ -71,8 +71,12 @@ Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (im
   los trabajos en curso y los datasets cargados.
 - **Puerto:** `127.0.0.1:8000`, sin exponer a la red; acceso remoto por túnel SSH. La base de datos **nunca** se
   expone.
-- **Secretos:** `POSTGRES_PASSWORD` y `VORACIOUS_DATABASE_URL` solo en el `.env` del servidor (no versionado;
-  plantilla en `.env.example`). Sin `POSTGRES_PASSWORD` Compose no arranca.
+- **Secretos:** Compose secrets, no variables de entorno (se verían en `docker inspect`). `postgres_password` y
+  `database_url` viven cifrados con SOPS + age en `deploy/demo/secrets.enc.yaml`; `scripts/deploy.sh` los descifra en
+  `DEPLOY_SECRETS_DIR` (fuera del repo, 0700/0444) y Compose los monta en `/run/secrets/…`, donde `POSTGRES_PASSWORD_FILE`
+  y `VORACIOUS_DATABASE_URL_FILE` los leen. El `.env` del servidor ya no lleva secretos. Sin `DEPLOY_SECRETS_DIR` Compose
+  no arranca. La API tampoco arranca sin el JWKS, `iss` y `aud` (`deploy/demo/jwks.json` y `auth.env`, públicos).
+  Operación en [`despliegue.md`](despliegue.md); decisiones en el [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md).
 - **Perfil 2 vCPU** (`.env.example`, comentado): `VORACIOUS_REPLICATE_PROCESSES=2`, `VORACIOUS_MRCD_THREADS=1`,
   carriles `ESTIMATION=1`, `CALIBRATION=1`, `LIGHT=2`, `ORCHESTRATION=1`. Procesos × hilos MRCD no supera los
   núcleos. Solo rendimiento: no cambia ningún resultado.
@@ -136,7 +140,7 @@ expresar que `container` está en medio. `config` queda fuera del orden (`exhaus
 
 ### Contratos de `import-linter` vigentes (`pyproject.toml`, `[tool.importlinter]`)
 
-Son 16; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2. En resumen:
+Son 17; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2. En resumen:
 
 1. Capas: `api | workers | cli` → `container` → `infrastructure` → `application` → `domain` (exhaustivo).
 2. `domain` no importa configuración, `container`, frameworks ni IO; desde el Paso 2 (M1) tampoco
@@ -152,11 +156,13 @@ Son 16; la lista numerada y su porqué están en [`CLAUDE.md`](../CLAUDE.md) §2
 14. `workers` no importa `infrastructure` ni `config` (solo vía `container`).
 15. `api` no importa el driver de Postgres (`psycopg`, `psycopg_pool`); 16. `cli` no importa `infrastructure` ni
     `config` (solo vía `container`).
+17. `jwt` y `cryptography` solo en `infrastructure/auth`: `api`, `workers`, `cli`, `container` y `config` no los importan.
 
-Además, `psycopg` y `psycopg_pool` están prohibidos en `domain` (2), `application` (3) y `pymrcd` (8): el driver
-solo vive en `infrastructure/postgres`.
+Además, `psycopg`, `psycopg_pool`, `jwt` y `cryptography` están prohibidos en `domain` (2), `application` (3) y
+`pymrcd` (8): el driver de Postgres solo vive en `infrastructure/postgres` y la criptografía de tokens en
+`infrastructure/auth`.
 
-Los contratos 5, 6, 13, 14, 15 y 16 llevan `allow_indirect_imports = true`: `api|workers|cli → container → config|infrastructure` y
+Los contratos 5, 6, 13, 14, 15, 16 y 17 llevan `allow_indirect_imports = true`: `api|workers|cli → container → config|infrastructure` y
 `charts.t2mrcd → estimators.mrcd → pymrcd` son caminos legítimos y, sin esa opción, import-linter los contaría
 como violación; lo que se prohíbe es el import directo.
 
@@ -177,7 +183,7 @@ los de la columna «después» son objetivo.
 | Reparto de tareas independientes | `TaskMapper` | `SerialTaskMapper` (dominio) o `ProcessPoolTaskMapper` | Celery/Dask | `VORACIOUS_REPLICATE_PROCESSES` |
 | Recuperación al arrancar | `RecoverInterruptedJobs` (caso de uso sobre los puertos de repositorio) | `lifespan` de la API: `failed / JOB_INTERRUPTED` | cola distribuida | — |
 | Identificadores y reloj | `IdGenerator`, `Clock` | `UuidIdGenerator`, `SystemClock` | — | — |
-| Tenant | `TenantContext` | cabecera `X-Tenant-ID` (`400 TENANT_REQUIRED` si falta; sin auth real) | JWT/OIDC | — |
+| Identidad y tenant | `TokenVerifier` (devuelve un `Principal`: sujeto, tenant, roles, caducidad, `jti`) | `JwtTokenVerifier` (PyJWT; JWKS en fichero; [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md)) | JWKS del IdP del banco (nivel B) | `VORACIOUS_JWT_*` |
 
 Decisiones de diseño de los puertos y registros:
 
@@ -298,9 +304,16 @@ producción se configuren igual (plantilla en `.env.example`).
 | `VORACIOUS_MRCD_THREADS` | entero ≥ 1, o vacío | vacío | Hilos de la extensión C de `pymrcd` por ajuste MRCD. Solo rendimiento: no cambia ningún resultado ni se guarda en las versiones ([ADR 0006](adr/0006-libreria-pymrcd.md), enmienda 2026-10-07). Vacío: `pymrcd` usa `PYMRCD_NUM_THREADS` o todos los CPU visibles. Cableada en `container`. |
 | `VORACIOUS_JOB_BACKEND` | `inline` | `inline` | Adaptador de la cola. |
 | `VORACIOUS_REPOSITORY` | `memory` \| `postgres` | `memory` | Adaptador de los repositorios. `postgres` exige `VORACIOUS_DATABASE_URL` y `VORACIOUS_STORAGE=local`; si no, `ConfigurationError` al arrancar. |
-| `VORACIOUS_DATABASE_URL` | `postgresql://usuario:contraseña@host:5432/base` | vacío | **Secreto** (`SecretStr`: no sale en `repr` ni en logs). Contraseña en codificación URL. Obligatoria con `postgres`. |
+| `VORACIOUS_DATABASE_URL` | `postgresql://usuario:contraseña@host:5432/base` | vacío | **Secreto** (`SecretStr`: no sale en `repr` ni en logs). Contraseña en codificación URL. Con `postgres` hace falta ella **o** `_FILE`. Directa: solo desarrollo, CI y tests. |
+| `VORACIOUS_DATABASE_URL_FILE` | ruta a un fichero con la URL | vacío | El secreto de Compose (`/run/secrets/database_url`). Excluyente con `VORACIOUS_DATABASE_URL`; se lee y se recortan los espacios de los extremos; vacío o inexistente es `ConfigurationError` (el mensaje nombra la ruta, nunca el contenido). |
+| `VORACIOUS_JWT_JWKS_FILE` | ruta a un JWKS | vacío | Llaves **públicas** que verifican los tokens (cada una con `kid` y `alg`). **Sin él, la API no arranca** (falla cerrado). La llave privada nunca entra en la configuración. |
+| `VORACIOUS_JWT_ISSUER` / `VORACIOUS_JWT_AUDIENCE` | texto | vacío | `iss` y `aud` exigidos, comparados enteros. Obligatorios con el JWKS. |
+| `VORACIOUS_JWT_ALGORITHMS` | `EdDSA`, `ES256`, `RS256`, `PS256` (separados por comas) | `EdDSA` | Algoritmos admitidos; nunca `none` ni `HS*`. |
+| `VORACIOUS_JWT_LEEWAY_SECONDS` | entero de 0 a 300 | 30 | Margen de reloj para `exp`, `nbf` e `iat`. |
 | `VORACIOUS_DATABASE_POOL_SIZE` | entero ≥ 1 | 10 | Conexiones máximas del pool. Solo rendimiento. |
-| `POSTGRES_USER` / `POSTGRES_DB` / `POSTGRES_PASSWORD` | texto | `voracious` / `voracious` / **obligatoria** | No son de la aplicación: los lee Compose para los servicios `postgres` y `backup`. |
+| `POSTGRES_USER` / `POSTGRES_DB` | texto | `voracious` / `voracious` | No son de la aplicación: los lee Compose para los servicios `postgres` y `backup`. La contraseña ya no es una variable: es el secreto `postgres_password`. |
+| `DEPLOY_SECRETS_DIR` / `DEPLOY_DIR` / `DEPLOY_TIMEOUT` / `DEPLOY_API_URL` / `DEPLOY_ENV_FILE` / `SOPS_AGE_KEY_FILE` / `SOPS_CONFIG` / `VORACIOUS_IMAGE` | rutas, segundos o URL | ver [`despliegue.md`](despliegue.md) | **No son de la aplicación**: las leen `docker-compose.yml` y `scripts/{deploy,issue_token,jwt_keygen}.sh`. `DEPLOY_SECRETS_DIR` es obligatoria para Compose. |
+| `VORACIOUS_API_TOKEN` | JWT | vacío | Solo `scripts/demo_seed.py` (alternativa a `--token-file`); nunca como argumento. |
 | `VORACIOUS_TEST_DATABASE_URL` | URL de un Postgres de prueba | vacío | Solo pruebas y compuerta; sin ella la compuerta levanta uno con Docker (`compose.test.yaml`). |
 | `VORACIOUS_STORAGE` | `memory` \| `local` | `memory` | Almacenamiento de datasets. |
 | `VORACIOUS_STORAGE_DIR` | ruta | vacío | Directorio base; obligatorio con `local`. |
@@ -329,7 +342,7 @@ del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
 - Estados `queued | running | succeeded | failed`. Un fallo de dominio **de un trabajo** queda en el registro y el
   `GET` responde `200`; los errores **síncronos** usan el formato `{code, message, details}` y los estados de
   `CODE_TO_STATUS` (`api/errors.py`).
-- Toda ruta de negocio exige `X-Tenant-ID` (`400 TENANT_REQUIRED`); un tenant nunca ve recursos de otro.
+- Toda ruta de negocio exige `Authorization: Bearer <JWT>` (`401 UNAUTHENTICATED` con `details.reason`; solo `/health`, `/ready` y la documentación son públicas) y un rol de la matriz (`403 FORBIDDEN` con `details.required_roles`): lectura = analyst, approver, admin; operación = analyst, admin; decisión (`approve`, `reject`) = approver, admin. El tenant sale del token y un tenant nunca ve recursos de otro; la cabecera de tenant anterior se ignora y `actor` ya no va en los cuerpos (es el `sub`). Ver la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
 - `?include=` (M3) pide las matrices grandes de modelos, versiones y recalibraciones; por defecto no se envían.
 - Con los defaults de T²MRCD la Fase I se ejecuta completa; si un campo decisivo se pasa como `None`, el rechazo es
   síncrono (`T2MRCD_DECISION_PENDING` con `details.pending`). Fase I y Fase II tienen límites distintos que
@@ -366,6 +379,13 @@ cuenta meses desde `approved_at` de la vigente (v0: fin de la Fase I) y observac
 (`count_scored_with`); se evalúa al consultar, sin tareas programadas. Cada versión guarda `base_hash` (SHA-256 de
 la base) y su `justification` (`initial_fit`, `structural_event`, `forced_replace`, `change_detected`,
 `no_change_detected`). Detalle en el ADR 0008, enmienda 2b.2.
+
+### Autenticación y registro de acceso (seguridad mínima, [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md))
+
+Orden de middlewares: **acceso → autenticación → aplicación**. El de autenticación (ASGI puro) verifica antes de leer
+el cuerpo, de modo que una subida de 50 MB o un JSON mal formado sin token responden `401` sin consumir nada. El
+registro de acceso (`http_request`) escribe método, **plantilla** de la ruta, estado, duración y `sub`/`tenant`/`jti`
+(o el motivo del 401); nunca el token ni la query. Por eso el `CMD` de la imagen lleva `uvicorn --no-access-log`.
 
 ### Salud (Paso 1; checks reales desde el 4.2)
 
