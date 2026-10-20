@@ -16,8 +16,8 @@ from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, FAST_PARAMS, OTHER, T0, TENANT, observations, score, wait
 from support.api import train as train_model
+from support.auth import auth_settings
 from voracious.api.app import create_app
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart
 
@@ -28,7 +28,7 @@ RANGE = {"range_from": T0.isoformat(), "range_to": END.isoformat()}
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings(), charts={"t2mrcd": T2MRCDChart()})
+    built = build_container(auth_settings(), charts={"t2mrcd": T2MRCDChart()})
     yield built
     built.shutdown()
 

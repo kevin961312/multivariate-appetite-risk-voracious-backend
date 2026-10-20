@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
+from voracious.api.auth import Operator, Reader
 from voracious.api.deps import get_container
 from voracious.api.errors import ApiError
 from voracious.api.schemas.common import ErrorResponse
@@ -28,7 +29,6 @@ from voracious.api.schemas.datasets import (
     DatasetResponse,
     DatasetUploadIn,
 )
-from voracious.api.tenant import tenant_id
 from voracious.application.use_cases import DEFAULT_DATE_COLUMN
 from voracious.container import Container
 
@@ -40,7 +40,7 @@ MULTIPART_FIELD = "file"
 _MIB = 1024 * 1024
 
 _ERRORS: dict[int | str, dict[str, object]] = {
-    code: {"model": ErrorResponse} for code in (400, 404, 413, 415, 422)
+    code: {"model": ErrorResponse} for code in (401, 403, 404, 413, 415, 422)
 }
 
 _UPLOAD_BODY: dict[str, object] = {
@@ -64,7 +64,6 @@ _UPLOAD_BODY: dict[str, object] = {
 router = APIRouter(prefix="/v1/datasets", responses=_ERRORS, tags=["datasets"])
 
 ContainerDep = Annotated[Container, Depends(get_container)]
-TenantDep = Annotated[str, Depends(tenant_id)]
 
 
 async def _body(request: Request, limit: int) -> bytes:
@@ -158,7 +157,7 @@ def _multipart_csv(content_type: str, payload: bytes) -> str:
 )
 async def upload_dataset(
     request: Request,
-    tenant: TenantDep,
+    principal: Operator,
     c: ContainerDep,
     date_column: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_DATE_COLUMN,
 ) -> DatasetCreated:
@@ -166,7 +165,7 @@ async def upload_dataset(
 
     Args:
         request: Petición (el cuerpo se lee según su ``Content-Type``).
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
         date_column: Columna de fecha de la cabecera de un CSV (se ignora en JSON).
 
@@ -188,16 +187,21 @@ async def upload_dataset(
             raise RequestValidationError(exc.errors()) from exc
         return DatasetCreated.of(
             upload.execute(
-                tenant, body.data, variables=body.variables, observed_at=body.observed_at
+                principal.tenant_id,
+                body.data,
+                variables=body.variables,
+                observed_at=body.observed_at,
             )
         )
     if media == "text/csv":
         return DatasetCreated.of(
-            upload.execute_csv(tenant, _text(payload), date_column=date_column)
+            upload.execute_csv(principal.tenant_id, _text(payload), date_column=date_column)
         )
     if media == "multipart/form-data":
         text = _multipart_csv(content_type, payload)
-        return DatasetCreated.of(upload.execute_csv(tenant, text, date_column=date_column))
+        return DatasetCreated.of(
+            upload.execute_csv(principal.tenant_id, text, date_column=date_column)
+        )
     raise ApiError(
         "UNSUPPORTED_MEDIA_TYPE",
         "tipo de contenido no admitido (application/json, text/csv o multipart/form-data)",
@@ -208,7 +212,7 @@ async def upload_dataset(
 @router.get("/{dataset_id}", response_model=DatasetResponse)
 def get_dataset(
     dataset_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[DatasetInclude] | None, Query()] = None,
 ) -> DatasetResponse:
@@ -216,11 +220,13 @@ def get_dataset(
 
     Args:
         dataset_id: Dataset.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         El dataset.
     """
-    return DatasetResponse.of(c.use_cases.get_dataset.execute(tenant, dataset_id), include or ())
+    return DatasetResponse.of(
+        c.use_cases.get_dataset.execute(principal.tenant_id, dataset_id), include or ()
+    )

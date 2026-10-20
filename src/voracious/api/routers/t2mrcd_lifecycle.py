@@ -15,6 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
+from voracious.api.auth import Decider, Operator, Reader
 from voracious.api.deps import get_container
 from voracious.api.schemas.common import AcceptedJob, ErrorResponse
 from voracious.api.schemas.t2mrcd import (
@@ -43,7 +44,6 @@ from voracious.api.schemas.t2mrcd_recalibration import (
     StepwiseRecalibrationOut,
     VersionProposalRequest,
 )
-from voracious.api.tenant import tenant_id
 from voracious.application.records import RecalibrationMode
 from voracious.container import Container
 from voracious.domain.charts.t2mrcd import CHART_ID
@@ -51,19 +51,18 @@ from voracious.domain.charts.t2mrcd import CHART_ID
 __all__ = ["router"]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
-    code: {"model": ErrorResponse} for code in (400, 404, 409, 422)
+    code: {"model": ErrorResponse} for code in (401, 403, 404, 409, 422)
 }
 
 router = APIRouter(prefix=f"/v1/charts/{CHART_ID}/models", responses=_ERRORS)
 
 ContainerDep = Annotated[Container, Depends(get_container)]
-TenantDep = Annotated[str, Depends(tenant_id)]
 
 
 @router.get("/{model_id}", response_model=ModelResponse, tags=["t2mrcd-models"])
 def get_model(
     model_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[ModelInclude] | None, Query()] = None,
 ) -> ModelResponse:
@@ -71,30 +70,30 @@ def get_model(
 
     Args:
         model_id: Modelo.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         El modelo.
     """
-    record = c.use_cases.get_model.execute(tenant, CHART_ID, model_id)
+    record = c.use_cases.get_model.execute(principal.tenant_id, CHART_ID, model_id)
     return ModelResponse.of(record, include or ())
 
 
 @router.get("/{model_id}/status", response_model=ChartStatusOut, tags=["t2mrcd-models"])
-def get_status(model_id: str, tenant: TenantDep, c: ContainerDep) -> ChartStatusOut:
+def get_status(model_id: str, principal: Reader, c: ContainerDep) -> ChartStatusOut:
     """Estado de la carta por precedencia y sus avisos.
 
     Args:
         model_id: Modelo.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         El estado.
     """
-    return ChartStatusOut.of(c.use_cases.status.execute(tenant, CHART_ID, model_id))
+    return ChartStatusOut.of(c.use_cases.status.execute(principal.tenant_id, CHART_ID, model_id))
 
 
 @router.post(
@@ -103,20 +102,20 @@ def get_status(model_id: str, tenant: TenantDep, c: ContainerDep) -> ChartStatus
     response_model=AcceptedJob,
     tags=["t2mrcd-scores"],
 )
-def score(model_id: str, body: ScoreRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+def score(model_id: str, body: ScoreRequest, principal: Operator, c: ContainerDep) -> AcceptedJob:
     """Valida y encola la puntuación de un lote (Fase II).
 
     Args:
         model_id: Modelo.
         body: Observaciones con fecha.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         El ``id`` de la puntuación, ``queued``.
     """
     score_id = c.use_cases.monitor.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         [o.values for o in body.observations],
@@ -128,20 +127,20 @@ def score(model_id: str, body: ScoreRequest, tenant: TenantDep, c: ContainerDep)
 
 
 @router.get("/{model_id}/scores/{score_id}", response_model=ScoreResponse, tags=["t2mrcd-scores"])
-def get_score(model_id: str, score_id: str, tenant: TenantDep, c: ContainerDep) -> ScoreResponse:
+def get_score(model_id: str, score_id: str, principal: Reader, c: ContainerDep) -> ScoreResponse:
     """Estado de una puntuación.
 
     Args:
         model_id: Modelo.
         score_id: Puntuación.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         La puntuación.
     """
     return ScoreResponse.of(
-        c.use_cases.get_monitoring.execute(tenant, CHART_ID, model_id, score_id)
+        c.use_cases.get_monitoring.execute(principal.tenant_id, CHART_ID, model_id, score_id)
     )
 
 
@@ -150,7 +149,7 @@ def get_score(model_id: str, score_id: str, tenant: TenantDep, c: ContainerDep) 
 )
 def list_observations(
     model_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     observed_from: Annotated[datetime | None, Query(alias="from")] = None,
     observed_to: Annotated[datetime | None, Query(alias="to")] = None,
@@ -160,7 +159,7 @@ def list_observations(
 
     Args:
         model_id: Modelo.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         observed_from: Inicio (con zona horaria).
         observed_to: Fin (con zona horaria).
@@ -170,7 +169,7 @@ def list_observations(
         Las observaciones.
     """
     rows = c.use_cases.list_observations.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         observed_from=observed_from,
@@ -190,7 +189,7 @@ def annotate(
     model_id: str,
     observation_id: str,
     body: AnnotationRequest,
-    tenant: TenantDep,
+    principal: Operator,
     c: ContainerDep,
 ) -> AnnotationOut:
     """Añade una anotación a una señal (append-only; vale la más reciente).
@@ -199,21 +198,22 @@ def annotate(
         model_id: Modelo.
         observation_id: Observación con señal.
         body: Anotación.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant y el
+            actor (``sub``).
         c: Contenedor.
 
     Returns:
         La anotación.
     """
     annotation = c.use_cases.annotate.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         observation_id,
         assignable_cause=body.assignable_cause,
         cause=body.cause,
         action=body.action,
-        actor=body.actor,
+        actor=principal.subject,
     )
     return AnnotationOut.of(annotation)
 
@@ -225,26 +225,27 @@ def annotate(
     tags=["t2mrcd-observations"],
 )
 def register_event(
-    model_id: str, body: StructuralEventRequest, tenant: TenantDep, c: ContainerDep
+    model_id: str, body: StructuralEventRequest, principal: Operator, c: ContainerDep
 ) -> StructuralEventOut:
     """Registra un evento estructural («requiere nueva base»).
 
     Args:
         model_id: Modelo.
         body: Evento.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant y el
+            actor (``sub``).
         c: Contenedor.
 
     Returns:
         El evento.
     """
     event = c.use_cases.register_event.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         occurred_at=body.occurred_at,
         description=body.description,
-        actor=body.actor,
+        actor=principal.subject,
     )
     return StructuralEventOut.of(event)
 
@@ -254,34 +255,34 @@ def register_event(
     response_model=list[StructuralEventOut],
     tags=["t2mrcd-observations"],
 )
-def list_events(model_id: str, tenant: TenantDep, c: ContainerDep) -> list[StructuralEventOut]:
+def list_events(model_id: str, principal: Reader, c: ContainerDep) -> list[StructuralEventOut]:
     """Eventos estructurales del modelo.
 
     Args:
         model_id: Modelo.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         Los eventos.
     """
-    events = c.use_cases.list_events.execute(tenant, CHART_ID, model_id)
+    events = c.use_cases.list_events.execute(principal.tenant_id, CHART_ID, model_id)
     return [StructuralEventOut.of(e) for e in events]
 
 
 @router.get("/{model_id}/versions", response_model=list[VersionSummary], tags=["t2mrcd-versions"])
-def list_versions(model_id: str, tenant: TenantDep, c: ContainerDep) -> list[VersionSummary]:
+def list_versions(model_id: str, principal: Reader, c: ContainerDep) -> list[VersionSummary]:
     """Versiones del modelo (resumen, sin modelo ni base).
 
     Args:
         model_id: Modelo.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         Las versiones.
     """
-    versions = c.use_cases.list_versions.execute(tenant, CHART_ID, model_id)
+    versions = c.use_cases.list_versions.execute(principal.tenant_id, CHART_ID, model_id)
     return [VersionSummary.of(v) for v in versions]
 
 
@@ -289,7 +290,7 @@ def list_versions(model_id: str, tenant: TenantDep, c: ContainerDep) -> list[Ver
 def get_version(
     model_id: str,
     number: int,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[VersionInclude] | None, Query()] = None,
 ) -> VersionDetail:
@@ -298,14 +299,14 @@ def get_version(
     Args:
         model_id: Modelo.
         number: Versión.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         La versión.
     """
-    version = c.use_cases.get_version.execute(tenant, CHART_ID, model_id, number)
+    version = c.use_cases.get_version.execute(principal.tenant_id, CHART_ID, model_id, number)
     return VersionDetail.detail(version, include or ())
 
 
@@ -317,7 +318,7 @@ def get_version(
 def approve(
     model_id: str,
     number: int,
-    tenant: TenantDep,
+    principal: Decider,
     c: ContainerDep,
     body: ApproveRequest | None = None,
 ) -> VersionSummary:
@@ -326,7 +327,8 @@ def approve(
     Args:
         model_id: Modelo.
         number: Versión propuesta.
-        tenant: Tenant.
+        principal: Quien llama (decisión: approver o admin); da el tenant y el
+            actor (``sub``).
         c: Contenedor.
         body: Datos de la aprobación (opcional).
 
@@ -335,13 +337,13 @@ def approve(
     """
     data = body if body is not None else ApproveRequest()
     version = c.use_cases.approve.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         number,
         effective_from=data.effective_from,
         note=data.note,
-        actor=data.actor,
+        actor=principal.subject,
     )
     return VersionSummary.of(version)
 
@@ -354,7 +356,7 @@ def approve(
 def reject(
     model_id: str,
     number: int,
-    tenant: TenantDep,
+    principal: Decider,
     c: ContainerDep,
     body: RejectRequest | None = None,
 ) -> VersionSummary:
@@ -363,7 +365,8 @@ def reject(
     Args:
         model_id: Modelo.
         number: Versión propuesta.
-        tenant: Tenant.
+        principal: Quien llama (decisión: approver o admin); da el tenant y el
+            actor (``sub``).
         c: Contenedor.
         body: Datos del rechazo (opcional).
 
@@ -372,7 +375,7 @@ def reject(
     """
     data = body if body is not None else RejectRequest()
     version = c.use_cases.reject.execute(
-        tenant, CHART_ID, model_id, number, note=data.note, actor=data.actor
+        principal.tenant_id, CHART_ID, model_id, number, note=data.note, actor=principal.subject
     )
     return VersionSummary.of(version)
 
@@ -387,7 +390,7 @@ def reject(
 def request_recalibration(
     model_id: str,
     body: RecalibrationRequest,
-    tenant: TenantDep,
+    principal: Operator,
     c: ContainerDep,
     response: Response,
 ) -> AcceptedJob | StepwiseRecalibrationOut:
@@ -396,7 +399,8 @@ def request_recalibration(
     Args:
         model_id: Modelo.
         body: Rango, parámetros, reemplazo forzado y modo.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant y el
+            actor (``sub``).
         c: Contenedor.
         response: Respuesta (fija ``201`` en modo ``stepwise``).
 
@@ -405,19 +409,21 @@ def request_recalibration(
     """
     mode = RecalibrationMode(body.mode)
     recalibration_id = c.use_cases.request_recalibration.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         range_from=body.range_from,
         range_to=body.range_to,
         params=body.params.to_domain(),
         force_replace=body.force_replace,
-        actor=body.actor,
+        actor=principal.subject,
         mode=mode,
     )
     if mode is RecalibrationMode.PIPELINE:
         return AcceptedJob(id=recalibration_id)
-    record = c.use_cases.get_recalibration.execute(tenant, CHART_ID, model_id, recalibration_id)
+    record = c.use_cases.get_recalibration.execute(
+        principal.tenant_id, CHART_ID, model_id, recalibration_id
+    )
     response.status_code = status.HTTP_201_CREATED
     return StepwiseRecalibrationOut(
         recalibration_id=recalibration_id,
@@ -433,7 +439,7 @@ def request_recalibration(
 def get_recalibration(
     model_id: str,
     recalibration_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[RecalibrationInclude] | None, Query()] = None,
 ) -> RecalibrationResponse:
@@ -442,14 +448,16 @@ def get_recalibration(
     Args:
         model_id: Modelo.
         recalibration_id: Recalibración.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         La recalibración.
     """
-    record = c.use_cases.get_recalibration.execute(tenant, CHART_ID, model_id, recalibration_id)
+    record = c.use_cases.get_recalibration.execute(
+        principal.tenant_id, CHART_ID, model_id, recalibration_id
+    )
     return RecalibrationResponse.of(record, include or ())
 
 
@@ -463,7 +471,7 @@ def request_extension(
     model_id: str,
     recalibration_id: str,
     body: ExtensionRequest,
-    tenant: TenantDep,
+    principal: Operator,
     c: ContainerDep,
 ) -> ExtensionOut:
     """Construye (síncrono) el dataset de extensión: base vigente + filas nuevas conservadas.
@@ -476,17 +484,19 @@ def request_extension(
         model_id: Modelo.
         recalibration_id: Recalibración en curso.
         body: Filas nuevas conservadas (candidatas o salida de su exclusión humana).
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         El dataset de extensión y sus filas.
     """
     extension_id = c.use_cases.request_extension.execute(
-        tenant, CHART_ID, model_id, recalibration_id, dataset_id=body.dataset_id
+        principal.tenant_id, CHART_ID, model_id, recalibration_id, dataset_id=body.dataset_id
     )
-    total = c.use_cases.get_dataset.execute(tenant, extension_id).dataset.data.shape[0]
-    kept = c.use_cases.get_dataset.execute(tenant, body.dataset_id).dataset.data.shape[0]
+    total = c.use_cases.get_dataset.execute(principal.tenant_id, extension_id).dataset.data.shape[0]
+    kept = c.use_cases.get_dataset.execute(principal.tenant_id, body.dataset_id).dataset.data.shape[
+        0
+    ]
     return ExtensionOut(dataset_id=extension_id, n_base=int(total - kept), n_kept_new=int(kept))
 
 
@@ -497,7 +507,7 @@ def request_extension(
     tags=["t2mrcd-versions"],
 )
 def request_version(
-    model_id: str, body: VersionProposalRequest, tenant: TenantDep, c: ContainerDep
+    model_id: str, body: VersionProposalRequest, principal: Operator, c: ContainerDep
 ) -> AcceptedJob:
     """Valida y encola la propuesta de versión de una recalibración (carril ``light``).
 
@@ -507,14 +517,14 @@ def request_version(
     Args:
         model_id: Modelo.
         body: Recalibración, ajuste y límites.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         El ``id`` de la recalibración, ``queued``.
     """
     recalibration_id = c.use_cases.request_version_proposal.execute(
-        tenant,
+        principal.tenant_id,
         CHART_ID,
         model_id,
         body.recalibration_id,
@@ -530,18 +540,20 @@ def request_version(
     tags=["t2mrcd-recalibrations"],
 )
 def cancel_recalibration(
-    model_id: str, recalibration_id: str, tenant: TenantDep, c: ContainerDep
+    model_id: str, recalibration_id: str, principal: Operator, c: ContainerDep
 ) -> RecalibrationResponse:
     """Cancela una sesión paso a paso ``running`` sin propuesta pedida (libera D6).
 
     Args:
         model_id: Modelo.
         recalibration_id: Recalibración.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         La recalibración ``cancelled``.
     """
-    record = c.use_cases.cancel_recalibration.execute(tenant, CHART_ID, model_id, recalibration_id)
+    record = c.use_cases.cancel_recalibration.execute(
+        principal.tenant_id, CHART_ID, model_id, recalibration_id
+    )
     return RecalibrationResponse.of(record, ())

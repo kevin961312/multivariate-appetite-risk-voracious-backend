@@ -11,6 +11,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
+    "pyjwt[crypto]>=2.10.1",
     "pymrcd",
     "scipy>=1.18.1",
     "structlog>=26.1.0",
@@ -148,6 +149,9 @@ forbidden_modules = [
     # Paso 4.2: el driver de Postgres solo vive en infrastructure/postgres.
     "psycopg",
     "psycopg_pool",
+    # Seguridad mínima: JWT y criptografía solo viven en infrastructure/auth.
+    "jwt",
+    "cryptography",
 ]
 
 [[tool.importlinter.contracts]]
@@ -164,6 +168,9 @@ forbidden_modules = [
     "structlog",
     "psycopg",
     "psycopg_pool",
+    # Seguridad mínima: el puerto TokenVerifier es stdlib; PyJWT solo en infrastructure/auth.
+    "jwt",
+    "cryptography",
 ]
 
 [[tool.importlinter.contracts]]
@@ -215,6 +222,8 @@ forbidden_modules = [
     "structlog",
     "psycopg",
     "psycopg_pool",
+    "jwt",
+    "cryptography",
 ]
 
 # --- Paso 2: independencia de cartas y estimadores (ADR 0004, punto 4) --------
@@ -282,4 +291,19 @@ type = "forbidden"
 source_modules = ["voracious.cli"]
 forbidden_modules = ["voracious.infrastructure", "voracious.config"]
 # Indirecto permitido: cli -> container -> infrastructure|config es el camino legítimo.
+allow_indirect_imports = true
+
+# --- Seguridad mínima: JWT y criptografía solo en infrastructure/auth ---------------------
+[[tool.importlinter.contracts]]
+name = "jwt y cryptography solo en infrastructure (api, workers, cli, container y config no)"
+type = "forbidden"
+source_modules = [
+    "voracious.api",
+    "voracious.workers",
+    "voracious.cli",
+    "voracious.container",
+    "voracious.config",
+]
+forbidden_modules = ["jwt", "cryptography"]
+# Indirecto permitido: api|cli -> container -> infrastructure.auth -> jwt es el camino legítimo.
 allow_indirect_imports = true

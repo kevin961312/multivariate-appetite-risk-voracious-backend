@@ -11,6 +11,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Protocol
 
+from voracious.application.auth import Principal
 from voracious.application.records import (
     DatasetRecord,
     ExclusionRecord,
@@ -50,6 +51,7 @@ __all__ = [
     "RecordNotFoundError",
     "SignalAnnotationRepository",
     "StructuralEventRepository",
+    "TokenVerifier",
     "VersionDecision",
     "VersionStatusChange",
     "lane_of",
@@ -1144,4 +1146,26 @@ class Clock(Protocol):
 
     def now(self) -> datetime:
         """Instante actual con zona horaria UTC."""
+        ...
+
+
+class TokenVerifier(Protocol):
+    """Verificación de un token portador de la petición.
+
+    ``JwtTokenVerifier`` con JWKS en fichero hoy; el JWKS del IdP del banco después (cambia la
+    fuente de las llaves, no este puerto).
+    """
+
+    def verify(self, token: str) -> Principal:
+        """Verifica el token y devuelve la identidad de quien llama.
+
+        Args:
+            token: Token tal como llegó en ``Authorization: Bearer``.
+
+        Returns:
+            El principal (sujeto, tenant, roles, caducidad e identificador del token).
+
+        Raises:
+            AuthenticationError: Si el token no es válido (``details.reason`` dice por qué).
+        """
         ...

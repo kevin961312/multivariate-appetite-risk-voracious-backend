@@ -1,15 +1,27 @@
 import dataclasses
+import json
+from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 import structlog
 
+from voracious.application.auth import AuthenticationError, AuthFailure, Role
 from voracious.application.errors import FitNotFoundError
 from voracious.application.ports import JobKind, JobRequest
 from voracious.application.use_cases import RunFitJob, RunLimitsJob
 from voracious.config import Settings
-from voracious.container import ConfigurationError, Container, build_container, oversubscribed
+from voracious.container import (
+    ConfigurationError,
+    Container,
+    build_container,
+    generate_signing_key,
+    issue_token,
+    oversubscribed,
+)
 from voracious.domain.common import SerialTaskMapper
+from voracious.infrastructure.auth import JwtTokenVerifier
 from voracious.infrastructure.clock import SystemClock
 from voracious.infrastructure.ids import UuidIdGenerator
 from voracious.infrastructure.memory import InMemoryDatasetStorage
@@ -176,3 +188,151 @@ def test_memory_container_has_no_database_check(tmp_path: Path) -> None:
     finally:
         memory.shutdown()
         local.shutdown()
+
+
+# --- seguridad mínima: URL en fichero, verificador y CLI ----------------------------------------
+
+
+def test_database_url_file_is_read_and_stripped(tmp_path: Path) -> None:
+    secret = tmp_path / "database_url"
+    secret.write_text("  postgresql://u:muy-secreta@127.0.0.1:1/db\n", encoding="utf-8")
+    # La URL se acepta (el error siguiente es de almacenamiento, no de la URL).
+    with pytest.raises(ConfigurationError, match="STORAGE=local"):
+        build_container(Settings(repository="postgres", database_url_file=secret))
+    built = build_container(
+        Settings(
+            repository="postgres",
+            database_url_file=secret,
+            storage="local",
+            storage_dir=tmp_path / "ds",
+        )
+    )
+    built.shutdown(wait=False)
+
+
+def test_database_url_and_its_file_are_exclusive_and_errors_hide_the_content(
+    tmp_path: Path,
+) -> None:
+    secret = tmp_path / "database_url"
+    secret.write_text("postgresql://u:muy-secreta@h/db", encoding="utf-8")
+    both = Settings(
+        repository="postgres", database_url="postgresql://x@h/db", database_url_file=secret
+    )
+    with pytest.raises(ConfigurationError, match="excluyentes") as info:
+        build_container(both)
+    assert "muy-secreta" not in str(info.value)
+    blank = tmp_path / "blank"
+    blank.write_text(" \n\t\n", encoding="utf-8")
+    with pytest.raises(ConfigurationError, match="vacío") as info:
+        build_container(Settings(repository="postgres", database_url_file=blank))
+    assert str(blank) in str(info.value)
+    missing = tmp_path / "no-existe"
+    with pytest.raises(ConfigurationError, match="no se puede leer") as info:
+        build_container(Settings(repository="postgres", database_url_file=missing))
+    assert str(missing) in str(info.value)
+    with pytest.raises(ConfigurationError, match="no se puede leer"):
+        build_container(Settings(repository="postgres", database_url_file=tmp_path))
+
+
+def test_without_jwks_there_is_no_verifier() -> None:
+    container = build_container(Settings())
+    try:
+        assert container.token_verifier is None
+    finally:
+        container.shutdown()
+
+
+def test_jwks_configuration_errors(tmp_path: Path) -> None:
+    from support.auth import JWKS_FILE, PUBLIC_JWK
+
+    with pytest.raises(ConfigurationError, match="VORACIOUS_JWT_ISSUER"):
+        build_container(Settings(jwt_jwks_file=JWKS_FILE, jwt_audience="a"))
+    with pytest.raises(ConfigurationError, match="VORACIOUS_JWT_ISSUER"):
+        build_container(Settings(jwt_jwks_file=JWKS_FILE, jwt_issuer="i"))
+    missing = tmp_path / "jwks.json"
+    with pytest.raises(ConfigurationError, match="no se puede leer") as info:
+        build_container(Settings(jwt_jwks_file=missing, jwt_issuer="i", jwt_audience="a"))
+    assert str(missing) in str(info.value)
+    leaked = tmp_path / "leaked.json"
+    leaked.write_text(json.dumps({"keys": [{**PUBLIC_JWK, "d": "PRIVADO"}]}), encoding="utf-8")
+    with pytest.raises(ConfigurationError, match="privados") as info:
+        build_container(Settings(jwt_jwks_file=leaked, jwt_issuer="i", jwt_audience="a"))
+    assert "PRIVADO" not in str(info.value)
+    with pytest.raises(ConfigurationError, match="'alg' permitido"):
+        build_container(
+            Settings(
+                jwt_jwks_file=JWKS_FILE,
+                jwt_issuer="i",
+                jwt_audience="a",
+                jwt_algorithms=("RS256",),
+            )
+        )
+
+
+def test_jwks_gives_a_verifier() -> None:
+    from support.auth import auth_settings, token
+
+    container = build_container(auth_settings())
+    try:
+        assert isinstance(container.token_verifier, JwtTokenVerifier)
+        assert container.token_verifier.verify(token("t-1")).tenant_id == "t-1"
+    finally:
+        container.shutdown()
+
+
+def test_issue_token_uses_the_configured_issuer_and_checks_the_jwks() -> None:
+    from support.auth import OTHER_KEY_PEM, PRIVATE_KEY_PEM, TEST_KID, auth_settings
+
+    settings = auth_settings()
+    kwargs: dict[str, Any] = {
+        "subject": "ana",
+        "tenant_id": "demo",
+        "roles": (Role.ANALYST,),
+        "ttl": timedelta(hours=1),
+    }
+    raw = issue_token(PRIVATE_KEY_PEM, kid=TEST_KID, settings=settings, **kwargs)
+    verifier = build_container(settings).token_verifier
+    assert verifier is not None
+    assert verifier.verify(raw).subject == "ana"
+    with pytest.raises(AuthenticationError) as info:
+        issue_token(PRIVATE_KEY_PEM, kid="otro-kid", settings=settings, **kwargs)
+    assert info.value.reason is AuthFailure.UNKNOWN_KEY
+    with pytest.raises(AuthenticationError) as info:
+        issue_token(OTHER_KEY_PEM, kid=TEST_KID, settings=settings, **kwargs)
+    assert info.value.reason is AuthFailure.BAD_SIGNATURE
+    # Sin JWKS se emite igual (no hay con qué comprobarlo).
+    plain = Settings(jwt_issuer="i", jwt_audience="a")
+    assert issue_token(PRIVATE_KEY_PEM, kid="cualquiera", settings=plain, **kwargs).count(".") == 2
+    with pytest.raises(ConfigurationError, match="VORACIOUS_JWT_ISSUER"):
+        issue_token(PRIVATE_KEY_PEM, kid=TEST_KID, settings=Settings(), **kwargs)
+    with pytest.raises(ValueError, match="vida"):
+        issue_token(
+            PRIVATE_KEY_PEM, kid=TEST_KID, settings=settings, **{**kwargs, "ttl": timedelta(days=8)}
+        )
+
+
+def test_issue_token_reports_invalid_variables_as_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from support.auth import PRIVATE_KEY_PEM
+
+    monkeypatch.setenv("VORACIOUS_JWT_ALGORITHMS", "HS256")
+    with pytest.raises(ConfigurationError, match="jwt_algorithms"):
+        issue_token(
+            PRIVATE_KEY_PEM,
+            kid="k",
+            subject="s",
+            tenant_id="t",
+            roles=(Role.ADMIN,),
+            ttl=timedelta(hours=1),
+        )
+
+
+def test_generate_signing_key_extends_the_jwks() -> None:
+    pem, first = generate_signing_key("k1", None)
+    assert pem.startswith(b"-----BEGIN PRIVATE KEY-----")
+    _, second = generate_signing_key("k2", first)
+    assert [k["kid"] for k in json.loads(second)["keys"]] == ["k1", "k2"]
+    assert "PRIVATE" not in second
+    with pytest.raises(ValueError, match="ya está"):
+        generate_signing_key("k1", second)

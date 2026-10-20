@@ -12,6 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
+from voracious.api.auth import Operator, Reader
 from voracious.api.deps import get_container
 from voracious.api.schemas.common import AcceptedJob, ErrorResponse
 from voracious.api.schemas.t2mrcd_phase1 import (
@@ -28,20 +29,18 @@ from voracious.api.schemas.t2mrcd_phase1 import (
     Phase1PipelineRequest,
     PipelineResponse,
 )
-from voracious.api.tenant import tenant_id
 from voracious.container import Container
 from voracious.domain.charts.t2mrcd import CHART_ID
 
 __all__ = ["router"]
 
 _ERRORS: dict[int | str, dict[str, object]] = {
-    code: {"model": ErrorResponse} for code in (400, 404, 409, 422)
+    code: {"model": ErrorResponse} for code in (401, 403, 404, 409, 422)
 }
 
 router = APIRouter(prefix=f"/v1/charts/{CHART_ID}", responses=_ERRORS)
 
 ContainerDep = Annotated[Container, Depends(get_container)]
-TenantDep = Annotated[str, Depends(tenant_id)]
 
 
 @router.post(
@@ -50,25 +49,27 @@ TenantDep = Annotated[str, Depends(tenant_id)]
     response_model=AcceptedJob,
     tags=["t2mrcd-phase1"],
 )
-def request_fit(body: FitRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+def request_fit(body: FitRequest, principal: Operator, c: ContainerDep) -> AcceptedJob:
     """Valida el dataset y encola su ajuste MRCD (carril ``estimation``).
 
     Args:
         body: Dataset y parámetros de MRCD.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         El ``id`` del ajuste, ``queued``.
     """
     mrcd = None if body.mrcd is None else body.mrcd.to_domain()
-    return AcceptedJob(id=c.use_cases.request_fit.execute(tenant, CHART_ID, body.dataset_id, mrcd))
+    return AcceptedJob(
+        id=c.use_cases.request_fit.execute(principal.tenant_id, CHART_ID, body.dataset_id, mrcd)
+    )
 
 
 @router.get("/fits/{fit_id}", response_model=FitResponse, tags=["t2mrcd-phase1"])
 def get_fit(
     fit_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[FitInclude] | None, Query()] = None,
 ) -> FitResponse:
@@ -76,14 +77,14 @@ def get_fit(
 
     Args:
         fit_id: Ajuste.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         El ajuste.
     """
-    record = c.use_cases.get_fit.execute(tenant, CHART_ID, fit_id)
+    record = c.use_cases.get_fit.execute(principal.tenant_id, CHART_ID, fit_id)
     return FitResponse.of(record, include or ())
 
 
@@ -93,7 +94,7 @@ def get_fit(
     response_model=AcceptedJob,
     tags=["t2mrcd-phase1"],
 )
-def request_limits(body: LimitsRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+def request_limits(body: LimitsRequest, principal: Operator, c: ContainerDep) -> AcceptedJob:
     """Valida el ajuste y encola la calibración de límites (carril ``calibration``).
 
     Con ``recalibration_id`` (filas nuevas o base ampliada de una recalibración) los parámetros
@@ -102,7 +103,7 @@ def request_limits(body: LimitsRequest, tenant: TenantDep, c: ContainerDep) -> A
 
     Args:
         body: Ajuste y parámetros de la carta (o la recalibración).
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
@@ -111,7 +112,11 @@ def request_limits(body: LimitsRequest, tenant: TenantDep, c: ContainerDep) -> A
     params = None if body.params is None else body.params.to_domain()
     return AcceptedJob(
         id=c.use_cases.request_limits.execute(
-            tenant, CHART_ID, body.fit_id, params, recalibration_id=body.recalibration_id
+            principal.tenant_id,
+            CHART_ID,
+            body.fit_id,
+            params,
+            recalibration_id=body.recalibration_id,
         )
     )
 
@@ -119,7 +124,7 @@ def request_limits(body: LimitsRequest, tenant: TenantDep, c: ContainerDep) -> A
 @router.get("/limits/{limits_id}", response_model=LimitsResponse, tags=["t2mrcd-phase1"])
 def get_limits(
     limits_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[LimitsInclude] | None, Query()] = None,
 ) -> LimitsResponse:
@@ -127,14 +132,14 @@ def get_limits(
 
     Args:
         limits_id: Límites.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         Los límites.
     """
-    record = c.use_cases.get_limits.execute(tenant, CHART_ID, limits_id)
+    record = c.use_cases.get_limits.execute(principal.tenant_id, CHART_ID, limits_id)
     return LimitsResponse.of(record, include or ())
 
 
@@ -144,7 +149,7 @@ def get_limits(
     response_model=AcceptedJob,
     tags=["t2mrcd-phase1"],
 )
-def request_exclusion(body: ExclusionRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+def request_exclusion(body: ExclusionRequest, principal: Operator, c: ContainerDep) -> AcceptedJob:
     """Valida y encola una exclusión humana (sin ajuste; carril ``light``).
 
     ``{dataset_id, assignable_cause}`` sobre el dataset subido (Fase I). Sobre las candidatas de
@@ -152,7 +157,7 @@ def request_exclusion(body: ExclusionRequest, tenant: TenantDep, c: ContainerDep
 
     Args:
         body: Dataset y filas con causa asignable.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
@@ -160,7 +165,7 @@ def request_exclusion(body: ExclusionRequest, tenant: TenantDep, c: ContainerDep
     """
     return AcceptedJob(
         id=c.use_cases.request_exclusion.execute(
-            tenant,
+            principal.tenant_id,
             CHART_ID,
             body.dataset_id,
             [a.to_record() for a in body.assignable_cause],
@@ -171,7 +176,7 @@ def request_exclusion(body: ExclusionRequest, tenant: TenantDep, c: ContainerDep
 @router.get("/exclusions/{exclusion_id}", response_model=ExclusionResponse, tags=["t2mrcd-phase1"])
 def get_exclusion(
     exclusion_id: str,
-    tenant: TenantDep,
+    principal: Reader,
     c: ContainerDep,
     include: Annotated[list[ExclusionInclude] | None, Query()] = None,
 ) -> ExclusionResponse:
@@ -179,14 +184,14 @@ def get_exclusion(
 
     Args:
         exclusion_id: Exclusión.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
         include: Partes grandes opcionales.
 
     Returns:
         La exclusión.
     """
-    record = c.use_cases.get_exclusion.execute(tenant, CHART_ID, exclusion_id)
+    record = c.use_cases.get_exclusion.execute(principal.tenant_id, CHART_ID, exclusion_id)
     return ExclusionResponse.of(record, include or ())
 
 
@@ -196,12 +201,12 @@ def get_exclusion(
     response_model=AcceptedJob,
     tags=["t2mrcd-models"],
 )
-def request_model(body: ModelFromRefsRequest, tenant: TenantDep, c: ContainerDep) -> AcceptedJob:
+def request_model(body: ModelFromRefsRequest, principal: Operator, c: ContainerDep) -> AcceptedJob:
     """Encola el ensamblado del modelo a partir de referencias (sin datos ni cómputo nuevo).
 
     Args:
         body: ``{fit_id, limits_id}`` y política.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
@@ -210,7 +215,7 @@ def request_model(body: ModelFromRefsRequest, tenant: TenantDep, c: ContainerDep
     policy = None if body.lifecycle_policy is None else body.lifecycle_policy.to_domain()
     return AcceptedJob(
         id=c.use_cases.request_model.execute(
-            tenant,
+            principal.tenant_id,
             CHART_ID,
             fit_id=body.fit_id,
             limits_id=body.limits_id,
@@ -226,13 +231,13 @@ def request_model(body: ModelFromRefsRequest, tenant: TenantDep, c: ContainerDep
     tags=["t2mrcd-pipelines"],
 )
 def request_pipeline(
-    body: Phase1PipelineRequest, tenant: TenantDep, c: ContainerDep
+    body: Phase1PipelineRequest, principal: Operator, c: ContainerDep
 ) -> AcceptedJob:
     """Encola la Fase I completa por pasos (orquestación de ``/fits`` … ``/models``).
 
     Args:
         body: Dataset, parámetros, exclusión humana y política.
-        tenant: Tenant.
+        principal: Quien llama (operación: analyst o admin); da el tenant.
         c: Contenedor.
 
     Returns:
@@ -241,7 +246,7 @@ def request_pipeline(
     policy = None if body.lifecycle_policy is None else body.lifecycle_policy.to_domain()
     return AcceptedJob(
         id=c.use_cases.request_pipeline.execute(
-            tenant,
+            principal.tenant_id,
             CHART_ID,
             body.dataset_id,
             body.params.to_domain(),
@@ -261,7 +266,7 @@ def request_pipeline(
     response_model=PipelineResponse,
     tags=["t2mrcd-pipelines"],
 )
-def get_pipeline(pipeline_id: str, tenant: TenantDep, c: ContainerDep) -> PipelineResponse:
+def get_pipeline(pipeline_id: str, principal: Reader, c: ContainerDep) -> PipelineResponse:
     """Estado de una tubería (Fase I o recalibración), sus pasos y el modelo resultante.
 
     ``/pipelines/{id}`` sirve para ambos tipos (``kind``); ``/pipelines/phase1/{id}`` se
@@ -269,10 +274,12 @@ def get_pipeline(pipeline_id: str, tenant: TenantDep, c: ContainerDep) -> Pipeli
 
     Args:
         pipeline_id: Tubería.
-        tenant: Tenant.
+        principal: Quien llama (lectura: analyst, approver o admin); da el tenant.
         c: Contenedor.
 
     Returns:
         La tubería.
     """
-    return PipelineResponse.of(c.use_cases.get_pipeline.execute(tenant, CHART_ID, pipeline_id))
+    return PipelineResponse.of(
+        c.use_cases.get_pipeline.execute(principal.tenant_id, CHART_ID, pipeline_id)
+    )

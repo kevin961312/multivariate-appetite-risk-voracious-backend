@@ -10,9 +10,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, DATASETS, FAST_PARAMS, OTHER, TENANT, upload, wait
+from support.auth import auth_settings
 from support.solo_test import small_data
 from voracious.api.app import create_app
-from voracious.config import Settings
 from voracious.container import build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart
 from voracious.domain.estimators.mrcd import MRCDFit
@@ -20,7 +20,7 @@ from voracious.domain.estimators.mrcd import MRCDFit
 
 @pytest.fixture(scope="module")
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app(build_container(Settings()))) as test_client:
+    with TestClient(create_app(build_container(auth_settings()))) as test_client:
         yield test_client
 
 
@@ -122,11 +122,11 @@ def test_upload_rejects_invalid_data(client: TestClient) -> None:
     _error(missing, 422, "INVALID_INPUT")
     plain = {**TENANT, "content-type": "text/plain"}
     _error(client.post(DATASETS, headers=plain, content="1"), 415, "UNSUPPORTED_MEDIA_TYPE")
-    _error(client.post(DATASETS, json={"data": [[1.0]]}), 400, "TENANT_REQUIRED")
+    _error(client.post(DATASETS, json={"data": [[1.0]]}), 401, "UNAUTHENTICATED")
 
 
 def test_upload_is_limited_by_max_upload_mb() -> None:
-    with TestClient(create_app(build_container(Settings(max_upload_mb=1)))) as small:
+    with TestClient(create_app(build_container(auth_settings(max_upload_mb=1)))) as small:
         big = "1.0\n" * (300 * 1024)
         csv = {**TENANT, "content-type": "text/csv"}
         body = _error(small.post(DATASETS, headers=csv, content=big), 413, "PAYLOAD_TOO_LARGE")
@@ -226,7 +226,7 @@ _RELEASE = threading.Event()
 
 
 def test_steps_on_unfinished_resources_are_409() -> None:
-    container = build_container(Settings(), charts={"t2mrcd": _SlowFitChart()})
+    container = build_container(auth_settings(), charts={"t2mrcd": _SlowFitChart()})
     with TestClient(create_app(container)) as slow:
         dataset = upload(slow, small_data(40, 4))
         fit = _accepted(

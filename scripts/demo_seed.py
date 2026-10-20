@@ -1,6 +1,13 @@
-"""Siembra una demo de Voracious por HTTP con DATOS SIMULADOS (Paso 4.2).
+"""Siembra una demo de Voracious por HTTP con DATOS SIMULADOS (Paso 4.2; con token desde 2026-10).
 
-    uv run python scripts/demo_seed.py --base-url http://127.0.0.1:8000 --tenant demo
+    VORACIOUS_API_TOKEN=$(scripts/issue_token.sh --via uv --tenant demo --roles analyst \
+        --subject demo-seed --ttl 1h) uv run python scripts/demo_seed.py
+    uv run python scripts/demo_seed.py --token-file - < token.txt     # o desde un fichero
+
+El tenant es el del token (claim ``tenant``): la API ya no acepta ``X-Tenant-ID``. El token se
+pasa por la variable ``VORACIOUS_API_TOKEN`` o con ``--token-file PATH|-`` (nunca como argumento
+suelto, que quedaría en el historial y en ``ps``) y **nunca se imprime**. Hace falta el rol
+``analyst`` (o ``admin``): sube datos, pide la Fase I, puntúa y anota.
 
 Qué hace, solo hablando con la API (no importa nada de ``voracious``):
 
@@ -10,7 +17,8 @@ Qué hace, solo hablando con la API (no importa nada de ``voracious``):
    carta (solo se fija la semilla del bootstrap, que es obligatoria) y espera al modelo.
 3. Puntúa 20 observaciones nuevas, también simuladas y con fechas posteriores; algunas están
    desplazadas a propósito para que haya señales.
-4. Anota una señal con causa asignable e imprime los identificadores.
+4. Anota una señal con causa asignable (el actor es el ``sub`` del token) e imprime los
+   identificadores.
 
 Los datos son simulados: no representan ningún portafolio real. Solo usa la biblioteca estándar y
 numpy.
@@ -19,10 +27,12 @@ numpy.
 import argparse
 import http.client
 import json
+import os
 import sys
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -46,6 +56,12 @@ SHIFT = 6.0
 
 CHART = "/v1/charts/t2mrcd"
 
+BEARER_ENV = "VORACIOUS_API_TOKEN"
+"""Variable de entorno con el token portador."""
+
+STDIN = "-"
+"""Valor de ``--token-file`` que lee la entrada estándar."""
+
 Json = dict[str, Any] | list[Any]
 """Cuerpo JSON de una respuesta."""
 
@@ -54,26 +70,33 @@ class ApiError(RuntimeError):
     """La API respondió con un error."""
 
 
+class TokenError(RuntimeError):
+    """No hay token o no se pudo leer."""
+
+
 class Api:
-    """Cliente HTTP mínimo (``urllib``) con la cabecera de tenant.
+    """Cliente HTTP mínimo (``http.client``) con el token portador.
 
     Attributes:
         base_url: URL base de la API.
-        tenant: Tenant (``X-Tenant-ID``).
         timeout: Segundos máximos por petición.
     """
 
-    def __init__(self, base_url: str, tenant: str, timeout: float = 30.0) -> None:
+    def __init__(self, base_url: str, token: str, timeout: float = 30.0) -> None:
         """Construye el cliente.
 
         Args:
             base_url: URL base de la API (``http`` o ``https``).
-            tenant: Tenant.
+            token: Token portador (no se guarda en ningún atributo público ni se imprime).
             timeout: Segundos máximos por petición.
         """
         self.base_url = base_url.rstrip("/")
-        self.tenant = tenant
+        self._authorization = f"Bearer {token}"
         self.timeout = timeout
+
+    def __repr__(self) -> str:
+        """Representación sin el token."""
+        return f"Api(base_url={self.base_url!r})"
 
     def call(self, method: str, path: str, body: object | None = None) -> Json:
         """Hace una petición JSON y devuelve el cuerpo de la respuesta."""
@@ -86,7 +109,7 @@ class Api:
                 method,
                 f"{url.path}{path}",
                 body=data,
-                headers={"X-Tenant-ID": self.tenant, "Content-Type": "application/json"},
+                headers={"Authorization": self._authorization, "Content-Type": "application/json"},
             )
             response = conn.getresponse()
             text = response.read().decode("utf-8", errors="replace")
@@ -194,7 +217,6 @@ def run(api: Api, *, limit: float = 600.0, poll: float = 1.0) -> dict[str, Any]:
                 "assignable_cause": True,
                 "cause": "error de carga simulado (demo)",
                 "action": "se corrigió la fuente (demo)",
-                "actor": "demo_seed",
             },
         )
         annotation_id = note["id"]
@@ -209,6 +231,38 @@ def run(api: Api, *, limit: float = 600.0, poll: float = 1.0) -> dict[str, Any]:
     }
 
 
+def read_token(token_file: str | None) -> str:
+    """Token portador de ``--token-file`` (``-`` = entrada estándar) o de ``VORACIOUS_API_TOKEN``.
+
+    Args:
+        token_file: Ruta, ``-`` o ``None`` (entonces la variable de entorno).
+
+    Returns:
+        El token, sin espacios en los extremos.
+
+    Raises:
+        TokenError: Si no hay token o no se puede leer (el mensaje no incluye su contenido).
+    """
+    if token_file == STDIN:
+        text = sys.stdin.read()
+    elif token_file is not None:
+        try:
+            text = Path(token_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            msg = f"no se puede leer --token-file ({token_file}): {type(exc).__name__}"
+            raise TokenError(msg) from exc
+    else:
+        text = os.environ.get(BEARER_ENV, "")
+    token = text.strip()
+    if not token:
+        msg = (
+            f"falta el token: define {BEARER_ENV} o usa --token-file PATH|- "
+            "(emítelo con scripts/issue_token.sh)"
+        )
+        raise TokenError(msg)
+    return token
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Punto de entrada.
 
@@ -216,22 +270,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Argumentos (sin el programa).
 
     Returns:
-        0 si fue bien; 1 si la API falló.
+        0 si fue bien; 1 si falta el token o la API falló.
     """
     parser = argparse.ArgumentParser(description="Siembra una demo de Voracious (datos simulados).")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
-    parser.add_argument("--tenant", default="demo")
+    parser.add_argument(
+        "--token-file",
+        default=None,
+        help=f"fichero con el token ('-' = entrada estándar); si no, {BEARER_ENV}",
+    )
     parser.add_argument("--timeout", type=float, default=600.0, help="espera máxima por trabajo")
     parser.add_argument("--poll", type=float, default=1.0, help="segundos entre sondeos")
     args = parser.parse_args(argv)
+    try:
+        token = read_token(args.token_file)
+    except TokenError as exc:
+        sys.stderr.write(f"la demo no puede empezar: {exc}\n")
+        return 1
     out = sys.stdout
     out.write("=== DATOS SIMULADOS: demo de Voracious, no es un portafolio real ===\n")
     try:
-        ids = run(Api(args.base_url, args.tenant), limit=args.timeout, poll=args.poll)
+        ids = run(Api(args.base_url, token), limit=args.timeout, poll=args.poll)
     except (ApiError, OSError) as exc:
         sys.stderr.write(f"la demo falló: {exc}\n")
         return 1
-    out.write(f"tenant:        {args.tenant}\n")
     for key in ("dataset_id", "pipeline_id", "model_id", "score_id", "annotation_id"):
         out.write(f"{key + ':':<15}{ids[key]}\n")
     out.write(f"señales:       {len(ids['signal_ids'])} de {len(ids['observation_ids'])}\n")

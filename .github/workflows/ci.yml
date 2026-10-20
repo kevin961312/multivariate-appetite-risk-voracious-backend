@@ -54,6 +54,24 @@ jobs:
         run: uv python install "${PYTHON_VERSION}"
       - name: Dependencias (uv.lock al día con pyproject.toml)
         run: uv sync --locked
+      - name: sops, age y shellcheck (M7 de seguridad mínima)
+        # Con sops y age corre tests/integration/test_deploy_sops.py (sin ellos se salta) y con
+        # shellcheck la etapa shellcheck de scripts/gate.sh (sin él sale en rojo). sops es el
+        # binario oficial fijado por versión y SHA-256 (el de su checksums.txt); age y shellcheck,
+        # paquetes de Ubuntu.
+        env:
+          SOPS_VERSION: "3.13.3"
+          SOPS_SHA256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends age shellcheck
+          curl -fsSL -o "${RUNNER_TEMP}/sops" \
+            "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+          echo "${SOPS_SHA256}  ${RUNNER_TEMP}/sops" | sha256sum -c -
+          sudo install -m 0755 "${RUNNER_TEMP}/sops" /usr/local/bin/sops
+          sops --disable-version-check --version
+          age --version
+          shellcheck --version
       - name: Traza de la plataforma
         run: |
           uname -a
@@ -74,16 +92,40 @@ jobs:
           retention-days: 14
 
   image:
-    name: imagen runtime (sin publicar)
+    # Seguridad mínima (T13): la imagen real con la pila Compose completa, secretos de PRUEBA en
+    # ficheros (Compose secrets + *_FILE) y una llave JWT efímera. Nada de esto es un secreto real:
+    # la contraseña es aleatoria por ejecución y la llave muere con el runner.
+    name: imagen runtime y pila Compose (sin publicar)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: docker-compose.yml y compose.test.yaml válidos
-        # Valor de relleno solo para interpolar: el real está en el .env del servidor.
-        env:
-          POSTGRES_PASSWORD: solo-para-validar
+      - name: Secretos de PRUEBA en ficheros (0444 dentro de un directorio 0700)
         run: |
+          secrets="${RUNNER_TEMP}/secrets"
+          deploy="${RUNNER_TEMP}/deploy"
+          install -d -m 700 "${secrets}"
+          install -d -m 755 "${deploy}"
+          password=$(openssl rand -hex 24)
+          echo "::add-mask::${password}"
+          (
+            umask 077
+            printf '%s' "${password}" > "${secrets}/postgres_password"
+            printf 'postgresql://voracious:%s@postgres:5432/voracious' "${password}" > "${secrets}/database_url"
+          )
+          chmod 0444 "${secrets}/postgres_password" "${secrets}/database_url"
+          cp deploy/demo/auth.env "${deploy}/auth.env"
+          {
+            echo "DEPLOY_SECRETS_DIR=${secrets}"
+            echo "DEPLOY_DIR=${deploy}"
+          } >> "${GITHUB_ENV}"
+      - name: docker-compose.yml y compose.test.yaml válidos
+        # Sin DEPLOY_SECRETS_DIR Compose no debe arrancar (falla cerrado); con él, valida.
+        run: |
+          if env -u DEPLOY_SECRETS_DIR docker compose config --quiet 2> /dev/null; then
+            echo "docker compose config debe fallar sin DEPLOY_SECRETS_DIR"
+            exit 1
+          fi
           docker compose config --quiet
           docker compose -f compose.test.yaml config --quiet
       - name: Build (la etapa builder falla si el binario de pymrcd tiene FMA)
@@ -91,44 +133,134 @@ jobs:
         # (p. ej. FMA en el binario) falla los 3 y el job sale en rojo igual.
         run: |
           for i in 1 2 3; do
-            docker build --progress=plain --target runtime -t voracious:ci . && exit 0
+            docker build --progress=plain --target runtime -t voracious:local . && exit 0
             echo "build falló (intento $i de 3)"
             [ "$i" -lt 3 ] && sleep 30
           done
           exit 1
-      - name: Arranque en solo lectura
+      - name: Sin autenticación configurada la API no arranca
         run: |
-          docker run -d --name voracious --read-only --tmpfs /tmp \
-            -p 127.0.0.1:8000:8000 voracious:ci
-      - name: /health, /ready, HEALTHCHECK, usuario y compilador
+          if timeout 60 docker run --rm --read-only --tmpfs /tmp voracious:local \
+              > "${RUNNER_TEMP}/noauth.log" 2>&1; then
+            echo "la imagen no debe arrancar sin VORACIOUS_JWT_*"
+            exit 1
+          fi
+          grep -q VORACIOUS_JWT_JWKS_FILE "${RUNNER_TEMP}/noauth.log"
+      - name: sops y age con una llave age efímera (la vía del servidor)
+        # sops y age solo viven en el servidor (decisión del dueño, 2026-10-20); aquí se prueba esa
+        # vía: jwt_keygen.sh e issue_token.sh --via docker, sin uv. sops es el binario oficial
+        # fijado por versión y SHA-256 (como en el trabajo gate); age, el paquete de Ubuntu. La
+        # llave age es de PRUEBA y muere con el runner.
+        env:
+          SOPS_VERSION: "3.13.3"
+          SOPS_SHA256: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
         run: |
-          for _ in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1 && break
-            sleep 1
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends age
+          curl -fsSL -o "${RUNNER_TEMP}/sops" \
+            "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+          echo "${SOPS_SHA256}  ${RUNNER_TEMP}/sops" | sha256sum -c -
+          sudo install -m 0755 "${RUNNER_TEMP}/sops" /usr/local/bin/sops
+          key="${RUNNER_TEMP}/age/keys.txt"
+          install -d -m 700 "${RUNNER_TEMP}/age"
+          age-keygen -o "${key}" 2> /dev/null
+          chmod 600 "${key}"
+          printf 'creation_rules:\n  - path_regex: .*\\.enc\\.yaml$\n    age: %s\n' \
+            "$(age-keygen -y "${key}")" > "${RUNNER_TEMP}/sops.yaml"
+          {
+            echo "SOPS_AGE_KEY_FILE=${key}"
+            echo "SOPS_CONFIG=${RUNNER_TEMP}/sops.yaml"
+          } >> "${GITHUB_ENV}"
+      - name: Llave JWT efímera (scripts/jwt_keygen.sh --via docker; solo para este trabajo)
+        run: |
+          scripts/jwt_keygen.sh --via docker ci
+          grep -q '"kid": "ci"' "${DEPLOY_DIR}/jwks.json"
+          if grep -q '"d"' "${DEPLOY_DIR}/jwks.json"; then
+            echo "el JWKS no puede llevar la parte privada"
+            exit 1
+          fi
+          grep -q '^sops:' "${DEPLOY_DIR}/jwt-signing.enc.yaml"
+          if grep -q 'PRIVATE KEY' "${DEPLOY_DIR}/jwt-signing.enc.yaml"; then
+            echo "la llave de firma no está cifrada"
+            exit 1
+          fi
+      - name: Pila Compose completa (postgres, migrate, api, backup)
+        run: |
+          docker compose up -d --no-build
+          for _ in $(seq 1 90); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/ready || true)
+            [ "${code}" = 200 ] && break
+            sleep 2
           done
-          curl -fsS http://127.0.0.1:8000/health
+          test "${code}" = 200
+      - name: /health, /ready, 401, token, docker inspect, backup, usuario, compilador y HEALTHCHECK
+        run: |
+          base=http://127.0.0.1:8000
+          curl -fsS "${base}/health"
           echo
-          curl -fsS http://127.0.0.1:8000/ready
+          # 200 ⇒ la API leyó VORACIOUS_DATABASE_URL_FILE (secreto montado) y conectó a Postgres.
+          curl -fsS "${base}/ready"
           echo
-          uid=$(docker exec voracious id -u)
+          code=$(curl -s -D "${RUNNER_TEMP}/h401" -o /dev/null -w '%{http_code}' "${base}/v1/datasets/nope")
+          test "${code}" = 401
+          grep -qi '^www-authenticate: Bearer realm="voracious"' "${RUNNER_TEMP}/h401"
+          token=$(scripts/issue_token.sh --via docker --tenant ci --roles analyst --subject ci --ttl 10m)
+          echo "::add-mask::${token}"
+          response=$(curl -s -H "Authorization: Bearer ${token}" -w '\n%{http_code}' "${base}/v1/datasets/nope")
+          test "$(printf '%s\n' "${response}" | tail -n 1)" = 404
+          printf '%s\n' "${response}" | head -n 1 | grep -q '"code":"DATASET_NOT_FOUND"'
+          # Ni la query ni la ruta cruda llegan al registro (uvicorn con --no-access-log; el
+          # registro propio solo escribe la plantilla de la ruta).
+          marker="marca-query-$(openssl rand -hex 8)"
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${token}" "${base}/v1/datasets/x?access_token=${marker}")
+          test "${code}" = 404
+          sleep 1
+          docker compose logs --no-color api > "${RUNNER_TEMP}/api.log"
+          grep -q '"event": *"http_request"' "${RUNNER_TEMP}/api.log"
+          if grep -F -q "${marker}" "${RUNNER_TEMP}/api.log"; then
+            echo "el registro de la API contiene la query de la petición"
+            exit 1
+          fi
+          # Ningún valor secreto en docker inspect (ni la contraseña ni la URL).
+          docker compose ps -aq | xargs docker inspect > "${RUNNER_TEMP}/inspect.json"
+          for name in postgres_password database_url; do
+            cat "${DEPLOY_SECRETS_DIR}/${name}"
+            echo
+          done | grep -v '^$' > "${RUNNER_TEMP}/patterns"
+          if grep -F -q -f "${RUNNER_TEMP}/patterns" "${RUNNER_TEMP}/inspect.json"; then
+            echo "docker inspect contiene un valor secreto"
+            exit 1
+          fi
+          postgres=$(docker compose ps -q postgres)
+          test "$(docker inspect --format '{{len .HostConfig.PortBindings}}' "${postgres}")" = 0
+          test "$(docker compose port api 8000)" = 127.0.0.1:8000
+          # El volcado prueba que backup leyó la contraseña del fichero del secreto.
+          for _ in $(seq 1 30); do
+            docker compose logs backup | grep -q 'backup: voracious-' && break
+            sleep 2
+          done
+          docker compose logs backup | grep 'backup: voracious-'
+          uid=$(docker compose exec -T api id -u)
           echo "uid: ${uid}"
           test "${uid}" != "0"
-          if docker exec voracious sh -c 'command -v gcc || command -v cc'; then
+          if docker compose exec -T api sh -c 'command -v gcc || command -v cc'; then
             echo "la imagen runtime no debe tener compilador"
             exit 1
           fi
-          for _ in $(seq 1 30); do
-            status=$(docker inspect --format '{{.State.Health.Status}}' voracious)
+          api=$(docker compose ps -q api)
+          for _ in $(seq 1 40); do
+            status=$(docker inspect --format '{{.State.Health.Status}}' "${api}")
             [ "${status}" = healthy ] && break
             sleep 3
           done
           echo "HEALTHCHECK: ${status}"
           test "${status}" = healthy
-      - name: Logs del contenedor
+      - name: Logs y limpieza
         if: always()
         run: |
-          docker logs voracious || true
-          docker rm -f voracious || true
+          docker compose logs --no-color || true
+          docker compose down -v --remove-orphans || true
 
   sanitizers:
     # M2: la extensión C de pymrcd con ASan y UBSan; cualquier aviso aborta (-fno-sanitize-recover).

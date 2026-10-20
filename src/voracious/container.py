@@ -6,11 +6,15 @@ configuración sin adaptador hace fallar el arranque (nunca se ignora en silenci
 """
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
+from datetime import timedelta
+from pathlib import Path
 
 import structlog
+from pydantic import ValidationError
 
+from voracious.application.auth import Role
 from voracious.application.charts import AnyChart, ChartRegistry
 from voracious.application.phase1_steps import Phase1Steps, Phase1StepsRegistry
 from voracious.application.ports import (
@@ -29,6 +33,7 @@ from voracious.application.ports import (
     RecalibrationRepository,
     SignalAnnotationRepository,
     StructuralEventRepository,
+    TokenVerifier,
 )
 from voracious.application.recalibration_steps import (
     RecalibrationSteps,
@@ -79,6 +84,14 @@ from voracious.config import Settings
 from voracious.domain.charts.t2mrcd import CHART_ID as T2MRCD_CHART_ID
 from voracious.domain.charts.t2mrcd import T2MRCDChart
 from voracious.domain.common import SerialTaskMapper, TaskMapper
+from voracious.infrastructure.auth import (
+    JwksError,
+    JwtTokenVerifier,
+    add_public_key,
+    generate_ed25519_key,
+    load_jwks,
+    sign_token,
+)
 from voracious.infrastructure.charts import T2MRCDPhase1Steps, T2MRCDRecalibrationSteps
 from voracious.infrastructure.clock import SystemClock
 from voracious.infrastructure.ids import UuidIdGenerator
@@ -129,7 +142,15 @@ from voracious.infrastructure.postgres import (
 )
 from voracious.infrastructure.storage import LocalDatasetStorage, LocalMatrixStore
 
-__all__ = ["ConfigurationError", "Container", "UseCases", "build_container", "run_migrations"]
+__all__ = [
+    "ConfigurationError",
+    "Container",
+    "UseCases",
+    "build_container",
+    "generate_signing_key",
+    "issue_token",
+    "run_migrations",
+]
 
 _log = structlog.get_logger(__name__)
 
@@ -227,6 +248,9 @@ class Container:
         readiness: Comprobación de cada dependencia externa para ``/ready`` (``database`` con
             Postgres, ``storage`` con almacenamiento local).
         closers: Lo que se cierra al apagar (el pool de Postgres).
+        token_verifier: Verificador de los tokens de la API (``JwtTokenVerifier`` sobre el JWKS de
+            ``VORACIOUS_JWT_JWKS_FILE``); ``None`` sin JWKS, y entonces la API no arranca. Los
+            workers y la CLI no lo usan.
     """
 
     settings: Settings
@@ -237,6 +261,7 @@ class Container:
     recovery: RecoverInterruptedJobs
     readiness: Mapping[str, Callable[[], bool]] = field(default_factory=dict)
     closers: tuple[Callable[[], None], ...] = ()
+    token_verifier: TokenVerifier | None = None
 
     def startup(self) -> Mapping[str, int]:
         """Arranque: cierra ``failed / JOB_INTERRUPTED`` lo que un reinicio dejó en curso.
@@ -428,8 +453,32 @@ def _memory_repositories(
     )
 
 
+def _read_text_file(path: Path, variable: str) -> str:
+    """Lee un fichero de configuración; un error nombra la variable y la ruta, nunca el contenido.
+
+    Args:
+        path: Ruta.
+        variable: Variable ``VORACIOUS_*`` que la da (para el mensaje).
+
+    Returns:
+        El texto (UTF-8).
+
+    Raises:
+        ConfigurationError: Si no existe, no se puede leer o no es UTF-8.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        msg = f"no se puede leer {variable} ({path}): {type(exc).__name__}"
+        raise ConfigurationError(msg) from exc
+
+
 def _database_url(settings: Settings) -> str:
     """Cadena de conexión revelada solo para abrir la conexión (nunca se registra).
+
+    ``VORACIOUS_DATABASE_URL`` (desarrollo, CI y tests) y ``VORACIOUS_DATABASE_URL_FILE``
+    (secreto de Compose en ``/run/secrets``) son excluyentes. El fichero se lee entero y se le
+    quitan los espacios de los extremos (el salto de línea final); no puede quedar vacío.
 
     Args:
         settings: Configuración.
@@ -438,12 +487,138 @@ def _database_url(settings: Settings) -> str:
         La cadena.
 
     Raises:
-        ConfigurationError: Si falta ``VORACIOUS_DATABASE_URL``.
+        ConfigurationError: Si faltan las dos, vienen las dos, o el fichero no se puede leer o está
+            vacío (el mensaje nombra la ruta, nunca el contenido).
     """
-    if settings.database_url is None or not settings.database_url.get_secret_value():
-        msg = "VORACIOUS_REPOSITORY=postgres exige VORACIOUS_DATABASE_URL"
+    direct = settings.database_url.get_secret_value() if settings.database_url else ""
+    path = settings.database_url_file
+    if direct and path is not None:
+        msg = "VORACIOUS_DATABASE_URL y VORACIOUS_DATABASE_URL_FILE son excluyentes (solo una)"
         raise ConfigurationError(msg)
-    return settings.database_url.get_secret_value()
+    if path is not None:
+        url = _read_text_file(path, "VORACIOUS_DATABASE_URL_FILE").strip()
+        if not url:
+            msg = f"VORACIOUS_DATABASE_URL_FILE ({path}) está vacío"
+            raise ConfigurationError(msg)
+        return url
+    if not direct:
+        msg = (
+            "VORACIOUS_REPOSITORY=postgres exige VORACIOUS_DATABASE_URL o "
+            "VORACIOUS_DATABASE_URL_FILE"
+        )
+        raise ConfigurationError(msg)
+    return direct
+
+
+def _token_verifier(settings: Settings) -> JwtTokenVerifier | None:
+    """Verificador de tokens sobre el JWKS configurado.
+
+    Args:
+        settings: Configuración.
+
+    Returns:
+        El verificador, o ``None`` sin ``VORACIOUS_JWT_JWKS_FILE``.
+
+    Raises:
+        ConfigurationError: Con JWKS pero sin emisor o audiencia, o si el fichero no se puede leer
+            o no es un JWKS válido (solo públicas, con ``kid`` y ``alg`` permitido).
+    """
+    path = settings.jwt_jwks_file
+    if path is None:
+        return None
+    if not settings.jwt_issuer or not settings.jwt_audience:
+        msg = "VORACIOUS_JWT_JWKS_FILE exige VORACIOUS_JWT_ISSUER y VORACIOUS_JWT_AUDIENCE"
+        raise ConfigurationError(msg)
+    text = _read_text_file(path, "VORACIOUS_JWT_JWKS_FILE")
+    try:
+        keys = load_jwks(text, allowed_algorithms=settings.jwt_algorithms)
+    except JwksError as exc:
+        msg = f"VORACIOUS_JWT_JWKS_FILE ({path}) no es válido: {exc}"
+        raise ConfigurationError(msg) from exc
+    return JwtTokenVerifier(
+        keys,
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+        algorithms=settings.jwt_algorithms,
+        leeway=timedelta(seconds=settings.jwt_leeway_seconds),
+    )
+
+
+def issue_token(
+    private_key_pem: bytes,
+    *,
+    kid: str,
+    subject: str,
+    tenant_id: str,
+    roles: Collection[Role],
+    ttl: timedelta,
+    settings: Settings | None = None,
+) -> str:
+    """Emite un token de nivel A (``python -m voracious.cli issue-token``).
+
+    ``iss`` y ``aud`` salen de ``VORACIOUS_JWT_ISSUER`` y ``VORACIOUS_JWT_AUDIENCE``. Si además hay
+    JWKS configurado, el token emitido se verifica con el mismo verificador que la API, de modo que
+    un ``kid`` que no esté en el JWKS (o una llave que no sea la suya) falla aquí y no en la API.
+
+    Args:
+        private_key_pem: Llave privada Ed25519 (PEM PKCS8); no se guarda.
+        kid: ``kid`` de la llave.
+        subject: ``sub``.
+        tenant_id: ``tenant``.
+        roles: ``roles``.
+        ttl: Vida del token (hasta 7 días).
+        settings: Configuración; ``None`` la lee del entorno.
+
+    Returns:
+        El token.
+
+    Raises:
+        ConfigurationError: Con variables ``VORACIOUS_*`` no válidas, sin emisor o audiencia, o
+            con un JWKS inválido.
+        ValueError: Si algún argumento no es válido.
+        AuthenticationError: Si el token emitido no verifica con el JWKS configurado.
+    """
+    try:
+        resolved = settings if settings is not None else Settings()
+    except ValidationError as exc:
+        fields = sorted({str(error["loc"][0]) for error in exc.errors() if error["loc"]})
+        msg = f"variables VORACIOUS_* no válidas: {', '.join(fields)}"
+        raise ConfigurationError(msg) from exc
+    if not resolved.jwt_issuer or not resolved.jwt_audience:
+        msg = "issue-token exige VORACIOUS_JWT_ISSUER y VORACIOUS_JWT_AUDIENCE"
+        raise ConfigurationError(msg)
+    verifier = _token_verifier(resolved)
+    token = sign_token(
+        private_key_pem,
+        kid=kid,
+        issuer=resolved.jwt_issuer,
+        audience=resolved.jwt_audience,
+        subject=subject,
+        tenant_id=tenant_id,
+        roles=roles,
+        ttl=ttl,
+        now=SystemClock().now(),
+    )
+    if verifier is not None:
+        verifier.verify(token)
+    return token
+
+
+def generate_signing_key(kid: str, jwks_text: str | None) -> tuple[bytes, str]:
+    """Genera una llave de firma Ed25519 y añade su parte pública al JWKS (``jwt-keygen``).
+
+    Args:
+        kid: ``kid`` nuevo (no puede estar ya en el JWKS).
+        jwks_text: JWKS actual, o ``None`` si aún no existe.
+
+    Returns:
+        ``(llave privada PEM PKCS8, JWKS nuevo)``.
+
+    Raises:
+        ValueError: Si el ``kid`` no es válido o ya existe, o el JWKS actual no es válido.
+    """
+    pem, jwk = generate_ed25519_key(kid)
+    return pem, add_public_key(jwks_text, jwk)
 
 
 def _postgres_repositories(
@@ -499,7 +674,8 @@ def run_migrations(settings: Settings | None = None) -> list[str]:
         Las versiones aplicadas ahora.
 
     Raises:
-        ConfigurationError: Si ``repository`` no es ``postgres`` o falta la URL.
+        ConfigurationError: Si ``repository`` no es ``postgres`` o la URL falta, viene dos veces
+            (directa y en fichero) o su fichero no se puede leer.
     """
     resolved = settings if settings is not None else Settings()
     configure_logging(resolved.log_level)
@@ -575,11 +751,13 @@ def build_container(
         El contenedor con todas las dependencias cableadas.
 
     Raises:
-        ConfigurationError: Si un adaptador configurado no existe o le falta configuración.
+        ConfigurationError: Si un adaptador configurado no existe o le falta configuración, o el
+            JWKS configurado no es válido.
     """
     resolved = settings if settings is not None else Settings()
     configure_logging(resolved.log_level)
     _check_adapters(resolved)
+    token_verifier = _token_verifier(resolved)
     if oversubscribed(resolved, os.cpu_count()):
         _log.warning(
             "replicate_oversubscription",
@@ -750,4 +928,5 @@ def build_container(
         ),
         readiness=repos.readiness,
         closers=repos.closers,
+        token_verifier=token_verifier,
     )

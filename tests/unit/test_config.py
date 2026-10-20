@@ -113,3 +113,69 @@ def test_database_url_is_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.database_url.get_secret_value() == url
     assert "clave-muy-secreta" not in repr(settings)
     assert "clave-muy-secreta" not in str(settings)
+
+
+# --- seguridad mínima: JWT y URL en fichero ---------------------------------------------------
+
+
+def test_auth_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "JWT_JWKS_FILE",
+        "JWT_ISSUER",
+        "JWT_AUDIENCE",
+        "JWT_ALGORITHMS",
+        "JWT_LEEWAY_SECONDS",
+        "DATABASE_URL_FILE",
+    ):
+        monkeypatch.delenv(f"VORACIOUS_{name}", raising=False)
+    s = Settings()
+    assert (s.jwt_jwks_file, s.jwt_issuer, s.jwt_audience, s.database_url_file) == (
+        None,
+        None,
+        None,
+        None,
+    )
+    assert s.jwt_algorithms == ("EdDSA",)
+    assert s.jwt_leeway_seconds == 30
+
+
+def test_auth_is_read_from_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("VORACIOUS_JWT_JWKS_FILE", str(tmp_path / "jwks.json"))
+    monkeypatch.setenv("VORACIOUS_JWT_ISSUER", "voracious-demo")
+    monkeypatch.setenv("VORACIOUS_JWT_AUDIENCE", "voracious-api")
+    monkeypatch.setenv("VORACIOUS_JWT_ALGORITHMS", "EdDSA, ES256,RS256,PS256")
+    monkeypatch.setenv("VORACIOUS_JWT_LEEWAY_SECONDS", "0")
+    monkeypatch.setenv("VORACIOUS_DATABASE_URL_FILE", "/run/secrets/database_url")
+    s = Settings()
+    assert s.jwt_jwks_file == tmp_path / "jwks.json"
+    assert (s.jwt_issuer, s.jwt_audience) == ("voracious-demo", "voracious-api")
+    assert s.jwt_algorithms == ("EdDSA", "ES256", "RS256", "PS256")
+    assert s.jwt_leeway_seconds == 0
+    assert s.database_url_file == Path("/run/secrets/database_url")
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("JWT_ALGORITHMS", "HS256"),
+        ("JWT_ALGORITHMS", "none"),
+        ("JWT_ALGORITHMS", "EdDSA,HS512"),
+        ("JWT_ALGORITHMS", " , "),
+        ("JWT_LEEWAY_SECONDS", "-1"),
+        ("JWT_LEEWAY_SECONDS", "301"),
+        ("JWT_ISSUER", "x" * 257),
+    ],
+)
+def test_invalid_auth_values_fail(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
+    monkeypatch.setenv(f"VORACIOUS_{name}", value)
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_empty_auth_variables_count_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VORACIOUS_JWT_ISSUER", "")
+    monkeypatch.setenv("VORACIOUS_JWT_ALGORITHMS", "")
+    s = Settings()
+    assert s.jwt_issuer is None
+    assert s.jwt_algorithms == ("EdDSA",)
+    assert Settings(jwt_algorithms=("RS256",)).jwt_algorithms == ("RS256",)

@@ -22,9 +22,10 @@ from support.api import (
     upload,
     wait,
 )
+from support.auth import auth_settings, bearer
 from support.solo_test import small_data
 from voracious.api.app import create_app
-from voracious.config import Settings
+from voracious.application.auth import Role
 from voracious.container import build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart, T2MRCDModel
 
@@ -33,7 +34,7 @@ END = (T0 + timedelta(hours=29)).isoformat()
 
 @pytest.fixture(scope="module")
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app(build_container(Settings()))) as test_client:
+    with TestClient(create_app(build_container(auth_settings()))) as test_client:
         yield test_client
 
 
@@ -53,12 +54,14 @@ def _error(response: httpx2.Response, status: int, code: str) -> dict[str, Any]:
     return body
 
 
-# --- tenant ---------------------------------------------------------------------
+# --- autenticación (el tenant sale del token; X-Tenant-ID ya no existe) ----------------
 
 
-@pytest.mark.parametrize("headers", [{}, {"X-Tenant-ID": "a b"}, {"X-Tenant-ID": "x" * 65}])
-def test_tenant_is_required_and_validated(client: TestClient, headers: dict[str, str]) -> None:
-    _error(client.get(f"{BASE}/nada", headers=headers), 400, "TENANT_REQUIRED")
+@pytest.mark.parametrize(
+    "headers", [{}, {"X-Tenant-ID": "tenant-a"}, {"Authorization": "Bearer x.y.z"}]
+)
+def test_a_token_is_required(client: TestClient, headers: dict[str, str]) -> None:
+    _error(client.get(f"{BASE}/nada", headers=headers), 401, "UNAUTHENTICATED")
 
 
 # --- modelos --------------------------------------------------------------------
@@ -126,7 +129,7 @@ class _BlockingChart(T2MRCDChart):
 
 def test_post_returns_202_before_the_job_finishes() -> None:
     chart = _BlockingChart()
-    container = build_container(Settings(), charts={"t2mrcd": chart})
+    container = build_container(auth_settings(), charts={"t2mrcd": chart})
     with TestClient(create_app(container)) as client:
         dataset_id = upload(client, small_data(40, 4))
         fit = client.post(f"{CHART_BASE}/fits", headers=TENANT, json={"dataset_id": dataset_id})
@@ -199,9 +202,13 @@ def test_annotations(client: TestClient, scored: dict[str, Any]) -> None:
     model_url = f"{BASE}/{scored['model_id']}"
     signal = scored["observation_ids"][3]
     url = f"{model_url}/observations/{signal}/annotations"
-    response = client.post(url, headers=TENANT, json={"assignable_cause": False, "actor": "ana"})
+    spoofed = {"assignable_cause": False, "actor": "otra-persona"}
+    _error(client.post(url, headers=TENANT, json=spoofed), 422, "INVALID_INPUT")  # M1
+    ana = bearer(subject="ana", roles=(Role.ANALYST,))
+    response = client.post(url, headers=ana, json={"assignable_cause": False})
     assert response.status_code == 201
     assert response.json()["observation_id"] == signal
+    assert response.json()["actor"] == "ana"  # el sub del token
     rows = client.get(f"{model_url}/observations", headers=TENANT, params={"signals_only": True})
     annotated = {r["id"]: r["annotation"] for r in rows.json()}
     assert annotated[signal]["actor"] == "ana"
@@ -277,14 +284,16 @@ def test_versions_and_status(client: TestClient, scored: dict[str, Any]) -> None
 # --- recalibraciones y eventos --------------------------------------------------------
 
 
-def _recalibrate(client: TestClient, model_id: str, **extra: object) -> httpx2.Response:
+def _recalibrate(
+    client: TestClient, model_id: str, headers: dict[str, str] = TENANT, **extra: object
+) -> httpx2.Response:
     body: dict[str, Any] = {
         "range_from": T0.isoformat(),
         "range_to": END,
         "params": {"seed": 11, "min_observations": 20},
         **extra,
     }
-    return client.post(f"{BASE}/{model_id}/recalibrations", headers=TENANT, json=body)
+    return client.post(f"{BASE}/{model_id}/recalibrations", headers=headers, json=body)
 
 
 def test_recalibration_validation(client: TestClient, scored: dict[str, Any]) -> None:
@@ -316,12 +325,14 @@ def test_recalibration_validation(client: TestClient, scored: dict[str, Any]) ->
 def test_forced_recalibration_proposal_and_reject(client: TestClient) -> None:
     model_id = train(client, seed=21)
     score(client, model_id, observations(30))
-    response = _recalibrate(client, model_id, force_replace=True, actor="ana")
+    _error(_recalibrate(client, model_id, force_replace=True, actor="ana"), 422, "INVALID_INPUT")
+    response = _recalibrate(client, model_id, headers=bearer(subject="ana"), force_replace=True)
     assert response.status_code == 202
     rid = response.json()["id"]
     url = f"{BASE}/{model_id}/recalibrations/{rid}"
     done = wait(client, url)
     assert done["status"] == "succeeded", done
+    assert done["actor"] == "ana"
     assert done["outcome"] == "replace"
     assert done["proposed_version"] == 1
     assert "forced" not in done["report"]
@@ -342,9 +353,11 @@ def test_forced_recalibration_proposal_and_reject(client: TestClient) -> None:
     _error(
         client.post(f"{BASE}/{model_id}/versions/1/reject", headers=OTHER), 404, "VERSION_NOT_FOUND"
     )
-    rejected = client.post(
-        f"{BASE}/{model_id}/versions/1/reject", headers=TENANT, json={"note": "no", "actor": "luis"}
-    )
+    reject_url = f"{BASE}/{model_id}/versions/1/reject"
+    luis = bearer(subject="luis", roles=(Role.APPROVER,))
+    spoofed = {"note": "no", "actor": "otra-persona"}
+    _error(client.post(reject_url, headers=luis, json=spoofed), 422, "INVALID_INPUT")
+    rejected = client.post(reject_url, headers=luis, json={"note": "no"})
     assert rejected.status_code == 200
     assert (rejected.json()["status"], rejected.json()["decided_by"]) == ("rejected", "luis")
     detail = client.get(f"{BASE}/{model_id}/versions/1", headers=TENANT).json()
@@ -356,8 +369,13 @@ def test_structural_events(client: TestClient) -> None:
     score(client, model_id, observations(30))
     url = f"{BASE}/{model_id}/structural-events"
     when = (T0 + timedelta(hours=10)).isoformat()
-    response = client.post(url, headers=TENANT, json={"occurred_at": when, "description": "fusión"})
+    event = {"occurred_at": when, "description": "fusión"}
+    spoofed = {**event, "actor": "otra-persona"}
+    _error(client.post(url, headers=TENANT, json=spoofed), 422, "INVALID_INPUT")  # M1
+    ana = bearer(subject="ana", roles=(Role.ANALYST,))
+    response = client.post(url, headers=ana, json=event)
     assert response.status_code == 201
+    assert response.json()["actor"] == "ana"  # el sub del token
     event_id = response.json()["id"]
     assert [e["id"] for e in client.get(url, headers=TENANT).json()] == [event_id]
     _error(client.get(url, headers=OTHER), 404, "MODEL_NOT_FOUND")
@@ -400,11 +418,15 @@ def test_end_to_end_train_score_annotate_recalibrate_approve(client: TestClient)
     )
     excluded = {(e["ref"], e["reason"]) for e in detail.json()["exclusions"]}
     assert (signal, "assignable_cause") in excluded
-    approved = client.post(
-        f"{BASE}/{model_id}/versions/{number}/approve", headers=TENANT, json={"actor": "ana"}
-    )
+    approve_url = f"{BASE}/{model_id}/versions/{number}/approve"
+    ana = bearer(subject="ana", roles=(Role.APPROVER,))
+    _error(client.post(approve_url, headers=ana, json={"actor": "ana"}), 422, "INVALID_INPUT")
+    analyst = bearer(subject="ana", roles=(Role.ANALYST,))
+    forbidden = _error(client.post(approve_url, headers=analyst, json={}), 403, "FORBIDDEN")
+    assert forbidden["details"] == {"required_roles": ["admin", "approver"]}
+    approved = client.post(approve_url, headers=ana, json={})
     assert approved.status_code == 200, approved.text
-    assert approved.json()["status"] == "active"
+    assert (approved.json()["status"], approved.json()["decided_by"]) == ("active", "ana")
     state = client.get(f"{BASE}/{model_id}/status", headers=TENANT).json()
     assert (state["status"], state["active_version"]) == ("active", number)
     versions = client.get(f"{BASE}/{model_id}/versions", headers=TENANT).json()

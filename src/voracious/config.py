@@ -1,12 +1,16 @@
 """Configuración de Voracious leída exclusivamente de variables de entorno ``VORACIOUS_*``."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
+JwtAlgorithm = Literal["EdDSA", "ES256", "RS256", "PS256"]
+"""Algoritmos de firma asimétrica admitidos (D2). Nunca ``none`` ni ``HS*``: una llave
+compartida permitiría firmar a quien solo debe verificar."""
 
 
 class Settings(BaseSettings):
@@ -45,8 +49,22 @@ class Settings(BaseSettings):
         database_url: Cadena de conexión de Postgres (``VORACIOUS_DATABASE_URL``, formato
             ``postgresql://usuario:contraseña@host:5432/base``). Secreto: ``SecretStr`` no la
             muestra en ``repr`` ni en logs. Obligatoria con ``repository=postgres``.
+        database_url_file: Fichero con la cadena de conexión (``VORACIOUS_DATABASE_URL_FILE``):
+            el secreto de Compose montado en ``/run/secrets/database_url``. Excluyente con
+            ``database_url`` (que queda para desarrollo, CI y tests); ``container`` lo lee, quita
+            los espacios de los extremos y exige que no quede vacío.
         database_pool_size: Conexiones máximas del pool (``VORACIOUS_DATABASE_POOL_SIZE``).
             Rendimiento, no estadístico: cubre los hilos de la cola y los de la API.
+        jwt_jwks_file: JWKS con las llaves **públicas** que verifican los tokens
+            (``VORACIOUS_JWT_JWKS_FILE``); cada llave con ``kid`` y ``alg``. Sin él la API no
+            arranca. La llave privada nunca entra en la configuración (D11).
+        jwt_issuer: Emisor exigido, comparado entero (claim ``iss``; ``VORACIOUS_JWT_ISSUER``).
+        jwt_audience: Audiencia exigida, comparada entera (claim ``aud``;
+            ``VORACIOUS_JWT_AUDIENCE``).
+        jwt_algorithms: Algoritmos admitidos (``VORACIOUS_JWT_ALGORITHMS``, separados por comas;
+            ``EdDSA`` por defecto). Al menos uno; solo asimétricos.
+        jwt_leeway_seconds: Margen de reloj en segundos al comprobar ``exp``, ``nbf`` e ``iat``
+            (``VORACIOUS_JWT_LEEWAY_SECONDS``, 0 a 300; 30 por defecto).
     """
 
     model_config = SettingsConfigDict(
@@ -66,4 +84,27 @@ class Settings(BaseSettings):
     queue_workers_orchestration: int = Field(default=2, ge=1)
     max_upload_mb: int = Field(default=50, ge=1)
     database_url: SecretStr | None = None
+    database_url_file: Path | None = None
     database_pool_size: int = Field(default=10, ge=1)
+    jwt_jwks_file: Path | None = None
+    jwt_issuer: str | None = Field(default=None, min_length=1, max_length=256)
+    jwt_audience: str | None = Field(default=None, min_length=1, max_length=256)
+    jwt_algorithms: Annotated[tuple[JwtAlgorithm, ...], NoDecode] = Field(
+        default=("EdDSA",), min_length=1
+    )
+    jwt_leeway_seconds: int = Field(default=30, ge=0, le=300)
+
+    @field_validator("jwt_algorithms", mode="before")
+    @classmethod
+    def _split_algorithms(cls, value: object) -> object:
+        """Admite ``EdDSA,ES256`` en la variable de entorno (sin JSON).
+
+        Args:
+            value: Valor crudo (cadena desde el entorno o secuencia desde el código).
+
+        Returns:
+            La secuencia de nombres, sin espacios ni elementos vacíos.
+        """
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return value

@@ -20,10 +20,20 @@ venv/
 coverage.xml
 htmlcov/
 
-# Configuración local y secretos
+# Configuración local y secretos: nada en claro (llaves PEM, llaves age ni descifrados).
 .env
 .env.*
 !.env.example
+*.pem
+keys.txt
+# deploy/ es una lista blanca: solo se versionan los cifrados con SOPS (*.enc.yaml), el JWKS
+# público (jwks.json) y la configuración pública del JWT (auth.env); todo lo demás, p. ej. un
+# secrets.yaml en claro, queda ignorado. «!deploy/**/» deja a git entrar en los subdirectorios.
+deploy/**
+!deploy/**/
+!deploy/**/*.enc.yaml
+!deploy/**/jwks.json
+!deploy/**/auth.env
 
 # Plantilla de agentes de otro proyecto (solo referencia local, no se sube)
 plantilla-agentes/
@@ -45,6 +55,9 @@ plantilla-agentes/
 
 # Código fuente de referencia de terceros (rrcov, robustbase): solo lectura local, no se versiona
 referencias/
+
+# Datos de trabajo locales: no se versionan (tampoco entran en la imagen, .dockerignore)
+datos/
 
 # Fixtures golden: intermedios p×p pesados solo en local (se regeneran con tools/r/, ver
 # packages/pymrcd/tests/golden/fixtures/README.md). Se versionan completos C1, C7, C8, C9, C11 y C8_eq.

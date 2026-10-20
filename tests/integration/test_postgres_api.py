@@ -17,24 +17,34 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from support.api import BASE, DATASETS, T0, TENANT, observations, score, train, wait
+from support.api import (
+    BASE,
+    DATASETS,
+    OTHER,
+    T0,
+    TENANT,
+    TENANT_ID,
+    observations,
+    score,
+    train,
+    wait,
+)
+from support.auth import auth_settings
 from support.bits import canonical
 from voracious.api.app import create_app
 from voracious.application.records import JobStatus
 from voracious.application.use_cases import JOB_INTERRUPTED
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart, T2MRCDRecalibrationParams
 from voracious.infrastructure.memory import ModelRecordCodec
 from voracious.infrastructure.postgres import PostgresModelRepository, create_pool
 
-TENANT_ID = TENANT["X-Tenant-ID"]
 CHART_ID = "t2mrcd"
 N = 30
 
 
 def _postgres(url: str, storage: Path) -> Container:
-    settings = Settings(
+    settings = auth_settings(
         repository="postgres",
         database_url=url,
         database_pool_size=4,
@@ -92,7 +102,7 @@ def _flow(container: Container) -> dict[str, Any]:
 
 
 def test_postgres_gives_the_same_bits_as_memory(pg_container: Container) -> None:
-    memory = build_container(Settings(), charts={CHART_ID: T2MRCDChart()})
+    memory = build_container(auth_settings(), charts={CHART_ID: T2MRCDChart()})
     try:
         expected = _flow(memory)
     finally:
@@ -122,7 +132,7 @@ def test_model_survives_rebuilding_the_container(pg_url: str, tmp_path: Path) ->
             root = before["provenance"]["root_dataset_id"]
             dataset = client.get(f"{DATASETS}/{root}", headers=TENANT)
             assert dataset.status_code == 200, dataset.text
-            other = client.get(f"{BASE}/{model_id}", headers={"X-Tenant-ID": "tenant-b"})
+            other = client.get(f"{BASE}/{model_id}", headers=OTHER)
             assert other.status_code == 404
     finally:
         second.shutdown()

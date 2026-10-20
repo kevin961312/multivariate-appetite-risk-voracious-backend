@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from voracious.application.auth import UNAUTHENTICATED
 from voracious.application.errors import ApplicationError
 from voracious.application.use_cases import INTERNAL_ERROR, JOB_INTERRUPTED
 from voracious.domain.common import DomainError, InvalidInputError
@@ -32,8 +33,10 @@ __all__ = [
 _log = structlog.get_logger(__name__)
 
 CODE_TO_STATUS: Mapping[str, int] = {
-    # 400: petición sin contexto válido.
-    "TENANT_REQUIRED": 400,
+    # 401: falta el token o no es válido (``details.reason``; con ``WWW-Authenticate``).
+    UNAUTHENTICATED: 401,
+    # 403: el token es válido pero sus roles no permiten la operación (``details.required_roles``).
+    "FORBIDDEN": 403,
     # 404: recurso inexistente o de otro tenant (indistinguibles).
     "CHART_NOT_FOUND": 404,
     "MODEL_NOT_FOUND": 404,
@@ -86,7 +89,7 @@ o del método frente a esa entrada, p. ej. ``T2MRCD_DECISION_PENDING`` al valida
 
 
 class ApiError(Exception):
-    """Error propio de la capa HTTP (p. ej. ``TENANT_REQUIRED``).
+    """Error propio de la capa HTTP (p. ej. ``FORBIDDEN``).
 
     Attributes:
         code: Código del catálogo.
@@ -123,7 +126,12 @@ def status_for(code: str) -> int | None:
 
 
 def error_response(
-    status: int, code: str, message: str, details: Mapping[str, object] | None = None
+    status: int,
+    code: str,
+    message: str,
+    details: Mapping[str, object] | None = None,
+    *,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     """Respuesta JSON de error.
 
@@ -132,12 +140,17 @@ def error_response(
         code: Código.
         message: Mensaje.
         details: Datos adicionales.
+        headers: Cabeceras adicionales (p. ej. ``WWW-Authenticate`` en un ``401``).
 
     Returns:
         La respuesta.
     """
     body = {"code": code, "message": message, "details": dict(details or {})}
-    return JSONResponse(status_code=status, content=jsonable_encoder(body))
+    return JSONResponse(
+        status_code=status,
+        content=jsonable_encoder(body),
+        headers=dict(headers) if headers is not None else None,
+    )
 
 
 def _internal() -> JSONResponse:

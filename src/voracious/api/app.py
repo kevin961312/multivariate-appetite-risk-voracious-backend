@@ -1,13 +1,15 @@
 """Fábrica de la aplicación FastAPI."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from voracious.api.access_log import AccessLogMiddleware
+from voracious.api.auth import AuthenticationMiddleware
 from voracious.api.errors import install_error_handlers
 from voracious.api.routers import datasets, health, t2mrcd_lifecycle, t2mrcd_phase1
-from voracious.container import Container, build_container
+from voracious.container import ConfigurationError, Container, build_container
 
 OPENAPI_TAGS = [
     {"name": "health", "description": "Vida y disponibilidad del proceso."},
@@ -43,6 +45,28 @@ OPENAPI_TAGS = [
 ]
 """Etiquetas de OpenAPI, en el orden en que se muestran."""
 
+_HTTP_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
+
+
+def _route_table(app: FastAPI) -> Callable[[], dict[str, frozenset[str]]]:
+    """Tabla de rutas para el registro de acceso: plantilla de OpenAPI → métodos.
+
+    Args:
+        app: Aplicación.
+
+    Returns:
+        Función que la calcula (en la primera petición, con todos los routers ya incluidos).
+    """
+
+    def table() -> dict[str, frozenset[str]]:
+        paths: dict[str, dict[str, object]] = app.openapi()["paths"]
+        return {
+            template: frozenset(m.upper() for m in ops if m.upper() in _HTTP_METHODS)
+            for template, ops in paths.items()
+        }
+
+    return table
+
 
 def create_app(container: Container | None = None) -> FastAPI:
     """Crea la aplicación FastAPI.
@@ -51,13 +75,30 @@ def create_app(container: Container | None = None) -> FastAPI:
     arrancar (``lifespan``) cierra ``failed / JOB_INTERRUPTED`` los trabajos que un reinicio dejó
     en curso; al cerrarse apaga la cola esperando a los que estén en curso y cierra el pool.
 
+    **No arranca sin autenticación** (falla cerrado): sin verificador de tokens (JWKS, emisor y
+    audiencia) lanza ``ConfigurationError``. Instala el registro de acceso (exterior) y el
+    middleware de autenticación (interior), que exige ``Authorization: Bearer`` fuera de las rutas
+    públicas antes de leer el cuerpo.
+
     Args:
         container: Dependencias ya cableadas; si es ``None`` se construyen desde el entorno.
 
     Returns:
         La aplicación con los routers registrados y el contenedor en ``app.state.container``.
+
+    Raises:
+        ConfigurationError: Si el contenedor no tiene verificador de tokens.
     """
     resolved = container if container is not None else build_container()
+    verifier = resolved.token_verifier
+    if verifier is None:
+        if container is None:
+            resolved.shutdown(wait=False)
+        msg = (
+            "la API exige autenticación: define VORACIOUS_JWT_JWKS_FILE, VORACIOUS_JWT_ISSUER y "
+            "VORACIOUS_JWT_AUDIENCE"
+        )
+        raise ConfigurationError(msg)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -72,4 +113,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     app.include_router(datasets.router)
     app.include_router(t2mrcd_phase1.router)
     app.include_router(t2mrcd_lifecycle.router)
+    # El último añadido es el más exterior: acceso → autenticación → aplicación.
+    app.add_middleware(AuthenticationMiddleware, verifier=verifier)
+    app.add_middleware(AccessLogMiddleware, routes=_route_table(app))
     return app

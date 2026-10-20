@@ -28,23 +28,23 @@ from support.api import (
     FAST_PARAMS,
     T0,
     TENANT,
+    TENANT_ID,
     observations,
     score,
     train,
     upload,
     wait,
 )
+from support.auth import auth_settings
 from support.bits import canonical
 from support.solo_test import small_data
 from voracious.api.app import create_app
 from voracious.application.ports import JobKind, ModelVersionRepository
 from voracious.application.records import JobStatus, ModelVersion, VersionStatus
 from voracious.application.use_cases import JOB_INTERRUPTED, JOB_INTERRUPTED_NOTE
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart, T2MRCDRecalibrationParams
 
-TENANT_ID = TENANT["X-Tenant-ID"]
 CHART_ID = "t2mrcd"
 
 
@@ -92,10 +92,10 @@ class _Backend:
 def backend(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[_Backend]:
     charts = {CHART_ID: T2MRCDChart()}
     if request.param == "memory":
-        built = _Backend(lambda: build_container(Settings(), charts=charts), persistent=False)
+        built = _Backend(lambda: build_container(auth_settings(), charts=charts), persistent=False)
     else:
         url = request.getfixturevalue("pg_url")
-        settings = Settings(
+        settings = auth_settings(
             repository="postgres",
             database_url=url,
             database_pool_size=4,

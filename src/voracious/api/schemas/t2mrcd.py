@@ -216,57 +216,57 @@ class ScoreRequest(RequestModel):
 class AnnotationRequest(RequestModel):
     """Anotación de una señal.
 
+    Sin ``actor`` (mejora M1): quién anota es el ``sub`` del token; enviarlo da ``422``.
+
     Attributes:
         assignable_cause: Causa asignable confirmada.
         cause: Cuál.
         action: Acción tomada.
-        actor: Quién anota.
     """
 
     assignable_cause: bool
     cause: str | None = None
     action: str | None = None
-    actor: str | None = None
 
 
 class StructuralEventRequest(RequestModel):
     """Evento estructural.
 
+    Sin ``actor`` (mejora M1): quién lo registra es el ``sub`` del token.
+
     Attributes:
         occurred_at: Cuándo ocurrió.
         description: Descripción.
-        actor: Quién lo registra.
     """
 
     occurred_at: UtcDatetime
     description: str = Field(min_length=1)
-    actor: str | None = None
 
 
 class ApproveRequest(RequestModel):
     """Aprobación de una propuesta.
 
+    Sin ``actor`` (mejora M1): ``decided_by`` es el ``sub`` del token.
+
     Attributes:
         effective_from: Desde cuándo rige (por defecto, ahora).
         note: Nota.
-        actor: Quién aprueba.
     """
 
     effective_from: UtcDatetime | None = None
     note: str | None = None
-    actor: str | None = None
 
 
 class RejectRequest(RequestModel):
     """Rechazo de una propuesta.
 
+    Sin ``actor`` (mejora M1): ``decided_by`` es el ``sub`` del token.
+
     Attributes:
         note: Motivo.
-        actor: Quién rechaza.
     """
 
     note: str | None = None
-    actor: str | None = None
 
 
 class RecalibrationParamsIn(RequestModel):
@@ -292,13 +292,14 @@ class RecalibrationParamsIn(RequestModel):
 class RecalibrationRequest(RequestModel):
     """Recalibración: todo junto (``pipeline``, ``202``) o paso a paso (``stepwise``, ``201``).
 
+    Sin ``actor`` (mejora M1): quién la pide es el ``sub`` del token.
+
     Attributes:
         range_from: Inicio del rango (inclusivo).
         range_to: Fin del rango (inclusivo).
         params: Parámetros.
         force_replace: Reemplazar la base por las filas nuevas (petición explícita); sin él se
             amplía la base, salvo evento estructural sin resolver.
-        actor: Quién la pide.
         mode: ``pipeline`` (por defecto) o ``stepwise``.
     """
 
@@ -306,7 +307,6 @@ class RecalibrationRequest(RequestModel):
     range_to: UtcDatetime
     params: RecalibrationParamsIn
     force_replace: bool = False
-    actor: str | None = None
     mode: Literal["pipeline", "stepwise"] = "pipeline"
 
 

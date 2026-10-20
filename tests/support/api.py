@@ -1,4 +1,4 @@
-"""Apoyo de los tests HTTP: cabeceras de tenant, sondeo de trabajos y escenarios mínimos."""
+"""Apoyo de los tests HTTP: tokens por tenant, sondeo de trabajos y escenarios mínimos."""
 
 import time
 from datetime import UTC, datetime, timedelta
@@ -8,10 +8,15 @@ import numpy as np
 import numpy.typing as npt
 from fastapi.testclient import TestClient
 
+from support.auth import bearer
 from support.solo_test import small_data
 
-TENANT = {"X-Tenant-ID": "tenant-a"}
-OTHER = {"X-Tenant-ID": "tenant-b"}
+TENANT_ID = "tenant-a"
+OTHER_ID = "tenant-b"
+TENANT = bearer(TENANT_ID)
+"""Token de admin del tenant A (SOLO TEST; dura 8 h, más que cualquier corrida de la suite)."""
+OTHER = bearer(OTHER_ID)
+"""Token de admin del tenant B."""
 CHART_BASE = "/v1/charts/t2mrcd"
 BASE = f"{CHART_BASE}/models"
 DATASETS = "/v1/datasets"

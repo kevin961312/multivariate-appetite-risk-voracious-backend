@@ -26,11 +26,16 @@ dist
 coverage.xml
 htmlcov
 
-# Secretos y configuración local (la plantilla sí entra)
+# Secretos y configuración local (la plantilla sí entra). deploy/ lleva cifrados SOPS, el JWKS y la
+# configuración pública del JWT: nada de eso va en la imagen (Compose lo monta en el despliegue).
 .env
 .env.*
 !.env.example
 .claude/settings.local.json
+deploy
+.sops.yaml
+**/*.pem
+**/keys.txt
 
 # Material local que no se versiona
 referencias

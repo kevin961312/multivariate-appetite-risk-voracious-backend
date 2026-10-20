@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from voracious.api.errors import CODE_TO_STATUS, ApiError, install_error_handlers
-from voracious.api.tenant import TENANT_REQUIRED
 from voracious.application import errors as app_errors
 from voracious.application.errors import ApplicationError
 from voracious.domain.common import DomainError, InvalidInputError
@@ -60,7 +59,15 @@ def _call(client: TestClient, exc: Exception) -> tuple[int, dict[str, object]]:
 def test_every_application_error_code_is_mapped() -> None:
     missing = [c.code for c in APPLICATION_ERRORS if c.code not in CODE_TO_STATUS]
     assert missing == [], f"códigos sin estado HTTP en CODE_TO_STATUS: {missing}"
-    assert {InvalidInputError.CODE, TENANT_REQUIRED, "INTERNAL_ERROR"} <= set(CODE_TO_STATUS)
+    assert {InvalidInputError.CODE, "UNAUTHENTICATED", "FORBIDDEN", "INTERNAL_ERROR"} <= set(
+        CODE_TO_STATUS
+    )
+    assert (CODE_TO_STATUS["UNAUTHENTICATED"], CODE_TO_STATUS["FORBIDDEN"]) == (401, 403)
+
+
+def test_the_tenant_header_code_is_gone() -> None:
+    """Seguridad mínima (D1): el tenant sale del token; ``X-Tenant-ID`` y su error desaparecen."""
+    assert "TENANT_REQUIRED" not in CODE_TO_STATUS
 
 
 @pytest.mark.parametrize(

@@ -47,6 +47,12 @@ RUN scripts/check_pymrcd_fma.sh
 
 FROM builder AS gate
 
+# shellcheck para la etapa shellcheck de scripts/gate.sh (M7 de seguridad mínima). Solo en gate:
+# runtime parte de la base limpia y solo copia el entorno virtual.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends shellcheck \
+    && rm -rf /var/lib/apt/lists/*
+
 # Grupo dev y todo lo versionado que deja pasar .dockerignore (tests, fixtures, configuración).
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -84,4 +90,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # (Paso 4.2) el estado ya es compartido, pero cada worker tendría su propia cola y, al arrancar,
 # cerraría como interrumpidos (JOB_INTERRUPTED) los trabajos en curso de los demás. Se escala
 # cuando llegue la cola distribuida.
-CMD ["uvicorn", "voracious.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# --no-access-log: el registro de acceso de uvicorn escribe la ruta cruda con la query (p. ej.
+# ?access_token=...) y duplica el propio (AccessLogMiddleware, M2: plantilla, sin query ni token).
+CMD ["uvicorn", "voracious.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-access-log"]

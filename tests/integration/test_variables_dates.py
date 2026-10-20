@@ -15,10 +15,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, DATASETS, FAST_PARAMS, TENANT, observations, wait
+from support.auth import auth_settings
 from support.bits import canonical
 from support.solo_test import small_data
 from voracious.api.app import create_app
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import T2MRCDChart
 
@@ -28,7 +28,7 @@ START = datetime(2025, 1, 1, tzinfo=UTC)
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings(), charts={"t2mrcd": T2MRCDChart()})
+    built = build_container(auth_settings(), charts={"t2mrcd": T2MRCDChart()})
     yield built
     built.shutdown()
 

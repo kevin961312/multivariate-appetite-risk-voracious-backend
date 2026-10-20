@@ -28,6 +28,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from support.api import BASE, CHART_BASE, T0, TENANT, score, train, wait
+from support.auth import auth_settings
 from support.bits import canonical
 from support.solo_test import small_data
 from voracious.api.app import create_app
@@ -39,7 +40,6 @@ from voracious.application.records import (
     ExclusionReason,
     ModelVersion,
 )
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import (
     SLOT_NEW_ROWS,
@@ -63,7 +63,7 @@ SHIFTED = (3, 7)
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings(), charts={CHART_ID: T2MRCDChart()})
+    built = build_container(auth_settings(), charts={CHART_ID: T2MRCDChart()})
     yield built
     built.shutdown()
 

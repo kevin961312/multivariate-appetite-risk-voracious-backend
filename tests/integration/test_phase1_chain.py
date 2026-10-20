@@ -17,10 +17,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from support.api import CHART_BASE, DATASETS, TENANT, upload, wait
+from support.auth import auth_settings
 from support.bits import canonical
 from support.composition_cases import Phase1Case, phase1_cases
 from voracious.api.app import create_app
-from voracious.config import Settings
 from voracious.container import Container, build_container
 from voracious.domain.charts.t2mrcd import SLOT_PHASE1, T2MRCDChart, T2MRCDModel
 from voracious.domain.common import SerialTaskMapper
@@ -32,7 +32,7 @@ PARAMS: dict[str, Any] = {"bootstrap": {"seed": 8, "n_replicates": 5}}
 
 @pytest.fixture(scope="module")
 def container() -> Iterator[Container]:
-    built = build_container(Settings())
+    built = build_container(auth_settings())
     yield built
     built.shutdown()
 

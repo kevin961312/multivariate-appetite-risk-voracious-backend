@@ -3,14 +3,14 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from support.auth import auth_settings
 from voracious.api.app import create_app
-from voracious.config import Settings
 from voracious.container import build_container
 
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    with TestClient(create_app(build_container(Settings(log_level="INFO")))) as test_client:
+    with TestClient(create_app(build_container(auth_settings(log_level="INFO")))) as test_client:
         yield test_client
 
 
