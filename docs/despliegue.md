@@ -5,9 +5,9 @@ Guía de operación del servidor de demo (`kevin@128.140.75.161`, Ubuntu, 2 vCPU
 [ADR 0012](adr/0012-seguridad-minima-sops-jwt.md) (secretos y JWT), el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)
 (imagen, CI) y el [ADR 0011](adr/0011-persistencia-en-postgres.md) (Postgres, backup).
 
-> **Estado.** Los scripts y el código de este documento existen en el árbol de trabajo pero **aún no están
-> commiteados**, y el redespliegue con secretos cifrados y JWT (T16) **todavía no se ha hecho**: la demo que corre hoy
-> es la del 2026-10-20 sobre `ec05eee`, con `.env` y sin autenticación. Las secciones de «redespliegue» son un
+> **Estado (2026-10-20).** El código y los scripts de este documento **ya están commiteados** (`b8c0029`, `27f1c6a`;
+> `main` en `74aae38`). Lo único pendiente es el redespliegue con secretos cifrados y JWT (T16): la demo que corre
+> hoy es la del 2026-10-20 sobre `ec05eee`, con `.env` y sin autenticación. Las secciones de «redespliegue» son un
 > procedimiento por ejecutar.
 
 ## Principios
@@ -24,18 +24,24 @@ Guía de operación del servidor de demo (`kevin@128.140.75.161`, Ubuntu, 2 vCPU
 ## Requisitos del servidor
 
 - Docker y el plugin `docker compose`; `curl`; `python3` (solo para el redespliegue inicial).
-- **sops 3.13.3**, instalado desde el binario oficial de la release y comprobado contra su checksum:
+- **sops 3.13.3 y age.** En el servidor `sudo` **pide contraseña**, así que una sesión no interactiva
+  (`ssh -o BatchMode=yes`) no puede instalar nada. Los instala **el dueño en una sesión interactiva**
+  (`ssh -t <usuario>@<servidor>`). sops, desde el binario oficial de la release y comprobado contra su SHA-256
+  (`e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b`); age, por apt:
 
   ```bash
   v=3.13.3
   curl -fsSLO "https://github.com/getsops/sops/releases/download/v${v}/sops-v${v}.linux.amd64"
   echo "e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b  sops-v${v}.linux.amd64" | sha256sum -c -
   sudo install -m 0755 "sops-v${v}.linux.amd64" /usr/local/bin/sops
+  sudo apt-get install -y age
+  sops --version     # 3.13.3
+  age --version
+  age-keygen --version
   ```
 
   (El mismo SHA-256 que fija `ci.yml`; `deploy.sh` exige sops ≥ 3.9. Otra versión pide recalcular el SHA-256 contra el
   `checksums.txt` de la release **y** cambiarlo en `ci.yml`.)
-- **age**: `sudo apt-get install -y age`.
 - La imagen `voracious:local` construida **antes** de emitir tokens o generar llaves (ver T16, paso 5).
 
 ## Variables de despliegue
@@ -61,14 +67,25 @@ cifrado tiene que ser **la contraseña actual**; si no, `migrate` y `api` no con
 llama `voracious` (`name:` en el YAML), así que mover la carpeta reutiliza los volúmenes `voracious_pgdata`,
 `voracious_datasets` y `voracious_pgbackups`.
 
-1. **Copia previa** (con la pila actual en marcha, desde `~/voracious-demo`):
+1. **Copia previa** (con la pila actual en marcha, desde `~/voracious-demo`). Por ssh sin terminal,
+   `docker compose exec` necesita `-T`. **Antes de T16** el contenedor `backup` aún tiene `PGPASSWORD` en el entorno:
 
    ```bash
-   docker compose exec backup sh -c 'pg_dump --format=custom --file=/backups/pre-sops-$(date -u +%Y%m%dT%H%M%SZ).dump'
-   docker compose exec backup ls -l /backups     # el volcado pre-sops-… existe y no está vacío
+   docker compose exec -T backup sh -c 'pg_dump --format=custom --file=/backups/pre-sops-$(date -u +%Y%m%dT%H%M%SZ).dump'
+   docker compose exec -T backup ls -l /backups     # el volcado pre-sops-… existe y no está vacío
    ```
 
-2. **Instalar herramientas**: sops y age como en «Requisitos». Crear la llave age del servidor:
+   **Después de T16** `backup` ya no tiene `PGPASSWORD` (la lee del secreto), así que un volcado a mano es:
+
+   ```bash
+   docker compose exec -T backup sh -c 'PGPASSWORD="$(cat /run/secrets/postgres_password)" pg_dump --format=custom --file=/backups/<nombre>.dump'
+   ```
+
+   El volcado previo ya hecho el 2026-10-20 es `/backups/pre-sops-20261020T191708Z.dump` (90 802 bytes, 16 tablas).
+   La rotación automática solo borra `voracious-*.dump`, de modo que los `pre-sops-*` se conservan.
+
+2. **Instalar herramientas**: sops y age los instala el dueño en sesión interactiva (`ssh -t`), como en
+   «Requisitos»; una sesión `BatchMode` no puede por el `sudo` con contraseña. Crear la llave age del servidor:
 
    ```bash
    install -d -m 700 ~/.config/sops/age
@@ -76,12 +93,16 @@ llama `voracious` (`name:` en el YAML), así que mover la carpeta reutiliza los 
    age-keygen -y ~/.config/sops/age/keys.txt     # receptor público (age1…): es el que va en .sops.yaml
    ```
 
-3. **Mover la carpeta y extraer la release** (empaquetada en el Mac con
-   `COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata`):
+3. **Mover la carpeta y copiar el código** con `git archive` desde el Mac: solo salen los ficheros versionados (nada de
+   `.env`, `datos` ni `referencias`) y no hace falta empaquetar un `.tar.gz`:
 
    ```bash
+   # en el servidor
    mv ~/voracious-demo ~/voracious-demo.prev
-   mkdir ~/voracious-demo && tar -xzf <release>.tar.gz -C ~/voracious-demo
+   mkdir ~/voracious-demo
+   # en el Mac, desde la raíz del repo
+   git archive <commit> | ssh kevin@128.140.75.161 'tar -x -C ~/voracious-demo'
+   # en el servidor
    install -m 600 ~/voracious-demo.prev/.env ~/voracious-demo/.env.pre-sops
    cd ~/voracious-demo
    ```
@@ -93,6 +114,11 @@ llama `voracious` (`name:` en el YAML), así que mover la carpeta reutiliza los 
      - path_regex: ^deploy/demo/.*\.enc\.yaml$
        age: age1…   # salida de age-keygen -y
    ```
+
+   **Antes de cifrar de verdad**, haz un cifrado de prueba y comprueba que el `path_regex` casa con la ruta
+   **absoluta** que `jwt_keygen.sh` pasa en `--filename-override` (con la relativa del ejemplo anterior casa, pero la
+   absoluta no empieza por `deploy/`). Si sops dice que no hay regla, usa
+   `path_regex: (^|/)deploy/demo/[^/]+\.enc\.yaml$`.
 
 5. **Construir la imagen antes**, porque `jwt_keygen.sh` e `issue_token.sh --via docker` usan `voracious:local`:
 
@@ -181,6 +207,14 @@ llama `voracious` (`name:` en el YAML), así que mover la carpeta reutiliza los 
 
 13. **Limpieza tras unos días en verde**:
     `shred -u ~/voracious-demo/.env.pre-sops ~/voracious-demo.prev/.env`.
+
+## Nota de seguridad: el integrador no toca el servidor
+
+El integrador (quien consume la API) **no** debe tener acceso al servidor ni a la llave de firma. El operador emite
+el token y se lo entrega por un canal seguro. Para el túnel SSH, se le da una **cuenta solo de túnel**: en su
+`authorized_keys`, `restrict,port-forwarding,permitopen="127.0.0.1:8000"` delante de la llave, de modo que solo
+pueda reenviar ese puerto, sin shell. Por qué: quien llegue al servidor llega a sops, a la llave age y a la llave de
+firma JWT, y con ellas puede emitir tokens de cualquier tenant y rol.
 
 ## Emitir tokens
 

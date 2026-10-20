@@ -1,0 +1,2424 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Voracious — Guía de integración de la API</title>
+<link rel="stylesheet" href="../marca/voracious.css">
+<style>@page { @top-left { content: "Voracious · Guía de integración de la API"; } @top-right { content: "Revisión {{REVISION}}"; } }</style>
+<style>
+  /* Ajustes locales de la guía (no cambian la hoja de marca). */
+  pre { overflow-wrap: anywhere; }
+  .endpoint { overflow-wrap: anywhere; }
+  pre.largo { page-break-inside: auto; }
+  table.matriz td, table.matriz th { text-align: center; }
+  table.matriz td:first-child, table.matriz th:first-child,
+  table.matriz td:nth-child(2), table.matriz th:nth-child(2) { text-align: left; }
+  .paso { font: 400 8.5pt/1.5 "Poppins"; color: var(--texto-2); margin: 0 0 2mm; }
+  caption { page-break-after: avoid; break-after: avoid; }
+  thead { page-break-before: avoid; break-before: avoid; }
+  .endpoint, .paso, h4 { page-break-after: avoid; break-after: avoid; }
+  .paso b { color: var(--indigo-600); font-weight: 600; }
+  /* Tablas cortas: no se parten (evita la cabecera sola al pie de página). */
+  table.corta { page-break-inside: avoid; break-inside: avoid; }
+  /* Referencias cruzadas con el número de la sección de destino (h2 o h3). */
+  a.ref2::before { content: target-counter(attr(href), h1) "." target-counter(attr(href), h2) "\00a0"; }
+  a.ref3::before { content: target-counter(attr(href), h1) "." target-counter(attr(href), h2) "."
+    target-counter(attr(href), h3) "\00a0"; }
+</style>
+</head>
+<body>
+
+<!-- ============ PORTADA ============ -->
+<section class="portada">
+  <div class="franja"><span class="f1"></span><span class="f2"></span><span class="f3"></span></div>
+  <div class="forma"></div><div class="forma2"></div>
+  <div class="contenido">
+    <div class="logo"><img class="icono" src="../marca/logotipo-icono.svg" alt=""><span class="nombre">voracious</span></div>
+    <p class="titulo">Guía de integración<br>de la API</p>
+    <p class="subtitulo">Carta de control robusta T²MRCD · Fase I y Fase II</p>
+    <div class="meta">
+      Revisión: {{REVISION}}<br>
+      Fecha: {{FECHA}}<br>
+      Versión de la API: v1 (OpenAPI 0.1.0)<br>
+      Destinatarios: equipos que integran sistemas con Voracious
+    </div>
+  </div>
+  <div class="pie">Voracious · Monitoreo robusto del apetito de riesgo multivariado con la carta T²MRCD</div>
+</section>
+
+<!-- ============ ÍNDICE ============ -->
+<!-- El marcador de abajo se sustituye por el título «Contenido» y la lista <ol> con li.n1 / li.n2
+     generada desde los h1 y h2 con id (mismo formato que docs/guia/plantilla/plantilla-marca.html). -->
+<section class="indice">
+{{INDICE}}
+</section>
+
+<!-- ============ 1 ============ -->
+<h1 id="descripcion">Descripción del servicio</h1>
+<p><strong>Voracious</strong> es un servicio para vigilar el <strong>apetito de riesgo multivariado</strong> de
+portafolios financieros. El integrador envía series de indicadores de riesgo (por ejemplo, LCR, NSFR, VaR o
+concentración) y el servicio devuelve una carta de control que indica cuándo el comportamiento <em>conjunto</em> de
+esos indicadores se aparta de lo habitual, aunque cada indicador por separado parezca normal.</p>
+
+<h2 id="t2mrcd">La carta T²MRCD</h2>
+<p>La carta calcula, para cada observación, un estadístico <strong>T²</strong>: la distancia de Mahalanobis al
+cuadrado respecto a una ubicación y una dispersión estimadas con <strong>MRCD</strong> (<em>Minimum Regularized
+Covariance Determinant</em>; Boudt, Rousseeuw, Vanduffel y Verdonck, 2020). La implementación es un port fiel de
+<code>rrcov::CovMrcd</code> de R. Frente a las cartas clásicas (Shewhart, EWMA, Hotelling), MRCD:</p>
+<ul>
+  <li>no supone que los datos sigan una distribución normal;</li>
+  <li>resiste valores atípicos y el enmascaramiento (atípicos que esconden a otros);</li>
+  <li>funciona con más variables que observaciones (<em>p</em> &gt; <em>n</em>) gracias a la regularización.</li>
+</ul>
+<p>Una observación genera una <strong>señal</strong> cuando su T² supera estrictamente el <strong>límite
+operativo</strong> de la versión vigente del modelo.</p>
+
+<h2 id="fases">Fase I y Fase II</h2>
+<table class="corta">
+  <thead><tr><th style="width:18%">Fase</th><th>Qué hace</th><th style="width:30%">Recursos de la API</th></tr></thead>
+  <tr><td><strong>Fase I</strong></td><td>Con un histórico de <em>n</em> observaciones y <em>p</em> variables, ajusta MRCD
+    (con el subconjunto de las <em>h</em> = ⌈0,75·<em>n</em>⌉ observaciones más consistentes) y calibra los límites de
+    control por <strong>bootstrap no paramétrico</strong> (B = 100 réplicas, cuantil 0,995). Produce dos límites: el
+    de Fase I y el de Fase II. El resultado es el modelo con su versión 0.</td>
+    <td><code>/v1/datasets</code>, <code>/fits</code>, <code>/limits</code>, <code>/exclusions</code>,
+    <code>/models</code>, <code>/pipelines/phase1</code></td></tr>
+  <tr><td><strong>Fase II</strong></td><td>Puntúa observaciones nuevas contra el modelo: T² por observación, límite
+    usado y señal. Cada observación queda registrada con su fecha y su lote.</td>
+    <td><code>…/scores</code>, <code>…/observations</code></td></tr>
+</table>
+
+<h2 id="ciclo-de-vida">Ciclo de vida del modelo</h2>
+<p>El servicio es dueño del ciclo de vida de la carta; el integrador solo consulta y solicita:</p>
+<ul>
+  <li><strong>Versiones inmutables.</strong> La versión 0 nace con la Fase I. Cada recalibración produce una versión
+    nueva en estado <em>propuesta</em>, que solo rige cuando un aprobador la aprueba. Una versión no se modifica: solo
+    cambia su estado (<code>proposed</code>, <code>active</code>, <code>superseded</code>, <code>rejected</code>).</li>
+  <li><strong>Límite operativo por régimen.</strong> La versión 0 vigila con el límite de Fase I (provisional y fijo);
+    las versiones recalibradas, con el de Fase II.</li>
+  <li><strong>No retroactividad.</strong> Una versión aprobada rige desde <code>effective_from</code>, que debe ser
+    posterior a la última observación puntuada. Cada observación se evalúa con la versión vigente en su fecha.</li>
+  <li><strong>Anotaciones.</strong> Las señales se anotan con su causa asignable (sí o no), cuál fue y la acción
+    tomada.</li>
+  <li><strong>Recalibración.</strong> Por defecto <strong>amplía la base</strong> (EXTEND): la base vigente más las
+    observaciones nuevas, salvo las que una persona marcó con causa asignable. Solo <strong>reemplaza</strong> la base
+    (REPLACE) si se pide explícitamente (<code>force_replace</code>) o si hay un <strong>evento estructural</strong>
+    sin resolver (por ejemplo, una fusión).</li>
+</ul>
+<div class="caja"><span class="etiqueta">Nota sobre la tasa de falsas alarmas</span>
+<p>El nivel nominal de los límites es 0,5 %. Como el bootstrap remuestrea solo el 75 % central del histórico (para que
+una contaminación no detectada no infle el límite), la tasa real de falsas alarmas medida frente a observaciones en
+control es de ≈ 2,3 % con el límite de Fase I y ≈ 2,1 % con el de Fase II (media entre semillas, entre ~1 % y 3,8 %;
+<em>n</em> = 200, <em>p</em> = 3). Es una característica del diseño, no un error. El caso <em>p</em> &gt; <em>n</em> no
+está medido.</p></div>
+
+<h2 id="glosario">Glosario</h2>
+<table>
+  <thead><tr><th style="width:24%">Término</th><th>Significado</th></tr></thead>
+  <tr><td>Tenant</td><td>Organización a la que pertenecen los recursos. Sale del token; un tenant nunca ve
+    los recursos de otro.</td></tr>
+  <tr><td>Integrador</td><td>Equipo o sistema que consume la API en nombre de un tenant.</td></tr>
+  <tr><td>Dataset</td><td>Matriz <em>n</em> × <em>p</em> subida o derivada (exclusión, candidatas, extensión), con
+    nombres de variables y fechas opcionales y su linaje.</td></tr>
+  <tr><td>Ajuste (<em>fit</em>)</td><td>Resultado de MRCD sobre un dataset.</td></tr>
+  <tr><td>Límites (<em>limits</em>)</td><td>Límites de Fase I y Fase II calibrados por bootstrap sobre un ajuste.</td></tr>
+  <tr><td>Modelo</td><td>Ensamblado de un ajuste y sus límites; agrupa todas las versiones de la carta.</td></tr>
+  <tr><td>Versión</td><td>Instantánea inmutable del modelo (base, ajuste y límites) con su estado y su decisión.</td></tr>
+  <tr><td>Observación</td><td>Fila puntuada en Fase II, con fecha, valores, T², límite usado y versión.</td></tr>
+  <tr><td>Señal</td><td>Observación con T² estrictamente mayor que el límite operativo.</td></tr>
+  <tr><td>Causa asignable</td><td>Explicación confirmada por una persona (error de carga, evento puntual); las filas con
+    causa asignable se excluyen de la base.</td></tr>
+  <tr><td>Evento estructural</td><td>Cambio del proceso que invalida la base (fusión, cambio de política); obliga a
+    reemplazarla en la siguiente recalibración.</td></tr>
+  <tr><td>Recalibración</td><td>Recálculo completo (ajuste y límites) sobre una base nueva; termina en una propuesta
+    de versión.</td></tr>
+</table>
+
+<!-- ============ 2 ============ -->
+<h1 id="arquitectura">Arquitectura</h1>
+<h2 id="arquitectura-despliegue">Despliegue</h2>
+<p>El servicio corre en un único servidor con Docker Compose: <code>api</code> (FastAPI sobre uvicorn, un solo
+proceso), <code>postgres</code> 17 (sin puertos publicados), <code>migrate</code> (aplica las migraciones y termina) y
+<code>backup</code> (volcado diario, siete días). La API solo escucha en <code>127.0.0.1:8000</code>; el integrador
+llega a ella por un túnel SSH. Los secretos viven cifrados (SOPS y age) y se montan como Compose secrets. La cola de
+trabajos vive dentro del proceso de la API: <strong>un reinicio interrumpe los trabajos en curso</strong>, que quedan
+<code>failed</code> con el código <code>JOB_INTERRUPTED</code> y deben volver a pedirse.</p>
+
+<div class="apaisada"><figure><img src="../diagramas/arquitectura-despliegue.svg" alt="Arquitectura de despliegue de Voracious"><figcaption>Figura 1. Despliegue en un servidor con Docker Compose: la API escucha solo en 127.0.0.1:8000 y se alcanza por túnel SSH; Postgres no publica ningún puerto.</figcaption></figure>
+</div>
+
+<h2 id="arquitectura-capas">Capas</h2>
+<p>El código sigue una arquitectura hexagonal. La capa <strong>API</strong> traduce HTTP, verifica el token y
+aplica la matriz de roles; la capa de <strong>aplicación</strong> orquesta los casos de uso (pasos de Fase I,
+puntuación, ciclo de vida); el <strong>dominio</strong> contiene la carta T²MRCD y el estimador MRCD, sin dependencias
+de red ni de base de datos; la <strong>infraestructura</strong> implementa la persistencia, el almacenamiento de
+datasets y la cola. La cola reparte los trabajos en carriles por coste (estimación, calibración, ligero y orquestación),
+de modo que un bootstrap de minutos no retrasa una puntuación de milisegundos.</p>
+
+<div class="apaisada"><figure><img src="../diagramas/arquitectura-capas.svg" alt="Capas de la arquitectura hexagonal de Voracious"><figcaption>Figura 2. Arquitectura hexagonal: las dependencias apuntan hacia el dominio (T²MRCD y MRCD).</figcaption></figure>
+</div>
+
+<!-- ============ 3 ============ -->
+<h1 id="autenticacion">Acceso y autenticación</h1>
+<h2 id="acceso-red">Acceso de red</h2>
+<p>La API <strong>no está expuesta a internet</strong>: escucha en <code>127.0.0.1:8000</code> del servidor, sin
+HTTPS propio. El integrador abre un túnel SSH (cifrado) con la cuenta que le entrega el operador de Voracious y usa la
+API como si fuera local:</p>
+<pre><code><span class="c"># Terminal 1: túnel hacia la API del servidor (se mantiene abierto)</span>
+ssh -N -L 8000:127.0.0.1:8000 &lt;usuario&gt;@&lt;servidor&gt;
+
+<span class="c"># Terminal 2: variables que usan todos los ejemplos de esta guía</span>
+export BASE=http://127.0.0.1:8000
+export C=$BASE/v1/charts/t2mrcd</code></pre>
+<p>Se recomienda que el operador entregue una <strong>cuenta solo de túnel</strong>: sin consola, sin copia de
+ficheros y con el reenvío limitado al puerto de la API. Para ello antepone estas opciones a la llave pública del
+integrador en el <code>authorized_keys</code> de esa cuenta y le asigna como shell de inicio
+<code>/usr/sbin/nologin</code>, que no permite entrar:</p>
+<pre><code>restrict,port-forwarding,permitopen="127.0.0.1:8000" ssh-ed25519 AAAA… integrador</code></pre>
+<p>Con esa cuenta funciona el túnel de arriba (<code>ssh -N</code>) y se rechaza cualquier otro uso de SSH: una
+consola, un comando remoto o un reenvío hacia otro destino.</p>
+
+<h2 id="token">Obtención de un token</h2>
+<p>Toda ruta de negocio exige la cabecera <code>Authorization: Bearer &lt;token&gt;</code>. El token es un JWT
+firmado. <strong>El operador de Voracious emite el token en el servidor y lo entrega al integrador por un canal
+seguro; el integrador no necesita ni debe tener acceso a la llave de firma ni al servidor</strong> (la cuenta de túnel
+de <a class="ref2" href="#acceso-red">Acceso de red</a> solo reenvía el puerto de la API).</p>
+<p>Para cada persona o sistema que vaya a llamar a la API, el integrador pide al operador un token con estos
+datos:</p>
+<table class="corta">
+  <caption>Datos que el integrador facilita al operador</caption>
+  <thead><tr><th style="width:20%">Dato</th><th>Descripción</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td>Tenant</td><td>Organización a la que pertenecerán los recursos (claim <code>tenant</code>). Formato <code>^[A-Za-z0-9_-]{1,64}$</code>.</td><td>Sí</td></tr>
+  <tr><td>Roles</td><td>Uno o varios de <code>analyst</code>, <code>approver</code> y <code>admin</code> (ver <a class="ref2" href="#roles">Roles y matriz de permisos</a>). Conviene pedir el menor rol necesario.</td><td>Sí</td></tr>
+  <tr><td>Sujeto (<code>sub</code>)</td><td>Identidad de quien llama, p. ej. <code>ana.analista</code> o el nombre de un proceso de carga. Formato <code>^[A-Za-z0-9_.@-]{1,128}$</code>. Queda registrado como autor de anotaciones, eventos estructurales, recalibraciones y decisiones.</td><td>Sí</td></tr>
+  <tr><td>Duración</td><td>Vida del token en minutos, horas o días. Por defecto 8 horas; como máximo 7 días.</td><td>No</td></tr>
+</table>
+<p>El integrador recibe el <strong>token</strong> (una cadena de tres partes en base64url separadas por puntos, que
+empieza por <code>eyJ</code>) y su <strong>fecha de caducidad</strong> (claim <code>exp</code>). Un token sirve solo para
+el tenant y los roles con que se emitió: para aprobar versiones hace falta otro token con el rol
+<code>approver</code> (en los ejemplos, <code>$APPROVER</code>). Para usarlo, se guarda en una variable de entorno sin
+escribirlo en disco ni dejarlo en el historial del shell:</p>
+<pre><code><span class="c"># Pegar el token y pulsar Intro (no se muestra en pantalla)</span>
+read -rs TOKEN
+export TOKEN</code></pre>
+<div class="caja aviso"><span class="etiqueta">Cuidado con los tokens</span>
+<ul>
+  <li><strong>No compartirlos.</strong> Cada persona o sistema usa su propio token: su <code>sub</code> queda registrado
+    como autor de lo que hace.</li>
+  <li><strong>No ponerlos en la URL.</strong> La API solo lee el token de la cabecera <code>Authorization</code> (uno en
+    la query se ignora) y una URL acaba en registros e historiales.</li>
+  <li><strong>Renovarlos al caducar.</strong> Antes de <code>exp</code> se pide otro al operador; un token caducado
+    responde <code>401</code> con <code>expired</code>. Ante la sospecha de que un token se filtró, se avisa al
+    operador.</li>
+</ul></div>
+
+<h2 id="contenido-token">Contenido del token</h2>
+<p>El token es un JWS compacto firmado con <strong>EdDSA (Ed25519)</strong>. Esta es la cabecera y los claims de un
+token de ejemplo; los valores de <code>iss</code>, <code>aud</code> y <code>kid</code> los fija el operador de cada
+entorno (<code>guia</code> es solo un <code>kid</code> de ejemplo):</p>
+<div class="dos-columnas">
+<div><h4>Cabecera</h4>
+<pre><code>{
+  <span class="k">"alg"</span>: <span class="s">"EdDSA"</span>,
+  <span class="k">"kid"</span>: <span class="s">"guia"</span>,
+  <span class="k">"typ"</span>: <span class="s">"JWT"</span>
+}</code></pre></div>
+<div><h4>Claims</h4>
+<pre><code>{
+  <span class="k">"iss"</span>: <span class="s">"voracious"</span>,
+  <span class="k">"aud"</span>: <span class="s">"voracious-api"</span>,
+  <span class="k">"sub"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"tenant"</span>: <span class="s">"banco-a"</span>,
+  <span class="k">"roles"</span>: [<span class="s">"analyst"</span>],
+  <span class="k">"iat"</span>: <span class="n">1792523831</span>,
+  <span class="k">"nbf"</span>: <span class="n">1792523831</span>,
+  <span class="k">"exp"</span>: <span class="n">1792552631</span>,
+  <span class="k">"jti"</span>: <span class="s">"62e7e474-0a17-48ed-b829-f7ad9fb74048"</span>
+}</code></pre></div>
+</div>
+<table class="corta">
+  <thead><tr><th style="width:14%">Claim</th><th>Descripción</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>iss</code></td><td>Emisor. Debe coincidir exactamente con el configurado en la API.</td><td>Sí</td></tr>
+  <tr><td><code>aud</code></td><td>Audiencia. Debe coincidir exactamente con la configurada.</td><td>Sí</td></tr>
+  <tr><td><code>sub</code></td><td>Identidad de quien llama (1 a 256 caracteres imprimibles). Se registra como actor.</td><td>Sí</td></tr>
+  <tr><td><code>tenant</code></td><td>Organización (tenant). Todos los recursos que se crean o consultan son de este tenant.</td><td>Sí</td></tr>
+  <tr><td><code>roles</code></td><td>Lista no vacía de roles conocidos (<code>analyst</code>, <code>approver</code>, <code>admin</code>).</td><td>Sí</td></tr>
+  <tr><td><code>iat</code></td><td>Instante de emisión (segundos Unix).</td><td>Sí</td></tr>
+  <tr><td><code>nbf</code></td><td>No válido antes de este instante.</td><td>No</td></tr>
+  <tr><td><code>exp</code></td><td>Caducidad. <code>exp − iat</code> no puede superar 7 días.</td><td>Sí</td></tr>
+  <tr><td><code>jti</code></td><td>Identificador único del token (aparece en el registro de acceso).</td><td>Sí</td></tr>
+</table>
+<p>La cabecera debe traer un <code>kid</code> presente en el JWKS del servidor y un <code>alg</code> igual al de esa
+llave; no se admiten las extensiones <code>crit</code> ni <code>b64</code>. El token se lee únicamente de la cabecera
+<code>Authorization</code>: un token en la query se ignora.</p>
+
+<h2 id="roles">Roles y matriz de permisos</h2>
+<table class="corta matriz">
+  <thead><tr><th style="width:15%">Nivel</th><th>Operaciones</th><th style="width:11%">analyst</th><th style="width:11%">approver</th><th style="width:11%">admin</th></tr></thead>
+  <tr><td><strong>Lectura</strong></td><td>Todos los <code>GET</code> de negocio: datasets, ajustes, límites, exclusiones,
+    modelos, estado, puntuaciones, observaciones, eventos, versiones, recalibraciones y tuberías.</td><td>Sí</td><td>Sí</td><td>Sí</td></tr>
+  <tr><td><strong>Operación</strong></td><td>Todos los <code>POST</code> salvo la decisión: subir datasets, pedir
+    ajustes, límites, exclusiones, modelos y tuberías, puntuar, anotar, registrar eventos, recalibrar, extender, cancelar
+    y <strong>proponer</strong> una versión.</td><td>Sí</td><td>No</td><td>Sí</td></tr>
+  <tr><td><strong>Decisión</strong></td><td><code>POST …/versions/{n}/approve</code> y <code>…/reject</code>.</td><td>No</td><td>Sí</td><td>Sí</td></tr>
+  <tr><td><strong>Público</strong></td><td><code>/health</code>, <code>/ready</code>, <code>/docs</code>,
+    <code>/redoc</code> y <code>/openapi.json</code>, sin token.</td><td>—</td><td>—</td><td>—</td></tr>
+</table>
+<ul>
+  <li>Un token puede llevar varios roles. <code>admin</code> lo es <strong>de su tenant</strong>: no existe un
+    administrador entre tenants.</li>
+  <li>La separación de funciones depende de los tokens emitidos: un token con <code>admin</code> puede proponer y
+    aprobar. Para el principio de cuatro ojos, el operador emite tokens distintos a quien opera (<code>analyst</code>)
+    y a quien aprueba (<code>approver</code>).</li>
+  <li>Un rol de operación nunca aprueba, pero sí puede <strong>cerrar</strong> una propuesta: registrar un evento
+    estructural (ver <a class="ref2" href="#flujo-evento">Registrar un evento estructural</a>) rechaza automáticamente
+    la versión propuesta pendiente, con <code>decided_by</code> igual al <code>sub</code> de quien registró el evento
+    (normalmente un <code>analyst</code>) y <code>decision_note</code> = <code>structural_event</code>. Una base
+    calculada antes del evento ya no es válida, por lo que su descarte no requiere un aprobador.</li>
+</ul>
+
+<h2 id="caducidad">Caducidad y renovación</h2>
+<p>Un token vale <strong>8 horas</strong> por defecto y <strong>7 días como máximo</strong>: el operador no puede
+emitir tokens de vida mayor y la API rechaza cualquier token con <code>exp − iat</code> mayor
+(<code>lifetime_too_long</code>). La API admite 30 segundos de margen de reloj en
+<code>exp</code>, <code>nbf</code> e <code>iat</code>. <strong>No hay revocación individual</strong>: un token deja de
+valer al caducar o cuando el operador rota la llave de firma. El integrador debe pedir un token nuevo antes de
+<code>exp</code> y no reutilizar tokens de larga vida.</p>
+
+<h2 id="error-401">Errores 401</h2>
+<p>Sin token o con un token no válido, la API responde <code>401 UNAUTHENTICATED</code> <strong>antes de leer el
+cuerpo</strong>, con el motivo en <code>details.reason</code> y la cabecera <code>WWW-Authenticate</code>:
+<code>Bearer realm="voracious"</code> si no se presentó token, y
+<code>Bearer realm="voracious", error="invalid_token"</code> si se presentó y se rechazó.</p>
+<table>
+  <thead><tr><th style="width:27%"><code>details.reason</code></th><th>Causa</th><th style="width:30%">Qué hacer</th></tr></thead>
+  <tr><td><code>missing_token</code></td><td>No hay cabecera <code>Authorization: Bearer</code>.</td><td>Enviar la cabecera.</td></tr>
+  <tr><td><code>malformed</code></td><td>No es un JWT compacto, hay varias cabeceras, tiene espacios o supera 8192 bytes.</td><td>Revisar cómo se copia el token.</td></tr>
+  <tr><td><code>unknown_key</code></td><td>El <code>kid</code> falta o no está en el JWKS.</td><td>Pedir un token nuevo (la llave se rotó).</td></tr>
+  <tr><td><code>algorithm_not_allowed</code></td><td><code>alg</code> no permitido o distinto del de la llave.</td><td>Usar un token emitido por el servicio.</td></tr>
+  <tr><td><code>bad_signature</code></td><td>La firma no corresponde a la llave.</td><td>Pedir un token nuevo.</td></tr>
+  <tr><td><code>expired</code></td><td><code>exp</code> ya pasó.</td><td>Renovar el token.</td></tr>
+  <tr><td><code>not_yet_valid</code></td><td><code>iat</code> o <code>nbf</code> en el futuro.</td><td>Revisar el reloj del equipo.</td></tr>
+  <tr><td><code>wrong_issuer</code></td><td><code>iss</code> distinto del configurado.</td><td>Pedir un token del entorno correcto.</td></tr>
+  <tr><td><code>wrong_audience</code></td><td><code>aud</code> distinta de la configurada.</td><td>Pedir un token del entorno correcto.</td></tr>
+  <tr><td><code>missing_claim</code></td><td>Falta un claim obligatorio.</td><td>Pedir un token nuevo.</td></tr>
+  <tr><td><code>invalid_claim</code></td><td>Un claim tiene un tipo o una forma no válidos (p. ej. un rol desconocido).</td><td>Pedir un token nuevo.</td></tr>
+  <tr><td><code>lifetime_too_long</code></td><td><code>exp − iat</code> supera 7 días.</td><td>Pedir un token de vida menor.</td></tr>
+</table>
+<h4><span class="chip ko">KO</span>  401 sin token</h4>
+<pre><code>curl -s -i "$BASE/v1/datasets/987aac67-a118-408d-b34a-f49b2f56a2f8"</code></pre>
+<pre><code>HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="voracious"
+
+{
+  <span class="k">"code"</span>: <span class="s">"UNAUTHENTICATED"</span>,
+  <span class="k">"message"</span>: <span class="s">"falta la cabecera Authorization: Bearer &lt;token&gt;"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"reason"</span>: <span class="s">"missing_token"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  401 con un token caducado</h4>
+<pre><code>HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="voracious", error="invalid_token"
+
+{
+  <span class="k">"code"</span>: <span class="s">"UNAUTHENTICATED"</span>,
+  <span class="k">"message"</span>: <span class="s">"el token caducó"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"reason"</span>: <span class="s">"expired"</span>
+  }
+}</code></pre>
+<div class="caja aviso"><span class="etiqueta">Aviso</span>
+<p>La cabecera <code>X-Tenant-ID</code> de versiones anteriores <strong>ya no existe</strong>: si llega, se ignora.
+Una petición que solo la envíe recibe <code>401</code> con <code>missing_token</code>. Una ruta inexistente responde
+<code>401</code> sin token y <code>404 ROUTE_NOT_FOUND</code> con él.</p></div>
+
+<h2 id="error-403">Errores 403</h2>
+<p>Con un token válido cuyos roles no permiten la operación, la API responde <code>403 FORBIDDEN</code> con los roles
+admitidos en <code>details.required_roles</code>. Ejemplo real: un token con solo <code>approver</code> intenta subir
+un dataset.</p>
+<h4><span class="chip ko">KO</span>  403</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"FORBIDDEN"</span>,
+  <span class="k">"message"</span>: <span class="s">"los roles del token no permiten esta operación"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"required_roles"</span>: [<span class="s">"admin"</span>, <span class="s">"analyst"</span>]
+  }
+}</code></pre>
+<div class="caja"><span class="etiqueta">Nota</span>
+<p>En las rutas con cuerpo JSON, el rol se comprueba después de decodificar el JSON y antes de validarlo contra el
+esquema: un JSON sintácticamente inválido responde <code>422</code> aunque el rol no baste; un JSON válido que no
+cumple el esquema responde <code>403</code> si el rol no basta. <code>POST /v1/datasets</code>, que admite también CSV
+y multipart, comprueba el rol antes de leer el cuerpo: con un rol insuficiente responde <code>403</code> sea cual sea
+el cuerpo. La autenticación (<code>401</code>) ocurre siempre antes de leer nada.</p></div>
+
+<h2 id="aislamiento">Aislamiento por tenant</h2>
+<p>El tenant de cada petición es el claim <code>tenant</code> del token; el integrador no puede elegir otro. Un recurso de
+otro tenant responde exactamente igual que uno inexistente (<code>404</code>), de modo que no se puede averiguar si
+existe. Ejemplo real: el token de <code>banco-b</code> consulta un dataset de <code>banco-a</code>.</p>
+<h4><span class="chip ko">KO</span>  404 para un recurso de otro tenant</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"DATASET_NOT_FOUND"</span>,
+  <span class="k">"message"</span>: <span class="s">"el dataset '987aac67-a118-408d-b34a-f49b2f56a2f8' no existe"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>
+  }
+}</code></pre>
+
+<!-- ============ 4 ============ -->
+<h1 id="convenciones">Convenciones de la API</h1>
+<h2 id="url-base">URL base y versionado</h2>
+<p>Con el túnel abierto, la URL base es <code>http://127.0.0.1:8000</code>. Las rutas de negocio llevan el prefijo de
+versión <code>/v1</code>; las de la carta cuelgan de <code>/v1/charts/t2mrcd</code> (en los ejemplos,
+<code>$C</code>). Los datasets no pertenecen a ninguna carta y viven en <code>/v1/datasets</code>. La especificación
+OpenAPI está en <code>/openapi.json</code> y la documentación interactiva en <code>/docs</code> y
+<code>/redoc</code>.</p>
+
+<h2 id="formato">Formato, identificadores y fechas</h2>
+<table class="corta">
+  <thead><tr><th style="width:24%">Elemento</th><th>Convención</th></tr></thead>
+  <tr><td>Cuerpos</td><td>JSON en UTF-8 con <code>Content-Type: application/json</code>. Los datasets admiten además
+    <code>text/csv</code> y <code>multipart/form-data</code>. Los campos desconocidos se rechazan (<code>422</code>).</td></tr>
+  <tr><td>Identificadores</td><td>UUID en texto (p. ej. <code>987aac67-a118-408d-b34a-f49b2f56a2f8</code>). Las
+    versiones se identifican por su número entero dentro del modelo (0, 1, 2…).</td></tr>
+  <tr><td>Fechas</td><td>ISO 8601 <strong>con zona horaria obligatoria</strong> en las entradas
+    (<code>2026-08-08T00:00:00Z</code> o <code>…-05:00</code>); se guardan y devuelven en UTC con sufijo
+    <code>Z</code>. Una fecha sin zona responde <code>422</code>. En los <code>details</code> de algunos errores las
+    fechas vienen con <code>+00:00</code> en lugar de <code>Z</code> (p. ej.
+    <code>2026-09-12T00:00:00+00:00</code>): ambas formas son ISO 8601 en UTC y el integrador debe aceptar las
+    dos.</td></tr>
+  <tr><td>Números</td><td>Valores finitos: <code>NaN</code> e infinitos se rechazan.</td></tr>
+  <tr><td>Huellas</td><td><code>content_hash</code> y <code>base_hash</code> con forma <code>sha256:&lt;hex&gt;</code>.</td></tr>
+  <tr><td>Partes grandes</td><td>Las matrices y vectores por fila solo se devuelven si se piden con
+    <code>?include=</code> (ver <a class="ref2" href="#include">Partes grandes con <code>?include=</code></a>).</td></tr>
+</table>
+<h4><span class="chip ko">KO</span>  422 por una fecha sin zona horaria</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"la petición no cumple el schema"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"errors"</span>: [
+      {
+        <span class="k">"loc"</span>: [<span class="s">"body"</span>, <span class="s">"observations"</span>, <span class="n">0</span>, <span class="s">"observed_at"</span>],
+        <span class="k">"msg"</span>: <span class="s">"Input should have timezone info"</span>,
+        <span class="k">"type"</span>: <span class="s">"timezone_aware"</span>
+      }
+    ]
+  }
+}</code></pre>
+
+<h2 id="modelo-asincrono">Modelo asíncrono</h2>
+<p>Los pasos de cálculo son <strong>trabajos asíncronos</strong>. El <code>POST</code> valida la petición de forma
+síncrona (los errores de entrada se responden en ese momento) y, si es válida, encola el trabajo y responde
+<code>202</code> con el identificador. El integrador consulta el recurso con <code>GET</code> hasta que su estado sea
+final.</p>
+<h4><span class="chip ok">OK</span>  Respuesta 202 de cualquier paso de cálculo</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<table class="corta">
+  <thead><tr><th style="width:18%">Estado</th><th>Significado</th><th style="width:14%">¿Final?</th></tr></thead>
+  <tr><td><code>queued</code></td><td>Encolado; aún no ha empezado.</td><td>No</td></tr>
+  <tr><td><code>running</code></td><td>En ejecución. Una recalibración paso a paso abierta también está <code>running</code>.</td><td>No</td></tr>
+  <tr><td><code>succeeded</code></td><td>Terminó bien; el <code>GET</code> trae el resultado.</td><td>Sí</td></tr>
+  <tr><td><code>failed</code></td><td>Terminó con error; el <code>GET</code> trae <code>error</code> con <code>{code, message, details}</code>.</td><td>Sí</td></tr>
+  <tr><td><code>cancelled</code></td><td>Solo una recalibración paso a paso cancelada.</td><td>Sí</td></tr>
+</table>
+<p><strong>Un trabajo fallido no es un error HTTP.</strong> El <code>GET</code> responde <code>200</code> y el error
+va en el cuerpo. Ejemplo real: el ajuste MRCD de un dataset con una columna constante.</p>
+<h4><span class="chip ko">KO</span>  Trabajo <code>failed</code> (GET 200)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"dc2a8979-903f-49c6-bc22-80e05b14f2f1"</span>,
+  <span class="k">"status"</span>: <span class="s">"failed"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"c332358b-1a8f-4add-84b2-79183327fbd2"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:22:49.136776Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:22:49.137328Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:22:49.144470Z"</span>,
+  <span class="k">"result"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: {
+    <span class="k">"code"</span>: <span class="s">"MRCD_FIT_FAILED"</span>,
+    <span class="k">"message"</span>: <span class="s">"el ajuste MRCD falló"</span>,
+    <span class="k">"details"</span>: {
+      <span class="k">"r_message"</span>: <span class="s">"infinite or missing values in 'x'"</span>
+    }
+  }
+}</code></pre>
+<p>Los comandos sin cálculo son síncronos: la subida de datasets, las anotaciones, los eventos estructurales, la
+apertura de una recalibración paso a paso y su extensión responden <code>201</code>; la aprobación, el rechazo y la
+cancelación, <code>200</code>.</p>
+<h3 id="sondeo">Sondeo</h3>
+<p>El servicio no ofrece notificaciones: el integrador sondea. Se recomienda un intervalo según el paso, con un
+tiempo máximo de espera y retroceso si el trabajo tarda:</p>
+<table class="corta">
+  <thead><tr><th style="width:36%">Paso</th><th>Duración orientativa</th><th style="width:18%">Intervalo</th></tr></thead>
+  <tr><td><code>/fits</code></td><td>Milisegundos con 60 × 4; segundos con 200 × 300.</td><td>5 s</td></tr>
+  <tr><td><code>/limits</code>, <code>/pipelines/phase1</code>, recalibración</td><td>B = 100 ajustes MRCD: ≈ 2 s con 60 × 4; ≈ 6 min con 200 × 300 en el servidor de 2 vCPU.</td><td>10–15 s</td></tr>
+  <tr><td><code>/exclusions</code>, <code>/models</code>, <code>…/scores</code>, <code>…/versions</code></td><td>Menos de un segundo.</td><td>1 s</td></tr>
+</table>
+<pre><code><span class="c"># Espera a que un recurso llegue a un estado final (requiere curl y jq).</span>
+<span class="c"># Uso: esperar URL [intervalo en s] [máximo en s]</span>
+<span class="c"># Sale con 0 y el estado final; 1 si la respuesta no se arregla esperando</span>
+<span class="c"># (401, 403, 404…, o un cuerpo sin status); 2 si se agota el tiempo máximo.</span>
+esperar() {
+  url=$1; intervalo=${2:-5}; limite=$(( $(date +%s) + ${3:-900} ))
+  cuerpo=$(mktemp)
+  while [ "$(date +%s)" -lt "$limite" ]; do
+    codigo=$(curl -s -o "$cuerpo" -w '%{http_code}' "$url" \
+      -H "Authorization: Bearer $TOKEN")
+    case "$codigo" in
+      200)
+        estado=$(jq -r '.status // "sin_status"' "$cuerpo" 2&gt;/dev/null)
+        case "$estado" in
+          succeeded|failed|cancelled)
+            echo "$estado"; rm -f "$cuerpo"; return 0 ;;
+          queued|running) ;;
+          *) echo "respuesta inesperada: ${estado:-no es JSON}" &gt;&amp;2
+             rm -f "$cuerpo"; return 1 ;;
+        esac ;;
+      000|5??) ;;  <span class="c"># sin conexión o servidor no disponible: se reintenta</span>
+      *) echo "HTTP $codigo $(jq -r '.code // empty' "$cuerpo" 2&gt;/dev/null)" &gt;&amp;2
+         rm -f "$cuerpo"; return 1 ;;
+    esac
+    sleep "$intervalo"
+  done
+  echo "tiempo máximo agotado" &gt;&amp;2; rm -f "$cuerpo"; return 2
+}
+esperar "$C/limits/$LIMITS_ID" 10 1200</code></pre>
+
+<h2 id="encadenamiento">Encadenamiento por identificador</h2>
+<p>Cada paso es un recurso independiente que recibe los <strong>identificadores</strong> de los pasos anteriores, no
+los datos. El integrador puede detenerse en cualquier paso, revisar su resultado y continuar. La tubería
+<code>/pipelines/phase1</code> encadena los mismos pasos y produce el <strong>mismo modelo, bit a bit</strong>.</p>
+<pre><code>dataset_id ──▶ [ /exclusions ] ──▶ /fits ──▶ /limits ──▶ /models ──▶ model_id
+                output_dataset_id   fit_id    limits_id
+model_id ──▶ …/scores ──▶ …/observations ──▶ …/annotations
+model_id ──▶ …/recalibrations ──▶ /exclusions ──▶ …/extension
+         ──▶ /fits ──▶ /limits ──▶ …/versions</code></pre>
+<p>Los pasos validan la coherencia de la cadena antes de encolar: unos límites que no son del ajuste indicado
+(<code>LIMITS_FIT_MISMATCH</code>), un paso que no pertenece a la recalibración (<code>RECALIBRATION_MISMATCH</code>) o
+un paso aún no terminado (<code>FIT_NOT_READY</code>, <code>LIMITS_NOT_READY</code>) se rechazan de inmediato.</p>
+
+<h2 id="formato-error">Formato de error</h2>
+<p>Todo error síncrono usa el mismo cuerpo, con un <code>code</code> estable que el integrador debe usar para
+decidir (el <code>message</code> es solo informativo y puede cambiar):</p>
+<table class="corta">
+  <thead><tr><th style="width:18%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th></tr></thead>
+  <tr><td><code>code</code></td><td>Código estable del catálogo (p. ej. <code>VARIABLES_MISMATCH</code>).</td><td>String</td></tr>
+  <tr><td><code>message</code></td><td>Texto legible en español.</td><td>String</td></tr>
+  <tr><td><code>details</code></td><td>Datos adicionales (motivo, identificadores, errores de schema en <code>details.errors</code>).</td><td>Object</td></tr>
+</table>
+<table>
+  <thead><tr><th style="width:12%">HTTP</th><th>Cuándo</th></tr></thead>
+  <tr><td>200</td><td>Consulta o comando con resultado; también el <code>GET</code> de un trabajo <code>failed</code>.</td></tr>
+  <tr><td>201</td><td>Recurso creado de forma síncrona.</td></tr>
+  <tr><td>202</td><td>Trabajo encolado.</td></tr>
+  <tr><td>401</td><td><code>UNAUTHENTICATED</code>: falta el token o no es válido.</td></tr>
+  <tr><td>403</td><td><code>FORBIDDEN</code>: el rol no permite la operación.</td></tr>
+  <tr><td>404</td><td>Recurso inexistente o de otro tenant (<code>*_NOT_FOUND</code>) o ruta inexistente (<code>ROUTE_NOT_FOUND</code>).</td></tr>
+  <tr><td>405</td><td><code>METHOD_NOT_ALLOWED</code>.</td></tr>
+  <tr><td>409</td><td>El recurso existe pero su estado no permite la operación (p. ej. <code>LIMITS_NOT_READY</code>, <code>NOT_A_SIGNAL</code>).</td></tr>
+  <tr><td>413</td><td><code>PAYLOAD_TOO_LARGE</code>: el cuerpo de la subida supera el máximo.</td></tr>
+  <tr><td>415</td><td><code>UNSUPPORTED_MEDIA_TYPE</code>.</td></tr>
+  <tr><td>422</td><td>Entrada no válida: <code>INVALID_INPUT</code> (con <code>details.reason</code> o <code>details.errors</code>) y validaciones del ciclo de vida.</td></tr>
+  <tr><td>500</td><td><code>INTERNAL_ERROR</code>: fallo inesperado (el detalle queda en el registro del servidor).</td></tr>
+  <tr><td>503</td><td><code>/ready</code> no disponible; <code>JOB_INTERRUPTED</code> solo aparece dentro de un trabajo <code>failed</code>.</td></tr>
+</table>
+
+<h2 id="include">Partes grandes con <code>?include=</code></h2>
+<p>Para no transferir matrices en cada consulta, las partes grandes se piden explícitamente. El parámetro se repite
+para pedir varias: <code>?include=covariance&amp;include=historical</code>.</p>
+<table class="corta">
+  <thead><tr><th style="width:38%">Recurso</th><th>Valores de <code>include</code></th></tr></thead>
+  <tr><td><code>GET /v1/datasets/{id}</code></td><td><code>data</code>, <code>rows</code>, <code>observed_at</code></td></tr>
+  <tr><td><code>GET $C/fits/{id}</code></td><td><code>covariance</code> (ubicación y dispersión MRCD)</td></tr>
+  <tr><td><code>GET $C/limits/{id}</code></td><td><code>clean_rows</code> (filas remuestreadas)</td></tr>
+  <tr><td><code>GET $C/exclusions/{id}</code></td><td><code>row_disposition</code></td></tr>
+  <tr><td><code>GET $C/models/{id}</code></td><td><code>training_data</code>, <code>observed_at</code>, <code>covariance</code>, <code>historical</code> (T² y atípicos del histórico)</td></tr>
+  <tr><td><code>GET $C/models/{id}/versions/{n}</code></td><td><code>base_data</code>, <code>base_refs</code>, <code>covariance</code>, <code>historical</code></td></tr>
+  <tr><td><code>GET $C/models/{id}/recalibrations/{rid}</code></td><td><code>row_disposition</code></td></tr>
+</table>
+
+<h2 id="idempotencia">Idempotencia y reintentos</h2>
+<p>La API <strong>no admite</strong> todavía una cabecera de idempotencia. Antes de repetir un <code>POST</code> tras un
+corte de red, el integrador debe comprobar si el recurso ya se creó. El comportamiento de cada operación ante un
+reintento es:</p>
+<table class="corta">
+  <thead><tr><th style="width:34%">Operación</th><th>Efecto de repetirla</th></tr></thead>
+  <tr><td><code>POST /v1/datasets</code></td><td>Crea otro dataset con otro <code>dataset_id</code> y el mismo <code>content_hash</code>.</td></tr>
+  <tr><td><code>/fits</code>, <code>/limits</code>,<br><code>/exclusions</code>, <code>/models</code>,<br><code>/pipelines/phase1</code></td><td>Crea otro trabajo; con los mismos parámetros y semilla el resultado es idéntico.</td></tr>
+  <tr><td><code>…/scores</code></td><td>Registra las observaciones otra vez (duplicadas). No se debe reintentar sin comprobar.</td></tr>
+  <tr><td><code>…/annotations</code></td><td>Añade otra anotación (son de solo adición; vale la más reciente).</td></tr>
+  <tr><td><code>…/recalibrations</code></td><td>Seguro: con una recalibración en curso responde <code>409 RECALIBRATION_IN_PROGRESS</code>.</td></tr>
+  <tr><td><code>…/recalibrations/{rid}/extension</code></td><td>Idempotente: devuelve la misma extensión.</td></tr>
+  <tr><td><code>…/approve</code>, <code>…/reject</code></td><td>Seguro: la segunda vez responde <code>409 VERSION_NOT_PROPOSED</code>.</td></tr>
+  <tr><td>Trabajo con <code>JOB_INTERRUPTED</code></td><td>El servicio se reinició durante el trabajo: se vuelve a pedir el mismo paso.</td></tr>
+</table>
+
+<h2 id="limites-api">Límites</h2>
+<table class="corta">
+  <thead><tr><th style="width:40%">Límite</th><th>Valor</th></tr></thead>
+  <tr><td>Cuerpo de <code>POST /v1/datasets</code></td><td>Lo configura el operador (<code>VORACIOUS_MAX_UPLOAD_MB</code>, en MiB); por defecto 50 MiB (52 428 800 bytes). Por encima, <code>413 PAYLOAD_TOO_LARGE</code>.</td></tr>
+  <tr><td>Tamaño del token</td><td>8192 bytes.</td></tr>
+  <tr><td>Nombre de variable, <code>batch_label</code></td><td>200 caracteres.</td></tr>
+  <tr><td>Causa de una exclusión</td><td>500 caracteres.</td></tr>
+  <tr><td>Observaciones mínimas de una recalibración</td><td><code>min_observations</code>, 25 por defecto.</td></tr>
+  <tr><td>Recalibraciones en curso por modelo</td><td>Una. Propuestas sin resolver por modelo: una.</td></tr>
+</table>
+<p>Si la cabecera <code>Content-Length</code> declara más bytes que el máximo, la subida se rechaza sin leer el cuerpo y
+<code>details</code> trae <code>max_bytes</code> y <code>declared_bytes</code>; si el cuerpo no declara su tamaño (envío
+por trozos) y supera el máximo al leerse, <code>details</code> trae solo <code>max_bytes</code>. Ejemplo real: una
+subida que declara 53 000 000 bytes con el máximo por defecto de 50 MiB.</p>
+<h4><span class="chip ko">KO</span>  413 por un cuerpo mayor que el máximo de subida</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"PAYLOAD_TOO_LARGE"</span>,
+  <span class="k">"message"</span>: <span class="s">"el cuerpo supera el máximo de subida"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"max_bytes"</span>: <span class="n">52428800</span>,
+    <span class="k">"declared_bytes"</span>: <span class="n">53000000</span>
+  }
+}</code></pre>
+
+<h2 id="catalogo-errores">Catálogo de códigos de error</h2>
+{{CATALOGO_ERRORES}}
+
+<!-- ============ 5 ============ -->
+<h1 id="flujos">Flujos de integración paso a paso</h1>
+<p>Este capítulo recorre los flujos completos con llamadas reales. Las respuestas proceden de una ejecución de la API
+con <strong>datos simulados</strong> (60 observaciones de cuatro indicadores: <code>lcr</code>, <code>nsfr</code>,
+<code>var_99</code> y <code>concentracion</code>) y se han acortado con «…» donde las listas son largas. Los
+identificadores son los de esa ejecución; el integrador obtendrá otros.</p>
+<div class="caja"><span class="etiqueta">Preparación</span>
+<p>Todos los ejemplos suponen el túnel abierto y las variables <code>BASE</code>, <code>C</code> y
+<code>TOKEN</code> definidas (ver <a class="ref2" href="#acceso-red">Acceso de red</a> y
+<a class="ref2" href="#token">Obtención de un token</a>). El rol necesario se indica en cada paso;
+<code>$APPROVER</code> es un token con el rol <code>approver</code>.</p></div>
+
+<h2 id="flujo-dataset">Subir un histórico</h2>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/datasets</div>
+<p class="paso"><b>Propósito:</b> registrar la matriz histórica <em>n</em> × <em>p</em> de la Fase I. ·
+<b>Rol:</b> operación (analyst o admin). · <b>Respuesta:</b> 201.</p>
+<h3 id="dataset-json">En JSON</h3>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:20%">Campo</th><th>Descripción</th><th style="width:16%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>data</code></td><td>Matriz por filas, finita, con <em>p</em> columnas en cada fila.</td><td>Array[Array[Number]]</td><td>Sí</td></tr>
+  <tr><td><code>variables</code></td><td>Nombre de cada columna (<em>p</em> nombres distintos). Pasan al modelo y, si se envían al puntuar, deben coincidir.</td><td>Array[String]</td><td>No</td></tr>
+  <tr><td><code>observed_at</code></td><td>Fecha de cada fila (<em>n</em>), con zona horaria. Solo trazabilidad: no entra en ninguna estadística.</td><td>Array[String]</td><td>No</td></tr>
+</table>
+<pre><code>curl -s -X POST "$BASE/v1/datasets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @historico.json</code></pre>
+<h4>Ejemplo de cuerpo (<code>historico.json</code>, 60 filas)</h4>
+<pre><code>{
+  <span class="k">"data"</span>: [
+    [<span class="n">1.2542</span>, <span class="n">1.0934</span>, <span class="n">0.0134</span>, <span class="n">0.1819</span>],
+    [<span class="n">1.4195</span>, <span class="n">1.1249</span>, <span class="n">0.0277</span>, <span class="n">0.1849</span>],
+    <span class="c">…</span>
+  ],
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"observed_at"</span>: [<span class="s">"2026-06-01T00:00:00Z"</span>, <span class="s">"2026-06-02T00:00:00Z"</span>, <span class="c">…</span>]
+}</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201</h4>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"n"</span>: <span class="n">60</span>,
+  <span class="k">"p"</span>: <span class="n">4</span>,
+  <span class="k">"content_hash"</span>: <span class="s">"sha256:25fd39decac97e2396a30637660b074fefb0fe4f8dffcaf31f782eb4bc664044"</span>,
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"has_observed_at"</span>: <span class="n">true</span>
+}</code></pre>
+<h3 id="dataset-csv">En CSV</h3>
+<p>El CSV lleva cabecera con los nombres de las variables. La columna de fecha se indica con
+<code>?date_column=</code> (por defecto <code>observed_at</code>) y no forma parte de la matriz. El mismo histórico en
+CSV produce la misma huella:</p>
+<pre><code><span class="c"># historico.csv</span>
+observed_at,lcr,nsfr,var_99,concentracion
+2026-06-01T00:00:00Z,1.2542,1.0934,0.0134,0.1819
+2026-06-02T00:00:00Z,1.4195,1.1249,0.0277,0.1849
+…
+
+curl -s -X POST "$BASE/v1/datasets?date_column=observed_at" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/csv" \
+  --data-binary @historico.csv
+
+<span class="c"># o como fichero en multipart/form-data (parte «file»)</span>
+curl -s -X POST "$BASE/v1/datasets" \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@historico.csv;type=text/csv"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201</h4>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"1efdac8d-a256-491e-8429-cc6c4bd7e69f"</span>,
+  <span class="k">"n"</span>: <span class="n">60</span>,
+  <span class="k">"p"</span>: <span class="n">4</span>,
+  <span class="k">"content_hash"</span>: <span class="s">"sha256:25fd39decac97e2396a30637660b074fefb0fe4f8dffcaf31f782eb4bc664044"</span>,
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"has_observed_at"</span>: <span class="n">true</span>
+}</code></pre>
+<h3 id="dataset-consulta">Consulta y errores</h3>
+<pre><code>curl -s "$BASE/v1/datasets/987aac67-a118-408d-b34a-f49b2f56a2f8" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"n"</span>: <span class="n">60</span>,
+  <span class="k">"p"</span>: <span class="n">4</span>,
+  <span class="k">"content_hash"</span>: <span class="s">"sha256:25fd39decac97e2396a30637660b074fefb0fe4f8dffcaf31f782eb4bc664044"</span>,
+  <span class="k">"source"</span>: <span class="s">"upload"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:18:13.076845Z"</span>,
+  <span class="k">"parent_id"</span>: <span class="n">null</span>,
+  <span class="k">"origin_ref"</span>: <span class="n">null</span>,
+  <span class="k">"lineage"</span>: [
+    {
+      <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+      <span class="k">"source"</span>: <span class="s">"upload"</span>,
+      <span class="k">"n"</span>: <span class="n">60</span>,
+      <span class="k">"origin_ref"</span>: <span class="n">null</span>
+    }
+  ],
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"has_observed_at"</span>: <span class="n">true</span>,
+  <span class="k">"data"</span>: <span class="n">null</span>,
+  <span class="k">"rows"</span>: <span class="n">null</span>,
+  <span class="k">"observed_at"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  415 por un tipo de contenido no admitido</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"UNSUPPORTED_MEDIA_TYPE"</span>,
+  <span class="k">"message"</span>: <span class="s">"tipo de contenido no admitido (application/json, text/csv o multipart/form-data)"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"content_type"</span>: <span class="s">"text/plain"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 por filas de distinta longitud</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"'data' debe ser una matriz numérica n x p"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"input"</span>: <span class="s">"data"</span>
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> el <code>dataset_id</code> se usa en <code>/fits</code> (Fase I paso a paso),
+en <code>/exclusions</code> (exclusión humana) o en <code>/pipelines/phase1</code> (Fase I en una llamada).</p>
+
+<h2 id="flujo-fase1-pasos">Fase I paso a paso</h2>
+<p>La Fase I por pasos es: <strong>exclusión humana (opcional) → ajuste MRCD → límites → modelo</strong>; para elegir
+las filas a excluir se puede hacer antes una pasada preliminar (ajuste y límites sobre el dataset subido). Cada paso
+es un trabajo asíncrono que se consulta por su id. Los ejemplos siguen ese recorrido completo: la pasada preliminar
+(<a class="ref3" href="#paso-ajuste">Ajuste MRCD</a> y <a class="ref3" href="#paso-limites">Límites de control</a>),
+la exclusión (<a class="ref3" href="#paso-exclusion">Exclusión humana</a>) y, sobre el dataset derivado, el ajuste,
+los límites y el modelo (<a class="ref3" href="#paso-modelo">Modelo</a>).</p>
+
+<h3 id="paso-ajuste">Ajuste MRCD</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/fits</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/fits/{id}</div>
+<p class="paso"><b>Propósito:</b> estimar la ubicación y la dispersión robustas del histórico. · <b>Rol:</b> operación
+para el <code>POST</code>, lectura para el <code>GET</code>. · <b>Respuesta:</b> 202 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:22%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>dataset_id</code></td><td>Dataset que se ajusta.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>mrcd.alpha</code></td><td>Proporción del subconjunto. Por defecto 0,75 (valor por defecto de la carta).</td><td>Number</td><td>No</td></tr>
+  <tr><td><code>mrcd.h</code></td><td>Tamaño del subconjunto; por defecto ⌈<code>alpha</code>·<em>n</em>⌉.</td><td>Integer</td><td>No</td></tr>
+  <tr><td><code>mrcd.maxcsteps</code></td><td>Máximo de C-steps. Por defecto 200.</td><td>Integer</td><td>No</td></tr>
+  <tr><td><code>mrcd.rho</code></td><td>Regularización fija; por defecto se elige por número de condición.</td><td>Number</td><td>No</td></tr>
+  <tr><td><code>mrcd.target</code></td><td><code>identity</code> (por defecto) o <code>equicorrelation</code>.</td><td>String</td><td>No</td></tr>
+  <tr><td><code>mrcd.maxcond</code></td><td>Número de condición objetivo. Por defecto 50.</td><td>Number</td><td>No</td></tr>
+</table>
+<p>Los parámetros que se omiten toman los valores por defecto citados de la carta; se recomienda omitirlos salvo
+indicación expresa del equipo de riesgos.</p>
+<pre><code>curl -s -X POST "$C/fits" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "987aac67-a118-408d-b34a-f49b2f56a2f8"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<pre><code>curl -s "$C/fits/b9c6bc0c-79b7-4aec-bf3c-b344326bf495" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200 (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"alpha"</span>: <span class="n">0.75</span>,
+    <span class="k">"h"</span>: <span class="n">null</span>,
+    <span class="k">"maxcsteps"</span>: <span class="n">200</span>,
+    <span class="k">"rho"</span>: <span class="n">null</span>,
+    <span class="k">"target"</span>: <span class="s">"identity"</span>,
+    <span class="k">"maxcond"</span>: <span class="n">50.0</span>
+  },
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:18:25.464497Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:18:25.464785Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:18:25.497787Z"</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"alpha"</span>: <span class="n">0.75</span>,
+    <span class="k">"h"</span>: <span class="n">45</span>,
+    <span class="k">"rho"</span>: <span class="n">1e-06</span>,
+    <span class="k">"cnp2"</span>: <span class="n">1.4864156071332653</span>,
+    <span class="k">"crit"</span>: <span class="n">-32.54765306204027</span>,
+    <span class="k">"n_obs"</span>: <span class="n">60</span>,
+    <span class="k">"center"</span>: <span class="n">null</span>,
+    <span class="k">"cov"</span>: <span class="n">null</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<p>Con <code>?include=covariance</code>, <code>result</code> añade <code>center</code> (vector de <em>p</em>) y
+<code>cov</code> (matriz <em>p</em> × <em>p</em>):</p>
+<pre><code>{
+  <span class="k">"result"</span>: {
+    <span class="k">"alpha"</span>: <span class="n">0.75</span>,
+    <span class="k">"h"</span>: <span class="n">45</span>,
+    <span class="k">"rho"</span>: <span class="n">1e-06</span>,
+    <span class="k">"cnp2"</span>: <span class="n">1.4864156071332653</span>,
+    <span class="k">"crit"</span>: <span class="n">-32.54765306204027</span>,
+    <span class="k">"n_obs"</span>: <span class="n">60</span>,
+    <span class="k">"center"</span>: [<span class="n">1.3640822222222222</span>, <span class="n">1.1253688888888889</span>, <span class="n">0.02456888888888889</span>, <span class="n">0.1840688888888889</span>],
+    <span class="k">"cov"</span>: [
+      [<span class="n">0.002306804610268342</span>, <span class="n">0.0006418233175270269</span>, <span class="n">9.38162133575348e-05</span>, <span class="n">0.0003202257987610752</span>],
+      <span class="c">…</span>
+    ]
+  },
+  <span class="c">…</span>
+}</code></pre>
+<p><strong>Encadenamiento:</strong> el <code>id</code> del ajuste es el <code>fit_id</code> de <code>/limits</code>.</p>
+
+<h3 id="paso-limites">Límites de control</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/limits</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/limits/{id}</div>
+<p class="paso"><b>Propósito:</b> calibrar los límites de Fase I y Fase II por bootstrap sobre el ajuste. · <b>Rol:</b>
+operación / lectura. · <b>Respuesta:</b> 202 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición (Fase I)</caption>
+  <thead><tr><th style="width:30%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>fit_id</code></td><td>Ajuste en <code>succeeded</code>.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>params.bootstrap.seed</code></td><td>Semilla raíz (entero ≥ 0). Hace el resultado reproducible.</td><td>Integer</td><td>Sí</td></tr>
+  <tr><td><code>params.bootstrap.n_replicates</code></td><td>Réplicas B. Por defecto 100.</td><td>Integer</td><td>No</td></tr>
+  <tr><td><code>params.bootstrap.alpha_limit</code></td><td>Nivel del límite de Fase I, en (0, 1). Por defecto 0,005.</td><td>Number</td><td>No</td></tr>
+  <tr><td><code>params.bootstrap.phase2_alpha_limit</code></td><td>Nivel del límite de Fase II. Por defecto 0,005.</td><td>Number</td><td>No</td></tr>
+  <tr><td><code>params.mrcd</code></td><td>Si se envía, debe coincidir con los parámetros del ajuste (<code>T2MRCD_FIT_PARAMS_MISMATCH</code>).</td><td>Object</td><td>No</td></tr>
+</table>
+<pre><code>curl -s -X POST "$C/limits" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"fit_id": "b9c6bc0c-79b7-4aec-bf3c-b344326bf495",
+       "params": {"bootstrap": {"seed": 20261020}}}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"5db1eb14-c959-469a-ad89-c57849da75e5"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET en curso (<code>running</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"5db1eb14-c959-469a-ad89-c57849da75e5"</span>,
+  <span class="k">"status"</span>: <span class="s">"running"</span>,
+  <span class="k">"fit_id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"seed"</span>: <span class="n">20261020</span>,
+  <span class="k">"stage_kind"</span>: <span class="s">"phase1"</span>,
+  <span class="k">"spawn_key"</span>: [<span class="n">0</span>, <span class="n">0</span>],
+  <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:18:37.310600Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:18:37.310748Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="n">null</span>,
+  <span class="k">"result"</span>: <span class="n">null</span>,
+  <span class="k">"clean_rows"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"5db1eb14-c959-469a-ad89-c57849da75e5"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"fit_id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"seed"</span>: <span class="n">20261020</span>,
+  <span class="k">"stage_kind"</span>: <span class="s">"phase1"</span>,
+  <span class="k">"spawn_key"</span>: [<span class="n">0</span>, <span class="n">0</span>],
+  <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:18:37.310600Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:18:37.310748Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:18:39.098648Z"</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"phase1_limit"</span>: <span class="n">30.058533319476776</span>,
+    <span class="k">"phase2_limit"</span>: <span class="n">37.448253226927584</span>,
+    <span class="k">"n_replicates"</span>: <span class="n">100</span>,
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"n_clean"</span>: <span class="n">45</span>,
+    <span class="k">"alpha_limit"</span>: <span class="n">0.005</span>,
+    <span class="k">"phase2_alpha_limit"</span>: <span class="n">0.005</span>,
+    <span class="k">"oob_size_min"</span>: <span class="n">10</span>,
+    <span class="k">"oob_size_mean"</span>: <span class="n">16.49</span>,
+    <span class="k">"phase1_mc_error"</span>: <span class="n">1.1950041281129338</span>,
+    <span class="k">"phase2_mc_error"</span>: <span class="n">3.256754098422013</span>,
+    <span class="k">"estimator_name"</span>: <span class="s">"mrcd"</span>,
+    <span class="k">"sampler_name"</span>: <span class="s">"bootstrap_oob"</span>
+  },
+  <span class="k">"clean_rows"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<table class="corta">
+  <caption>Campos de <code>result</code></caption>
+  <thead><tr><th style="width:30%">Campo</th><th>Descripción</th></tr></thead>
+  <tr><td><code>phase1_limit</code></td><td>Límite de Fase I: cuantil 1 − <code>alpha_limit</code> del conjunto de T² de todas las réplicas.</td></tr>
+  <tr><td><code>phase2_limit</code></td><td>Límite de Fase II: el mismo cuantil sobre los T² de las filas fuera de cada réplica (OOB).</td></tr>
+  <tr><td><code>n_clean</code></td><td>Filas limpias remuestreadas (subconjunto MRCD, <em>h</em>).</td></tr>
+  <tr><td><code>oob_size_min</code>, <code>oob_size_mean</code></td><td>Filas OOB por réplica (mínimo y media).</td></tr>
+  <tr><td><code>phase1_mc_error</code>, <code>phase2_mc_error</code></td><td>Error Monte Carlo de cada límite (<code>null</code> con B = 1).</td></tr>
+</table>
+<h4><span class="chip ko">KO</span>  422 sin <code>params</code></h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"faltan los parámetros de la carta"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"field"</span>: <span class="s">"params"</span>,
+    <span class="k">"reason"</span>: <span class="s">"params_required"</span>
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> el <code>id</code> de los límites es el <code>limits_id</code> de
+<code>/models</code>, junto con el <code>fit_id</code> sobre el que se calibraron.</p>
+
+<h3 id="paso-exclusion">Exclusión humana (opcional)</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/exclusions</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/exclusions/{id}</div>
+<p class="paso"><b>Propósito:</b> quitar del histórico las filas con una causa asignable confirmada por una persona. ·
+<b>Rol:</b> operación / lectura. · <b>Respuesta:</b> 202 y 200.</p>
+<p>El servicio <strong>no depura automáticamente</strong>: el único filtro de filas es la decisión humana. Para
+identificar filas candidatas, el analista puede ensamblar un modelo preliminar con el ajuste y los límites anteriores y
+revisar los T² del histórico con <code>GET $C/models/{id}?include=historical</code>. La exclusión se pide
+<strong>siempre sobre el dataset subido</strong> y produce un dataset derivado sobre el que se repiten el ajuste y los
+límites; si las causas se conocen de antemano, se pide antes del primer ajuste.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:30%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>dataset_id</code></td><td>Dataset subido (no uno derivado).</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>assignable_cause[].row</code></td><td>Índice de la fila, empezando en 0.</td><td>Integer</td><td>Sí</td></tr>
+  <tr><td><code>assignable_cause[].cause</code></td><td>Causa confirmada (hasta 500 caracteres).</td><td>String</td><td>No</td></tr>
+</table>
+<pre><code>curl -s -X POST "$C/exclusions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "987aac67-a118-408d-b34a-f49b2f56a2f8",
+       "assignable_cause": [{"row": 43,
+         "cause": "carga duplicada del cierre del 2026-07-14"}]}'</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"64b7c927-cbe7-4ce7-8df5-0e08fbb7c473"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"assignable_cause"</span>: [
+    {
+      <span class="k">"row"</span>: <span class="n">43</span>,
+      <span class="k">"cause"</span>: <span class="s">"carga duplicada del cierre del 2026-07-14"</span>,
+      <span class="k">"annotation_id"</span>: <span class="n">null</span>
+    }
+  ],
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:12.473594Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:12.473705Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:19:12.473879Z"</span>,
+  <span class="k">"insufficient"</span>: <span class="n">false</span>,
+  <span class="k">"output_dataset_id"</span>: <span class="s">"4733680b-dab5-429f-830b-ddbd4efde80e"</span>,
+  <span class="k">"n_kept"</span>: <span class="n">59</span>,
+  <span class="k">"n_excluded_assignable_cause"</span>: <span class="n">1</span>,
+  <span class="k">"row_disposition"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<p>El dataset derivado conserva el linaje y las fechas de las filas que quedan:</p>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"4733680b-dab5-429f-830b-ddbd4efde80e"</span>,
+  <span class="k">"n"</span>: <span class="n">59</span>,
+  <span class="k">"p"</span>: <span class="n">4</span>,
+  <span class="k">"content_hash"</span>: <span class="s">"sha256:f480f358cb346ab5bc49a477d1efa85693305d44ac8c6f8b7510991ba01c22b8"</span>,
+  <span class="k">"source"</span>: <span class="s">"exclusion_output"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:12.473844Z"</span>,
+  <span class="k">"parent_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"origin_ref"</span>: <span class="s">"64b7c927-cbe7-4ce7-8df5-0e08fbb7c473"</span>,
+  <span class="k">"lineage"</span>: [
+    {
+      <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+      <span class="k">"source"</span>: <span class="s">"upload"</span>,
+      <span class="k">"n"</span>: <span class="n">60</span>,
+      <span class="k">"origin_ref"</span>: <span class="n">null</span>
+    },
+    {
+      <span class="k">"dataset_id"</span>: <span class="s">"4733680b-dab5-429f-830b-ddbd4efde80e"</span>,
+      <span class="k">"source"</span>: <span class="s">"exclusion_output"</span>,
+      <span class="k">"n"</span>: <span class="n">59</span>,
+      <span class="k">"origin_ref"</span>: <span class="s">"64b7c927-cbe7-4ce7-8df5-0e08fbb7c473"</span>
+    }
+  ],
+  <span class="c">…</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 al excluir sobre un dataset derivado</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"la exclusión humana solo se admite al principio, sobre el dataset subido"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"dataset_id"</span>: <span class="s">"4733680b-dab5-429f-830b-ddbd4efde80e"</span>,
+    <span class="k">"reason"</span>: <span class="s">"human_exclusion_only_at_start"</span>
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> se repiten el ajuste y los límites sobre <code>output_dataset_id</code> (en el
+ejemplo, ajuste <code>e3f897cf-…</code> y límites <code>c773e411-…</code>) y se ensambla el modelo con ellos.</p>
+
+<h3 id="paso-modelo">Modelo</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}</div>
+<p class="paso"><b>Propósito:</b> ensamblar el modelo de Fase I (versión 0) a partir de un ajuste y sus límites, sin
+cálculo nuevo. · <b>Rol:</b> operación / lectura. · <b>Respuesta:</b> 202 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:22%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>fit_id</code></td><td>Ajuste del dataset subido o de su exclusión.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>limits_id</code></td><td>Límites calibrados sobre ese ajuste.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>lifecycle_policy</code></td><td>Política de revalidación: <code>revalidate_every_months</code> (meses hasta el aviso; por defecto 6) y <code>revalidate_every_observations</code> (observaciones hasta el aviso; por defecto sin límite). Un campo en <code>null</code> desactiva ese criterio.</td><td>Object</td><td>No</td></tr>
+</table>
+<pre><code>curl -s -X POST "$C/models" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"fit_id": "e3f897cf-8b76-4e5b-8c59-764dd781ba14",
+       "limits_id": "c773e411-1c13-4fc4-b59c-a681ad906778"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre class="largo"><code>{
+  <span class="k">"id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:26.720398Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:26.720595Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:19:26.720950Z"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"lifecycle_policy"</span>: {
+    <span class="k">"revalidate_every_months"</span>: <span class="n">6</span>,
+    <span class="k">"revalidate_every_observations"</span>: <span class="n">null</span>
+  },
+  <span class="k">"n_rows"</span>: <span class="n">60</span>,
+  <span class="k">"n_features"</span>: <span class="n">4</span>,
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"has_observed_at"</span>: <span class="n">true</span>,
+  <span class="k">"provenance"</span>: {
+    <span class="k">"root_dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+    <span class="k">"fit_id"</span>: <span class="s">"e3f897cf-8b76-4e5b-8c59-764dd781ba14"</span>,
+    <span class="k">"limits_id"</span>: <span class="s">"c773e411-1c13-4fc4-b59c-a681ad906778"</span>,
+    <span class="k">"exclusion_id"</span>: <span class="s">"64b7c927-cbe7-4ce7-8df5-0e08fbb7c473"</span>
+  },
+  <span class="k">"result"</span>: {
+    <span class="k">"n_features"</span>: <span class="n">4</span>,
+    <span class="k">"n_base"</span>: <span class="n">59</span>,
+    <span class="k">"limit_regime"</span>: <span class="s">"phase1_provisional"</span>,
+    <span class="k">"operative_limit"</span>: <span class="n">34.44350155561304</span>,
+    <span class="k">"limits"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">34.44350155561304</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">40.07411341809791</span>,
+      <span class="k">"n_replicates"</span>: <span class="n">100</span>,
+      <span class="k">"seed"</span>: <span class="n">20261020</span>,
+      <span class="k">"n_clean"</span>: <span class="n">45</span>,
+      <span class="k">"alpha_limit"</span>: <span class="n">0.005</span>,
+      <span class="k">"phase2_alpha_limit"</span>: <span class="n">0.005</span>,
+      <span class="k">"oob_size_min"</span>: <span class="n">10</span>,
+      <span class="k">"oob_size_mean"</span>: <span class="n">16.49</span>,
+      <span class="k">"phase1_mc_error"</span>: <span class="n">2.634607934188237</span>,
+      <span class="k">"phase2_mc_error"</span>: <span class="n">3.6801295963802465</span>,
+      <span class="k">"estimator_name"</span>: <span class="s">"mrcd"</span>,
+      <span class="k">"sampler_name"</span>: <span class="s">"bootstrap_oob"</span>
+    },
+    <span class="k">"mrcd"</span>: {
+      <span class="k">"alpha"</span>: <span class="n">0.75</span>,
+      <span class="k">"h"</span>: <span class="n">45</span>,
+      <span class="k">"rho"</span>: <span class="n">1e-06</span>,
+      <span class="k">"cnp2"</span>: <span class="n">1.4613895998943889</span>,
+      <span class="k">"crit"</span>: <span class="n">-32.6179610708025</span>,
+      <span class="k">"n_obs"</span>: <span class="n">59</span>,
+      <span class="k">"center"</span>: <span class="n">null</span>,
+      <span class="k">"cov"</span>: <span class="n">null</span>
+    },
+    <span class="k">"pymrcd_version"</span>: <span class="s">"0.1.0"</span>,
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"statistic_reference"</span>: <span class="s">"Pineda Jaramillo, K. S. (2026). Carta de control robusta para observaciones individuales en fase I para procesos de alta dimensionalidad. Tesis de maestría, Universidad Nacional de Colombia. https://repositorio.unal.edu.co/handle/unal/90389"</span>,
+    <span class="k">"historical_t2"</span>: <span class="n">null</span>,
+    <span class="k">"historical_outlier"</span>: <span class="n">null</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>,
+  <span class="k">"training_data"</span>: <span class="n">null</span>,
+  <span class="k">"observed_at"</span>: <span class="n">null</span>
+}</code></pre>
+<p><code>n_rows</code> es el tamaño del dataset raíz y <code>result.n_base</code> el de la base tras la exclusión.
+<code>operative_limit</code> es el límite con el que se vigilará: en la versión 0, el de Fase I
+(<code>limit_regime</code> = <code>phase1_provisional</code>).</p>
+<h4><span class="chip ko">KO</span>  409 si los límites aún no han terminado</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"LIMITS_NOT_READY"</span>,
+  <span class="k">"message"</span>: <span class="s">"los límites 'c773e411-1c13-4fc4-b59c-a681ad906778' no están listos"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"limits_id"</span>: <span class="s">"c773e411-1c13-4fc4-b59c-a681ad906778"</span>,
+    <span class="k">"status"</span>: <span class="s">"running"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si los límites no son de ese ajuste</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"LIMITS_FIT_MISMATCH"</span>,
+  <span class="k">"message"</span>: <span class="s">"los límites 'c773e411-1c13-4fc4-b59c-a681ad906778' no se calibraron sobre el ajuste 'b9c6bc0c-79b7-4aec-bf3c-b344326bf495'"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"limits_id"</span>: <span class="s">"c773e411-1c13-4fc4-b59c-a681ad906778"</span>,
+    <span class="k">"fit_id"</span>: <span class="s">"b9c6bc0c-79b7-4aec-bf3c-b344326bf495"</span>,
+    <span class="k">"limits_fit_id"</span>: <span class="s">"e3f897cf-8b76-4e5b-8c59-764dd781ba14"</span>
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> el <code>id</code> del modelo es el <code>{id}</code> de todas las rutas de Fase II
+y del ciclo de vida (<code>$C/models/{id}/…</code>).</p>
+
+<h2 id="flujo-fase1-tuberia">Fase I en una llamada</h2>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/pipelines/phase1</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/pipelines/{id}</div>
+<p class="paso"><b>Propósito:</b> ejecutar la Fase I completa (exclusión, ajuste, límites y modelo) con una sola
+petición. · <b>Rol:</b> operación / lectura. · <b>Respuesta:</b> 202 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:24%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>dataset_id</code></td><td>Dataset subido.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>params</code></td><td>Parámetros de la carta, como en <code>/limits</code> (<code>bootstrap.seed</code> obligatoria; <code>mrcd</code> opcional).</td><td>Object</td><td>Sí</td></tr>
+  <tr><td><code>assignable_cause</code></td><td>Filas del dataset con causa asignable, como en <code>/exclusions</code>.</td><td>Array</td><td>No</td></tr>
+  <tr><td><code>lifecycle_policy</code></td><td>Política de revalidación, como en <code>/models</code>.</td><td>Object</td><td>No</td></tr>
+</table>
+<pre><code>curl -s -X POST "$C/pipelines/phase1" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "987aac67-a118-408d-b34a-f49b2f56a2f8",
+       "params": {"bootstrap": {"seed": 20261020}},
+       "assignable_cause": [{"row": 43,
+         "cause": "carga duplicada del cierre del 2026-07-14"}]}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"d6216135-8001-4d53-b7f6-dec1cc291910"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET en curso: los pasos aparecen a medida que se crean</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"d6216135-8001-4d53-b7f6-dec1cc291910"</span>,
+  <span class="k">"kind"</span>: <span class="s">"phase1"</span>,
+  <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+  <span class="k">"status"</span>: <span class="s">"running"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"steps"</span>: [
+    {
+      <span class="k">"kind"</span>: <span class="s">"exclusion"</span>,
+      <span class="k">"id"</span>: <span class="s">"25ff9f99-ab1e-46d5-9a6e-2192d8774580"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"fit"</span>,
+      <span class="k">"id"</span>: <span class="s">"a3bb69a0-664f-441f-9598-2f14e55a5eb0"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"limits"</span>,
+      <span class="k">"id"</span>: <span class="s">"808eb5eb-6abd-4df7-bf1b-c96bfcbdd8f7"</span>
+    }
+  ],
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:36.839670Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:36.839890Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="n">null</span>,
+  <span class="k">"model_id"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"d6216135-8001-4d53-b7f6-dec1cc291910"</span>,
+  <span class="k">"kind"</span>: <span class="s">"phase1"</span>,
+  <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"987aac67-a118-408d-b34a-f49b2f56a2f8"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"steps"</span>: [
+    {
+      <span class="k">"kind"</span>: <span class="s">"exclusion"</span>,
+      <span class="k">"id"</span>: <span class="s">"25ff9f99-ab1e-46d5-9a6e-2192d8774580"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"fit"</span>,
+      <span class="k">"id"</span>: <span class="s">"a3bb69a0-664f-441f-9598-2f14e55a5eb0"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"limits"</span>,
+      <span class="k">"id"</span>: <span class="s">"808eb5eb-6abd-4df7-bf1b-c96bfcbdd8f7"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"model"</span>,
+      <span class="k">"id"</span>: <span class="s">"3f8f1077-4a9f-40c3-8ac0-8fdeca52d683"</span>
+    }
+  ],
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:36.839670Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:36.839890Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:19:38.666925Z"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"3f8f1077-4a9f-40c3-8ac0-8fdeca52d683"</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<div class="caja exito"><span class="etiqueta">Equivalencia</span>
+<p>El modelo <code>3f8f1077-…</code> de la tubería tiene exactamente los mismos límites que el modelo
+<code>19439d6d-…</code> construido paso a paso (<code>phase1_limit</code> = 34.44350155561304 en ambos): la tubería
+solo encadena los pasos.</p></div>
+<h4><span class="chip ko">KO</span>  422 sin semilla</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"la petición no cumple el schema"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"errors"</span>: [
+      {
+        <span class="k">"loc"</span>: [<span class="s">"body"</span>, <span class="s">"params"</span>, <span class="s">"bootstrap"</span>, <span class="s">"seed"</span>],
+        <span class="k">"msg"</span>: <span class="s">"Field required"</span>,
+        <span class="k">"type"</span>: <span class="s">"missing"</span>
+      }
+    ]
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> <code>model_id</code> es el modelo para la Fase II. Cada paso de
+<code>steps</code> se puede consultar en su propia ruta.</p>
+
+<h2 id="flujo-fase2">Fase II</h2>
+<h3 id="paso-puntuar">Puntuar observaciones nuevas</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/scores</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/scores/{sid}</div>
+<p class="paso"><b>Propósito:</b> calcular el T² y la señal de un lote de observaciones nuevas y registrarlas. ·
+<b>Rol:</b> operación / lectura. · <b>Respuesta:</b> 202 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:28%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>observations[].observed_at</code></td><td>Fecha de la observación, con zona horaria. Determina la versión con la que se puntúa.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>observations[].values</code></td><td>Valores de las <em>p</em> variables, en el orden del modelo.</td><td>Array[Number]</td><td>Sí</td></tr>
+  <tr><td><code>batch_label</code></td><td>Etiqueta del lote (hasta 200 caracteres).</td><td>String</td><td>No</td></tr>
+  <tr><td><code>variables</code></td><td>Nombres de las columnas. Si el modelo tiene nombres, deben ser los mismos y en el mismo orden.</td><td>Array[String]</td><td>No</td></tr>
+</table>
+<pre><code>MODEL_ID=19439d6d-c490-4a9b-857a-919673f3d5da
+curl -s -X POST "$C/models/$MODEL_ID/scores" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @lote-agosto.json</code></pre>
+<h4>Ejemplo de cuerpo (25 observaciones)</h4>
+<pre><code>{
+  <span class="k">"batch_label"</span>: <span class="s">"agosto-2026"</span>,
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"observations"</span>: [
+    {
+      <span class="k">"observed_at"</span>: <span class="s">"2026-08-01T00:00:00Z"</span>,
+      <span class="k">"values"</span>: [<span class="n">1.2738</span>, <span class="n">1.1079</span>, <span class="n">0.0237</span>, <span class="n">0.1563</span>]
+    },
+    {
+      <span class="k">"observed_at"</span>: <span class="s">"2026-08-02T00:00:00Z"</span>,
+      <span class="k">"values"</span>: [<span class="n">1.3302</span>, <span class="n">1.1237</span>, <span class="n">0.0247</span>, <span class="n">0.2175</span>]
+    },
+    <span class="c">…</span>
+  ]
+}</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"6ee637fc-793e-4315-aa36-41cd4729ea51"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"6ee637fc-793e-4315-aa36-41cd4729ea51"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"batch_label"</span>: <span class="s">"agosto-2026"</span>,
+  <span class="k">"n_observations"</span>: <span class="n">25</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:50.225319Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:50.225476Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:19:50.226618Z"</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"observation_ids"</span>: [
+      <span class="s">"f421ec67-c534-4700-9672-8beab3d6e683"</span>,
+      <span class="s">"4801781d-44e9-4f9c-b2ec-bc19ca6d640a"</span>,
+      <span class="s">"c50eafec-cbac-4371-b6ac-21ea0e1a4243"</span>,
+      <span class="c">…</span>
+    ],
+    <span class="k">"version_numbers"</span>: [<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="c">…</span>],
+    <span class="k">"n_signals"</span>: <span class="n">2</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<p><code>version_numbers</code> indica, por observación, la versión con la que se puntuó (la vigente en su
+<code>observed_at</code>).</p>
+<p>Las observaciones siguientes se envían en otro lote. En el ejemplo, un segundo lote de 15 observaciones (del
+26/08/2026 al 09/09/2026) con una señal; los dos lotes suman las 40 observaciones y las tres señales que se usan en el
+resto del capítulo:</p>
+<pre><code>curl -s -X POST "$C/models/$MODEL_ID/scores" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-binary @lote-septiembre.json</code></pre>
+<h4>Ejemplo de cuerpo (15 observaciones)</h4>
+<pre><code>{
+  <span class="k">"batch_label"</span>: <span class="s">"septiembre-2026"</span>,
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"observations"</span>: [
+    {
+      <span class="k">"observed_at"</span>: <span class="s">"2026-08-26T00:00:00Z"</span>,
+      <span class="k">"values"</span>: [<span class="n">1.2822</span>, <span class="n">1.1101</span>, <span class="n">0.023</span>, <span class="n">0.1856</span>]
+    },
+    <span class="c">…</span>
+    {
+      <span class="k">"observed_at"</span>: <span class="s">"2026-09-09T00:00:00Z"</span>,
+      <span class="k">"values"</span>: [<span class="n">1.3683</span>, <span class="n">1.1873</span>, <span class="n">0.0288</span>, <span class="n">0.2214</span>]
+    }
+  ]
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET del segundo lote terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"e1654672-8f1b-4e9f-8e49-b9a6e81b2f89"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"batch_label"</span>: <span class="s">"septiembre-2026"</span>,
+  <span class="k">"n_observations"</span>: <span class="n">15</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:51.449952Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:19:51.450073Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:19:51.451033Z"</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"observation_ids"</span>: [
+      <span class="s">"6151c40c-4236-47d5-a5db-2678a8b63fda"</span>,
+      <span class="s">"21f0a503-dbc8-4831-8d07-bff94d1cc37e"</span>,
+      <span class="s">"87d7d512-5c4a-4f6d-b175-01ff22038144"</span>,
+      <span class="c">…</span>
+    ],
+    <span class="k">"version_numbers"</span>: [<span class="n">0</span>, <span class="n">0</span>, <span class="n">0</span>, <span class="c">…</span>],
+    <span class="k">"n_signals"</span>: <span class="n">1</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si las variables no coinciden con las del modelo</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"VARIABLES_MISMATCH"</span>,
+  <span class="k">"message"</span>: <span class="s">"las variables no son las del modelo (mismos nombres y en el mismo orden)"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"input"</span>: <span class="s">"scores"</span>,
+    <span class="k">"expected"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+    <span class="k">"received"</span>: [<span class="s">"nsfr"</span>, <span class="s">"lcr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>]
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  404 si el modelo no existe o es de otro tenant</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"MODEL_NOT_FOUND"</span>,
+  <span class="k">"message"</span>: <span class="s">"el modelo '00000000-0000-0000-0000-000000000000' no existe"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"model_id"</span>: <span class="s">"00000000-0000-0000-0000-000000000000"</span>
+  }
+}</code></pre>
+<p><strong>Encadenamiento:</strong> los <code>observation_ids</code> se consultan en <code>…/observations</code>; las
+señales se anotan en <code>…/observations/{oid}/annotations</code>.</p>
+
+<h3 id="paso-observaciones">Consultar observaciones y señales</h3>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/observations</div>
+<p class="paso"><b>Propósito:</b> leer las observaciones registradas por rango de fechas y, opcionalmente, solo las
+señales. · <b>Rol:</b> lectura. · <b>Respuesta:</b> 200.</p>
+<table class="corta">
+  <caption>Parámetros de consulta</caption>
+  <thead><tr><th style="width:22%">Parámetro</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>from</code></td><td>Inicio del rango de <code>observed_at</code> (inclusivo), con zona horaria.</td><td>String</td><td>No</td></tr>
+  <tr><td><code>to</code></td><td>Fin del rango (inclusivo).</td><td>String</td><td>No</td></tr>
+  <tr><td><code>signals_only</code></td><td><code>true</code> para devolver solo las señales.</td><td>Boolean</td><td>No</td></tr>
+</table>
+<pre><code>curl -s "$C/models/$MODEL_ID/observations?signals_only=true" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200 (tres señales; se muestra la primera)</h4>
+<pre><code>[
+  {
+    <span class="k">"id"</span>: <span class="s">"aa05a567-e18e-4134-8479-56a93d4553d6"</span>,
+    <span class="k">"score_id"</span>: <span class="s">"6ee637fc-793e-4315-aa36-41cd4729ea51"</span>,
+    <span class="k">"batch_label"</span>: <span class="s">"agosto-2026"</span>,
+    <span class="k">"observed_at"</span>: <span class="s">"2026-08-08T00:00:00Z"</span>,
+    <span class="k">"values"</span>: [<span class="n">1.0271</span>, <span class="n">0.9221</span>, <span class="n">0.0423</span>, <span class="n">0.2707</span>],
+    <span class="k">"t2"</span>: <span class="n">204.51134697016283</span>,
+    <span class="k">"limit"</span>: <span class="n">34.44350155561304</span>,
+    <span class="k">"limit_kind"</span>: <span class="s">"phase1_provisional"</span>,
+    <span class="k">"version_number"</span>: <span class="n">0</span>,
+    <span class="k">"signal"</span>: <span class="n">true</span>,
+    <span class="k">"recorded_at"</span>: <span class="s">"2026-10-20T19:19:50.226171Z"</span>,
+    <span class="k">"annotation"</span>: <span class="n">null</span>
+  },
+  <span class="c">…</span>
+]</code></pre>
+<table class="corta">
+  <caption>Campos de cada observación</caption>
+  <thead><tr><th style="width:26%">Campo</th><th>Descripción</th></tr></thead>
+  <tr><td><code>t2</code></td><td>Estadístico T² de la observación.</td></tr>
+  <tr><td><code>limit</code>, <code>limit_kind</code></td><td>Límite usado y su régimen (<code>phase1_provisional</code> en la versión 0; <code>phase2</code> en las recalibradas).</td></tr>
+  <tr><td><code>version_number</code></td><td>Versión con la que se puntuó.</td></tr>
+  <tr><td><code>signal</code></td><td><code>t2 &gt; limit</code> (estricto).</td></tr>
+  <tr><td><code>annotation</code></td><td>Anotación vigente (la más reciente) o <code>null</code>.</td></tr>
+</table>
+
+<h3 id="paso-anotar">Anotar una señal</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/observations/{oid}/annotations</div>
+<p class="paso"><b>Propósito:</b> dejar constancia de la investigación de una señal. Las señales con causa asignable se
+excluyen de la base en la siguiente recalibración. · <b>Rol:</b> operación. · <b>Respuesta:</b> 201.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:24%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>assignable_cause</code></td><td><code>true</code> si una persona confirmó una causa asignable.</td><td>Boolean</td><td>Sí</td></tr>
+  <tr><td><code>cause</code></td><td>Cuál fue la causa.</td><td>String</td><td>No</td></tr>
+  <tr><td><code>action</code></td><td>Acción tomada.</td><td>String</td><td>No</td></tr>
+</table>
+<p>El autor (<code>actor</code>) es el <code>sub</code> del token; no se envía en el cuerpo. Las anotaciones son de
+solo adición: una anotación nueva no borra la anterior, pero vale la más reciente.</p>
+<pre><code>OBS_ID=aa05a567-e18e-4134-8479-56a93d4553d6
+curl -s -X POST "$C/models/$MODEL_ID/observations/$OBS_ID/annotations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"assignable_cause": true,
+       "cause": "error en la carga del LCR del 2026-08-08",
+       "action": "se corrigió la fuente y se reprocesó el cierre"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"7d6d310e-aa9d-48de-9e77-b3169e698ac8"</span>,
+  <span class="k">"observation_id"</span>: <span class="s">"aa05a567-e18e-4134-8479-56a93d4553d6"</span>,
+  <span class="k">"assignable_cause"</span>: <span class="n">true</span>,
+  <span class="k">"cause"</span>: <span class="s">"error en la carga del LCR del 2026-08-08"</span>,
+  <span class="k">"action"</span>: <span class="s">"se corrigió la fuente y se reprocesó el cierre"</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:09.583332Z"</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  409 al anotar una observación sin señal</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"NOT_A_SIGNAL"</span>,
+  <span class="k">"message"</span>: <span class="s">"solo se anotan observaciones con señal"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"observation_id"</span>: <span class="s">"f421ec67-c534-4700-9672-8beab3d6e683"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si el cuerpo trae <code>actor</code></h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"la petición no cumple el schema"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"errors"</span>: [
+      {
+        <span class="k">"loc"</span>: [<span class="s">"body"</span>, <span class="s">"actor"</span>],
+        <span class="k">"msg"</span>: <span class="s">"Extra inputs are not permitted"</span>,
+        <span class="k">"type"</span>: <span class="s">"extra_forbidden"</span>
+      }
+    ]
+  }
+}</code></pre>
+
+<h3 id="paso-estado">Estado de la carta</h3>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/status</div>
+<p class="paso"><b>Propósito:</b> conocer la situación del modelo y sus avisos. · <b>Rol:</b> lectura. ·
+<b>Respuesta:</b> 200.</p>
+<pre><code>curl -s "$C/models/$MODEL_ID/status" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre><code>{
+  <span class="k">"status"</span>: <span class="s">"startup"</span>,
+  <span class="k">"active_version"</span>: <span class="n">0</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"unresolved_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"revalidation_due"</span>: <span class="n">false</span>,
+  <span class="k">"revalidation_due_at"</span>: <span class="s">"2027-04-20T19:19:26.720950Z"</span>,
+  <span class="k">"observations_since_active"</span>: <span class="n">40</span>,
+  <span class="k">"notices"</span>: []
+}</code></pre>
+<table class="corta">
+  <caption>Valores de <code>status</code>, por precedencia (vale el primero que aplique)</caption>
+  <thead><tr><th style="width:26%">Valor</th><th>Significado</th></tr></thead>
+  <tr><td><code>requires_new_base</code></td><td>Hay un evento estructural sin una base nueva posterior. Se sigue vigilando con la versión vigente.</td></tr>
+  <tr><td><code>proposal_pending</code></td><td>Hay una versión propuesta sin aprobar ni rechazar.</td></tr>
+  <tr><td><code>revalidation_due</code></td><td>Venció la revalidación periódica (meses u observaciones).</td></tr>
+  <tr><td><code>startup</code></td><td>Se vigila con la versión 0 (límite de Fase I).</td></tr>
+  <tr><td><code>active</code></td><td>Se vigila con una versión recalibrada (límite de Fase II).</td></tr>
+</table>
+
+<h2 id="flujo-evento">Registrar un evento estructural</h2>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/structural-events</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/structural-events</div>
+<p class="paso"><b>Propósito:</b> declarar un cambio del proceso que invalida la base (fusión, cambio de política o de
+metodología). · <b>Rol:</b> operación / lectura. · <b>Respuesta:</b> 201 y 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:22%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>occurred_at</code></td><td>Cuándo ocurrió, con zona horaria.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>description</code></td><td>Descripción del evento.</td><td>String</td><td>Sí</td></tr>
+</table>
+<p>El ejemplo usa otro modelo del mismo tenant (<code>3f8f1077-…</code>, el de la tubería), con 70 observaciones
+puntuadas entre agosto y octubre.</p>
+<pre><code>MODEL_ID=3f8f1077-4a9f-40c3-8ac0-8fdeca52d683
+curl -s -X POST "$C/models/$MODEL_ID/structural-events" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"occurred_at": "2026-09-12T00:00:00Z",
+       "description":
+         "Fusión con la entidad B: cambia la composición del balance"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+  <span class="k">"occurred_at"</span>: <span class="s">"2026-09-12T00:00:00Z"</span>,
+  <span class="k">"description"</span>: <span class="s">"Fusión con la entidad B: cambia la composición del balance"</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"registered_at"</span>: <span class="s">"2026-10-20T19:21:47.228388Z"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  Estado de la carta tras el evento</h4>
+<pre><code>{
+  <span class="k">"status"</span>: <span class="s">"requires_new_base"</span>,
+  <span class="k">"active_version"</span>: <span class="n">0</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"unresolved_event_id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+  <span class="k">"revalidation_due"</span>: <span class="n">false</span>,
+  <span class="k">"revalidation_due_at"</span>: <span class="s">"2027-04-20T19:19:38.666419Z"</span>,
+  <span class="k">"observations_since_active"</span>: <span class="n">70</span>,
+  <span class="k">"notices"</span>: [<span class="s">"requires_new_base"</span>]
+}</code></pre>
+<p>Consecuencias para el integrador:</p>
+<ul>
+  <li>Se sigue vigilando con la versión vigente hasta que se apruebe una base nueva.</li>
+  <li>Si había una versión <strong>propuesta</strong> sin resolver, queda rechazada en el acto: pasa a
+    <code>rejected</code> con <code>decided_by</code> igual al <code>sub</code> de quien registró el evento (en el
+    ejemplo sería <code>ana.analista</code>, con rol <code>analyst</code>), <code>decision_note</code> =
+    <code>structural_event</code> y <code>rejected_at</code> igual al instante del registro. Una base anterior al
+    evento ya no es válida, así que no hace falta un aprobador para descartarla. Si la propuesta se estaba calculando
+    cuando se registró el evento, la versión nace ya rechazada con la misma nota. En este ejemplo no había ninguna
+    propuesta pendiente.</li>
+  <li>La siguiente recalibración <strong>reemplaza</strong> la base (REPLACE) aunque no se pida
+    <code>force_replace</code>, y su rango no puede incluir fechas anteriores al evento.</li>
+</ul>
+<h4><span class="chip ko">KO</span>  422 si el rango de una recalibración empieza antes del evento</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"RANGE_BEFORE_STRUCTURAL_EVENT"</span>,
+  <span class="k">"message"</span>: <span class="s">"el rango incluye datos anteriores al último evento estructural"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"event_id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+    <span class="k">"occurred_at"</span>: <span class="s">"2026-09-12T00:00:00+00:00"</span>,
+    <span class="k">"range_from"</span>: <span class="s">"2026-08-01T00:00:00+00:00"</span>
+  }
+}</code></pre>
+
+<h2 id="flujo-recalibracion">Recalibración</h2>
+<p>Una recalibración recalcula todo (ajuste MRCD y límites) sobre una base nueva y termina en una
+<strong>versión propuesta</strong>. Se hace por pasos (<code>mode: "stepwise"</code>) o en una llamada
+(<code>mode: "pipeline"</code>, por defecto). Las cadenas de pasos son:</p>
+<table class="corta">
+  <thead><tr><th style="width:26%">Decisión</th><th>Cadena</th></tr></thead>
+  <tr><td><strong>EXTEND</strong> (por defecto)</td><td>abrir → [exclusión desde anotaciones] → <code>/extension</code> → <code>/fits</code> → <code>/limits</code> → <code>…/versions</code></td></tr>
+  <tr><td><strong>REPLACE</strong> (forzado o por evento)</td><td>abrir → [exclusión desde anotaciones] → <code>/fits</code> → <code>/limits</code> → <code>…/versions</code></td></tr>
+</table>
+
+<h3 id="recal-abrir">Abrir la recalibración</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/recalibrations</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/recalibrations/{rid}</div>
+<p class="paso"><b>Propósito:</b> fijar el rango de observaciones nuevas y congelar las candidatas. · <b>Rol:</b>
+operación / lectura. · <b>Respuesta:</b> 201 (<code>stepwise</code>) o 202 (<code>pipeline</code>).</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:28%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>range_from</code>, <code>range_to</code></td><td>Rango de <code>observed_at</code> de las observaciones nuevas (inclusivo).</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>params.seed</code></td><td>Semilla de la recalibración (entero ≥ 0).</td><td>Integer</td><td>Sí</td></tr>
+  <tr><td><code>params.min_observations</code></td><td>Mínimo de observaciones nuevas conservadas. Por defecto 25.</td><td>Integer</td><td>No</td></tr>
+  <tr><td><code>force_replace</code></td><td><code>true</code> para reemplazar la base por las observaciones nuevas. Por defecto <code>false</code> (se amplía).</td><td>Boolean</td><td>No</td></tr>
+  <tr><td><code>mode</code></td><td><code>pipeline</code> (por defecto) o <code>stepwise</code>.</td><td>String</td><td>No</td></tr>
+</table>
+<p>El resto de parámetros (B, niveles, MRCD) se <strong>heredan de la versión vigente</strong>
+(<code>inherited_params</code>); no se envían.</p>
+<pre><code>MODEL_ID=19439d6d-c490-4a9b-857a-919673f3d5da
+curl -s -X POST "$C/models/$MODEL_ID/recalibrations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"range_from": "2026-08-01T00:00:00Z", "range_to": "2026-09-30T23:59:59Z",
+       "params": {"seed": 20261020}, "mode": "stepwise"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201</h4>
+<pre><code>{
+  <span class="k">"recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"candidates_dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+  <span class="k">"status"</span>: <span class="s">"running"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET de la sesión abierta</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"mode"</span>: <span class="s">"stepwise"</span>,
+  <span class="k">"status"</span>: <span class="s">"running"</span>,
+  <span class="k">"range_from"</span>: <span class="s">"2026-08-01T00:00:00Z"</span>,
+  <span class="k">"range_to"</span>: <span class="s">"2026-09-30T23:59:59Z"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>
+  },
+  <span class="k">"force_replace"</span>: <span class="n">false</span>,
+  <span class="k">"base_version_number"</span>: <span class="n">0</span>,
+  <span class="k">"structural_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:35.318505Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:20:35.318505Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="n">null</span>,
+  <span class="k">"outcome"</span>: <span class="n">null</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"candidates_dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+  <span class="k">"n_candidates"</span>: <span class="n">40</span>,
+  <span class="k">"n_already_in_base"</span>: <span class="n">0</span>,
+  <span class="k">"inherited_params"</span>: <span class="c">…</span>,
+  <span class="k">"pipeline_id"</span>: <span class="n">null</span>,
+  <span class="k">"proposal"</span>: <span class="n">null</span>,
+  <span class="k">"kept_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"extension_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"report"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  409 si ya hay una recalibración en curso</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"RECALIBRATION_IN_PROGRESS"</span>,
+  <span class="k">"message"</span>: <span class="s">"ya hay una recalibración en curso"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si no hay suficientes observaciones en el rango</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"RECALIBRATION_INSUFFICIENT_OBSERVATIONS"</span>,
+  <span class="k">"message"</span>: <span class="s">"no hay suficientes observaciones candidatas en el rango"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"available"</span>: <span class="n">16</span>,
+    <span class="k">"required"</span>: <span class="n">25</span>
+  }
+}</code></pre>
+
+<h3 id="recal-candidatas">Candidatas</h3>
+<p>Las observaciones del rango que no están ya en la base forman el dataset de candidatas
+(<code>candidates_dataset_id</code>), congelado al abrir la sesión:</p>
+<pre><code>curl -s "$BASE/v1/datasets/2693bb4f-b11d-428d-88e1-23463f3c4a45" \
+  -H "Authorization: Bearer $TOKEN"</code></pre>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+  <span class="k">"n"</span>: <span class="n">40</span>,
+  <span class="k">"p"</span>: <span class="n">4</span>,
+  <span class="k">"content_hash"</span>: <span class="s">"sha256:c13eab9886dac8ee791d9f28e74eb11ad8a6178eae12cdc95f74b7144eae18f6"</span>,
+  <span class="k">"source"</span>: <span class="s">"recalibration_candidates"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:35.318505Z"</span>,
+  <span class="k">"parent_id"</span>: <span class="n">null</span>,
+  <span class="k">"origin_ref"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"lineage"</span>: [
+    {
+      <span class="k">"dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+      <span class="k">"source"</span>: <span class="s">"recalibration_candidates"</span>,
+      <span class="k">"n"</span>: <span class="n">40</span>,
+      <span class="k">"origin_ref"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>
+    }
+  ],
+  <span class="k">"variables"</span>: [<span class="s">"lcr"</span>, <span class="s">"nsfr"</span>, <span class="s">"var_99"</span>, <span class="s">"concentracion"</span>],
+  <span class="k">"has_observed_at"</span>: <span class="n">true</span>,
+  <span class="c">…</span>
+}</code></pre>
+
+<h3 id="recal-exclusion">Exclusión desde las anotaciones</h3>
+<p>Si alguna candidata tiene una anotación vigente con <code>assignable_cause: true</code>, la exclusión es
+obligatoria antes de seguir. Se pide con <code>{dataset_id}</code> solo: las filas salen de las anotaciones. Las señales
+sin anotación o anotadas sin causa asignable se conservan.</p>
+<pre><code>curl -s -X POST "$C/exclusions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "2693bb4f-b11d-428d-88e1-23463f3c4a45"}'</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"7c5f6e07-dca2-4360-a029-7e3009b493f3"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+  <span class="k">"assignable_cause"</span>: [
+    {
+      <span class="k">"row"</span>: <span class="n">7</span>,
+      <span class="k">"cause"</span>: <span class="s">"error en la carga del LCR del 2026-08-08"</span>,
+      <span class="k">"annotation_id"</span>: <span class="s">"7d6d310e-aa9d-48de-9e77-b3169e698ac8"</span>
+    }
+  ],
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:46.779058Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:20:46.779124Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:20:46.779306Z"</span>,
+  <span class="k">"insufficient"</span>: <span class="n">false</span>,
+  <span class="k">"output_dataset_id"</span>: <span class="s">"e10cfac9-5709-4782-b1f3-35776503be16"</span>,
+  <span class="k">"n_kept"</span>: <span class="n">39</span>,
+  <span class="k">"n_excluded_assignable_cause"</span>: <span class="n">1</span>,
+  <span class="k">"row_disposition"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si se intenta extender sin la exclusión</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"hay candidatas con causa asignable: primero la exclusión humana"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+    <span class="k">"reason"</span>: <span class="s">"human_exclusion_required"</span>
+  }
+}</code></pre>
+
+<h3 id="recal-extension">Extensión de la base</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/recalibrations/{rid}/extension</div>
+<p class="paso"><b>Propósito:</b> construir el dataset de la base ampliada (base vigente + nuevas conservadas). Solo en
+EXTEND. · <b>Rol:</b> operación. · <b>Respuesta:</b> 201 (síncrono e idempotente).</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:22%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>dataset_id</code></td><td>Nuevas conservadas: la salida de la exclusión o, si no hubo causas asignables, las candidatas.</td><td>String</td><td>Sí</td></tr>
+</table>
+<pre><code>REC_ID=c659c437-0c1a-49a9-bf2f-a18bd9325bb6
+curl -s -X POST "$C/models/$MODEL_ID/recalibrations/$REC_ID/extension" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "e10cfac9-5709-4782-b1f3-35776503be16"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 201 (repetirla devuelve lo mismo)</h4>
+<pre><code>{
+  <span class="k">"dataset_id"</span>: <span class="s">"c4080f38-3643-4e22-b38d-51975f03dbec"</span>,
+  <span class="k">"n_base"</span>: <span class="n">59</span>,
+  <span class="k">"n_kept_new"</span>: <span class="n">39</span>
+}</code></pre>
+
+<h3 id="recal-ajuste-limites">Ajuste y límites de la nueva base</h3>
+<p>Se ajusta MRCD sobre el dataset de extensión (o, en REPLACE, sobre las nuevas conservadas) y se calibran los límites
+indicando la recalibración en lugar de <code>params</code>:</p>
+<pre><code>curl -s -X POST "$C/fits" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dataset_id": "c4080f38-3643-4e22-b38d-51975f03dbec"}'
+
+curl -s -X POST "$C/limits" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"fit_id": "40698613-7612-4636-835e-af52c1229b4f",
+       "recalibration_id": "c659c437-0c1a-49a9-bf2f-a18bd9325bb6"}'</code></pre>
+<h4><span class="chip ok">OK</span>  GET de los límites terminados</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"ef2df7a9-6b02-4333-8b58-ef7778905605"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"fit_id"</span>: <span class="s">"40698613-7612-4636-835e-af52c1229b4f"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"seed"</span>: <span class="n">20261020</span>,
+  <span class="k">"stage_kind"</span>: <span class="s">"extension"</span>,
+  <span class="k">"spawn_key"</span>: [<span class="n">0</span>, <span class="n">0</span>],
+  <span class="k">"recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:58.074051Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:20:58.074150Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:20:59.954644Z"</span>,
+  <span class="k">"result"</span>: {
+    <span class="k">"phase1_limit"</span>: <span class="n">22.698059003374087</span>,
+    <span class="k">"phase2_limit"</span>: <span class="n">24.91495850852821</span>,
+    <span class="k">"n_replicates"</span>: <span class="n">100</span>,
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"n_clean"</span>: <span class="n">74</span>,
+    <span class="k">"alpha_limit"</span>: <span class="n">0.005</span>,
+    <span class="k">"phase2_alpha_limit"</span>: <span class="n">0.005</span>,
+    <span class="k">"oob_size_min"</span>: <span class="n">21</span>,
+    <span class="k">"oob_size_mean"</span>: <span class="n">27.34</span>,
+    <span class="k">"phase1_mc_error"</span>: <span class="n">0.9322323441941347</span>,
+    <span class="k">"phase2_mc_error"</span>: <span class="n">1.0841299989864772</span>,
+    <span class="k">"estimator_name"</span>: <span class="s">"mrcd"</span>,
+    <span class="k">"sampler_name"</span>: <span class="s">"bootstrap_oob"</span>
+  },
+  <span class="k">"clean_rows"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  422 si se envían <code>params</code> para un ajuste de una recalibración</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"RECALIBRATION_MISMATCH"</span>,
+  <span class="k">"message"</span>: <span class="s">"el ajuste no es de esa recalibración"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"fit_id"</span>: <span class="s">"40698613-7612-4636-835e-af52c1229b4f"</span>,
+    <span class="k">"dataset_id"</span>: <span class="s">"c4080f38-3643-4e22-b38d-51975f03dbec"</span>,
+    <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+    <span class="k">"dataset_recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>
+  }
+}</code></pre>
+
+<h3 id="recal-propuesta">Propuesta de versión</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/versions</div>
+<p class="paso"><b>Propósito:</b> crear la versión propuesta a partir del ajuste y los límites finales. · <b>Rol:</b>
+operación. · <b>Respuesta:</b> 202; el <code>id</code> devuelto es el de la recalibración, que se consulta hasta
+<code>succeeded</code>.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición</caption>
+  <thead><tr><th style="width:24%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>recalibration_id</code></td><td>Recalibración en curso.</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>fit_id</code></td><td>Ajuste final (de la extensión en EXTEND; de las nuevas en REPLACE).</td><td>String</td><td>Sí</td></tr>
+  <tr><td><code>limits_id</code></td><td>Límites de ese ajuste.</td><td>String</td><td>Sí</td></tr>
+</table>
+<pre><code>curl -s -X POST "$C/models/$MODEL_ID/versions" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"recalibration_id": "c659c437-0c1a-49a9-bf2f-a18bd9325bb6",
+       "fit_id": "40698613-7612-4636-835e-af52c1229b4f",
+       "limits_id": "ef2df7a9-6b02-4333-8b58-ef7778905605"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET de la recalibración terminada, con su informe antes/después</h4>
+<pre class="largo"><code>{
+  <span class="k">"id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"19439d6d-c490-4a9b-857a-919673f3d5da"</span>,
+  <span class="k">"mode"</span>: <span class="s">"stepwise"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"range_from"</span>: <span class="s">"2026-08-01T00:00:00Z"</span>,
+  <span class="k">"range_to"</span>: <span class="s">"2026-09-30T23:59:59Z"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>
+  },
+  <span class="k">"force_replace"</span>: <span class="n">false</span>,
+  <span class="k">"base_version_number"</span>: <span class="n">0</span>,
+  <span class="k">"structural_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:20:35.318505Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:20:35.318505Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:21:07.025475Z"</span>,
+  <span class="k">"outcome"</span>: <span class="s">"extend"</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">1</span>,
+  <span class="k">"candidates_dataset_id"</span>: <span class="s">"2693bb4f-b11d-428d-88e1-23463f3c4a45"</span>,
+  <span class="k">"n_candidates"</span>: <span class="n">40</span>,
+  <span class="k">"n_already_in_base"</span>: <span class="n">0</span>,
+  <span class="k">"inherited_params"</span>: <span class="c">…</span>,
+  <span class="k">"pipeline_id"</span>: <span class="n">null</span>,
+  <span class="k">"proposal"</span>: {
+    <span class="k">"fit_id"</span>: <span class="s">"40698613-7612-4636-835e-af52c1229b4f"</span>,
+    <span class="k">"limits_id"</span>: <span class="s">"ef2df7a9-6b02-4333-8b58-ef7778905605"</span>,
+    <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+    <span class="k">"requested_at"</span>: <span class="s">"2026-10-20T19:21:07.021940Z"</span>
+  },
+  <span class="k">"kept_dataset_id"</span>: <span class="s">"e10cfac9-5709-4782-b1f3-35776503be16"</span>,
+  <span class="k">"extension_dataset_id"</span>: <span class="s">"c4080f38-3643-4e22-b38d-51975f03dbec"</span>,
+  <span class="k">"report"</span>: {
+    <span class="k">"decision"</span>: <span class="s">"extend"</span>,
+    <span class="k">"n_base"</span>: <span class="n">59</span>,
+    <span class="k">"n_new"</span>: <span class="n">40</span>,
+    <span class="k">"n_excluded_assignable_cause"</span>: <span class="n">1</span>,
+    <span class="k">"n_kept_new"</span>: <span class="n">39</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>,
+    <span class="k">"before"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">34.44350155561304</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">40.07411341809791</span>,
+      <span class="k">"phase1_mc_error"</span>: <span class="n">2.634607934188237</span>,
+      <span class="k">"phase2_mc_error"</span>: <span class="n">3.6801295963802465</span>,
+      <span class="k">"regime"</span>: <span class="s">"phase1_provisional"</span>,
+      <span class="k">"operative_limit"</span>: <span class="n">34.44350155561304</span>,
+      <span class="k">"n_base"</span>: <span class="n">59</span>
+    },
+    <span class="k">"after"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">22.698059003374087</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">24.91495850852821</span>,
+      <span class="k">"phase1_mc_error"</span>: <span class="n">0.9322323441941347</span>,
+      <span class="k">"phase2_mc_error"</span>: <span class="n">1.0841299989864772</span>,
+      <span class="k">"regime"</span>: <span class="s">"phase2"</span>,
+      <span class="k">"operative_limit"</span>: <span class="n">24.91495850852821</span>,
+      <span class="k">"n_base"</span>: <span class="n">98</span>
+    },
+    <span class="k">"phase2_exceeds_phase1"</span>: <span class="n">true</span>,
+    <span class="k">"row_disposition"</span>: <span class="n">null</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<table class="corta">
+  <caption>Informe (<code>report</code>)</caption>
+  <thead><tr><th style="width:32%">Campo</th><th>Descripción</th></tr></thead>
+  <tr><td><code>decision</code></td><td><code>extend</code> o <code>replace</code>.</td></tr>
+  <tr><td><code>n_base</code>, <code>n_new</code></td><td>Filas de la base vigente y candidatas nuevas.</td></tr>
+  <tr><td><code>n_excluded_assignable_cause</code>, <code>n_kept_new</code></td><td>Nuevas excluidas por causa asignable y conservadas.</td></tr>
+  <tr><td><code>before</code>, <code>after</code></td><td>Límites y límite operativo antes y después.</td></tr>
+  <tr><td><code>phase2_exceeds_phase1</code></td><td>Diagnóstico: el límite de Fase II supera al de Fase I.</td></tr>
+</table>
+<p>La carta pasa a <code>proposal_pending</code>:</p>
+<pre><code>{
+  <span class="k">"status"</span>: <span class="s">"proposal_pending"</span>,
+  <span class="k">"active_version"</span>: <span class="n">0</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">1</span>,
+  <span class="k">"unresolved_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"revalidation_due"</span>: <span class="n">false</span>,
+  <span class="k">"revalidation_due_at"</span>: <span class="s">"2027-04-20T19:19:26.720950Z"</span>,
+  <span class="k">"observations_since_active"</span>: <span class="n">40</span>,
+  <span class="k">"notices"</span>: [<span class="s">"proposal_pending"</span>]
+}</code></pre>
+
+<h3 id="recal-reemplazo">Reemplazo forzado o por evento</h3>
+<p>Con <code>force_replace: true</code> o con un evento estructural sin resolver, la base nueva son solo las
+observaciones nuevas conservadas y no hay paso de extensión: tras la exclusión (si hay causas asignables) se ajusta
+MRCD con <code>/fits</code> sobre <code>candidates_dataset_id</code> (o sobre la salida de la exclusión), se calibran
+los límites con <code>{fit_id, recalibration_id}</code> y se pide la versión con <code>…/versions</code>, igual que en
+EXTEND. El ejemplo usa el modelo con el evento estructural:</p>
+<pre><code>MODEL_ID=3f8f1077-4a9f-40c3-8ac0-8fdeca52d683
+curl -s -X POST "$C/models/$MODEL_ID/recalibrations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"range_from": "2026-09-13T00:00:00Z", "range_to": "2026-10-15T00:00:00Z",
+       "params": {"seed": 20261021}, "force_replace": true, "mode": "stepwise"}'</code></pre>
+<h4><span class="chip ko">KO</span>  422 al pedir la extensión en un reemplazo</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="s">"un reemplazo (evento estructural o petición explícita) no amplía la base"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"recalibration_id"</span>: <span class="s">"cac23eda-2774-447c-a3db-c921d3e04e5a"</span>,
+    <span class="k">"reason"</span>: <span class="s">"forced_replace_has_no_extension"</span>
+  }
+}</code></pre>
+<p>En la ejecución de la guía, esta primera sesión se canceló y una segunda sesión idéntica completó la cadena
+<code>/fits</code> → <code>/limits</code> → <code>…/versions</code>: produjo la versión 2 del modelo
+(<code>decision</code> = <code>replace</code>, <code>justification</code> = <code>structural_event</code>), que se
+aprobó después. La versión 1 de ese modelo es la propuesta de la tubería, rechazada en
+<a class="ref3" href="#version-rechazar">Rechazar</a>.</p>
+<p>Una sesión paso a paso no caduca sola: si se abandona, se cancela para liberar el modelo.</p>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/recalibrations/{rid}/cancel</div>
+<h4><span class="chip ok">OK</span>  Respuesta 200 (<code>cancelled</code>)</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"cac23eda-2774-447c-a3db-c921d3e04e5a"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"3f8f1077-4a9f-40c3-8ac0-8fdeca52d683"</span>,
+  <span class="k">"mode"</span>: <span class="s">"stepwise"</span>,
+  <span class="k">"status"</span>: <span class="s">"cancelled"</span>,
+  <span class="k">"range_from"</span>: <span class="s">"2026-09-13T00:00:00Z"</span>,
+  <span class="k">"range_to"</span>: <span class="s">"2026-10-15T00:00:00Z"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"seed"</span>: <span class="n">20261021</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>
+  },
+  <span class="k">"force_replace"</span>: <span class="n">true</span>,
+  <span class="k">"base_version_number"</span>: <span class="n">0</span>,
+  <span class="k">"structural_event_id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:22:11.005153Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:22:11.005153Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:22:11.171580Z"</span>,
+  <span class="k">"outcome"</span>: <span class="n">null</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"candidates_dataset_id"</span>: <span class="s">"44b06356-f026-45b5-bc3c-799a4eb23a22"</span>,
+  <span class="k">"n_candidates"</span>: <span class="n">30</span>,
+  <span class="k">"n_already_in_base"</span>: <span class="n">0</span>,
+  <span class="k">"inherited_params"</span>: <span class="c">…</span>,
+  <span class="k">"pipeline_id"</span>: <span class="n">null</span>,
+  <span class="k">"proposal"</span>: <span class="n">null</span>,
+  <span class="k">"kept_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"extension_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"report"</span>: <span class="n">null</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<h4><span class="chip ko">KO</span>  409 al cancelar una sesión que ya no está en curso</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"RECALIBRATION_NOT_IN_PROGRESS"</span>,
+  <span class="k">"message"</span>: <span class="s">"la recalibración 'cac23eda-2774-447c-a3db-c921d3e04e5a' no se puede cancelar"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"recalibration_id"</span>: <span class="s">"cac23eda-2774-447c-a3db-c921d3e04e5a"</span>,
+    <span class="k">"mode"</span>: <span class="s">"stepwise"</span>,
+    <span class="k">"status"</span>: <span class="s">"cancelled"</span>,
+    <span class="k">"proposal_requested"</span>: <span class="n">false</span>
+  }
+}</code></pre>
+
+<h3 id="recal-tuberia">Recalibración en una llamada</h3>
+<p>Con <code>mode: "pipeline"</code> (o sin <code>mode</code>) el servicio encadena todos los pasos y responde
+<code>202</code>; el integrador consulta la recalibración hasta <code>succeeded</code>. Ejemplo real con el evento
+estructural sin resolver (la decisión es <code>replace</code> aunque no se pidió):</p>
+<pre><code>curl -s -X POST "$C/models/$MODEL_ID/recalibrations" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"range_from": "2026-09-13T00:00:00Z", "range_to": "2026-10-15T00:00:00Z",
+       "params": {"seed": 20261020}, "mode": "pipeline"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 202</h4>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"ecbc6fb0-a7b6-4344-8da0-ac1ec6b3c5b9"</span>,
+  <span class="k">"status"</span>: <span class="s">"queued"</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  GET terminado (<code>succeeded</code>)</h4>
+<pre class="largo"><code>{
+  <span class="k">"id"</span>: <span class="s">"ecbc6fb0-a7b6-4344-8da0-ac1ec6b3c5b9"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"3f8f1077-4a9f-40c3-8ac0-8fdeca52d683"</span>,
+  <span class="k">"mode"</span>: <span class="s">"pipeline"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"range_from"</span>: <span class="s">"2026-09-13T00:00:00Z"</span>,
+  <span class="k">"range_to"</span>: <span class="s">"2026-10-15T00:00:00Z"</span>,
+  <span class="k">"params"</span>: {
+    <span class="k">"seed"</span>: <span class="n">20261020</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>
+  },
+  <span class="k">"force_replace"</span>: <span class="n">true</span>,
+  <span class="k">"base_version_number"</span>: <span class="n">0</span>,
+  <span class="k">"structural_event_id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+  <span class="k">"actor"</span>: <span class="s">"ana.analista"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:21:57.426559Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:21:57.426973Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:21:58.905058Z"</span>,
+  <span class="k">"outcome"</span>: <span class="s">"replace"</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">1</span>,
+  <span class="k">"candidates_dataset_id"</span>: <span class="s">"3598c8d4-af19-40b7-901a-9834a5ab57d5"</span>,
+  <span class="k">"n_candidates"</span>: <span class="n">30</span>,
+  <span class="k">"n_already_in_base"</span>: <span class="n">0</span>,
+  <span class="k">"inherited_params"</span>: <span class="c">…</span>,
+  <span class="k">"pipeline_id"</span>: <span class="s">"ff558e5b-c596-49a9-9a60-fdc433b4e02e"</span>,
+  <span class="k">"proposal"</span>: {
+    <span class="k">"fit_id"</span>: <span class="s">"e53d5d44-557a-4152-befc-74409db5a534"</span>,
+    <span class="k">"limits_id"</span>: <span class="s">"4f96745f-930c-4e0f-97ec-151e0509bdfd"</span>,
+    <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+    <span class="k">"requested_at"</span>: <span class="s">"2026-10-20T19:21:58.903324Z"</span>
+  },
+  <span class="k">"kept_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"extension_dataset_id"</span>: <span class="n">null</span>,
+  <span class="k">"report"</span>: {
+    <span class="k">"decision"</span>: <span class="s">"replace"</span>,
+    <span class="k">"n_base"</span>: <span class="n">59</span>,
+    <span class="k">"n_new"</span>: <span class="n">30</span>,
+    <span class="k">"n_excluded_assignable_cause"</span>: <span class="n">0</span>,
+    <span class="k">"n_kept_new"</span>: <span class="n">30</span>,
+    <span class="k">"min_observations"</span>: <span class="n">25</span>,
+    <span class="k">"before"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">34.44350155561304</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">40.07411341809791</span>,
+      <span class="k">"phase1_mc_error"</span>: <span class="n">2.634607934188237</span>,
+      <span class="k">"phase2_mc_error"</span>: <span class="n">3.6801295963802465</span>,
+      <span class="k">"regime"</span>: <span class="s">"phase1_provisional"</span>,
+      <span class="k">"operative_limit"</span>: <span class="n">34.44350155561304</span>,
+      <span class="k">"n_base"</span>: <span class="n">59</span>
+    },
+    <span class="k">"after"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">58.33443557452896</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">110.38826302921456</span>,
+      <span class="k">"phase1_mc_error"</span>: <span class="n">3.055769677860356</span>,
+      <span class="k">"phase2_mc_error"</span>: <span class="n">22.26669668675915</span>,
+      <span class="k">"regime"</span>: <span class="s">"phase2"</span>,
+      <span class="k">"operative_limit"</span>: <span class="n">110.38826302921456</span>,
+      <span class="k">"n_base"</span>: <span class="n">30</span>
+    },
+    <span class="k">"phase2_exceeds_phase1"</span>: <span class="n">true</span>,
+    <span class="k">"row_disposition"</span>: <span class="n">null</span>
+  },
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+<p><code>force_replace</code> aparece en <code>true</code> porque el evento estructural fuerza el reemplazo. Los
+pasos que creó la tubería se consultan en <code>GET $C/pipelines/{pipeline_id}</code>:</p>
+<pre><code>{
+  <span class="k">"id"</span>: <span class="s">"ff558e5b-c596-49a9-9a60-fdc433b4e02e"</span>,
+  <span class="k">"kind"</span>: <span class="s">"recalibration"</span>,
+  <span class="k">"recalibration_id"</span>: <span class="s">"ecbc6fb0-a7b6-4344-8da0-ac1ec6b3c5b9"</span>,
+  <span class="k">"status"</span>: <span class="s">"succeeded"</span>,
+  <span class="k">"dataset_id"</span>: <span class="s">"3598c8d4-af19-40b7-901a-9834a5ab57d5"</span>,
+  <span class="k">"params"</span>: <span class="c">…</span>,
+  <span class="k">"steps"</span>: [
+    {
+      <span class="k">"kind"</span>: <span class="s">"fit"</span>,
+      <span class="k">"id"</span>: <span class="s">"e53d5d44-557a-4152-befc-74409db5a534"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"limits"</span>,
+      <span class="k">"id"</span>: <span class="s">"4f96745f-930c-4e0f-97ec-151e0509bdfd"</span>
+    },
+    {
+      <span class="k">"kind"</span>: <span class="s">"version"</span>,
+      <span class="k">"id"</span>: <span class="s">"ecbc6fb0-a7b6-4344-8da0-ac1ec6b3c5b9"</span>
+    }
+  ],
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:21:57.426559Z"</span>,
+  <span class="k">"started_at"</span>: <span class="s">"2026-10-20T19:21:57.426894Z"</span>,
+  <span class="k">"finished_at"</span>: <span class="s">"2026-10-20T19:21:58.905282Z"</span>,
+  <span class="k">"model_id"</span>: <span class="s">"3f8f1077-4a9f-40c3-8ac0-8fdeca52d683"</span>,
+  <span class="k">"error"</span>: <span class="n">null</span>
+}</code></pre>
+
+<h2 id="flujo-aprobacion">Aprobar o rechazar una versión</h2>
+<h3 id="version-consulta">Consultar las versiones</h3>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/versions</div>
+<div class="endpoint"><span class="metodo get">GET</span>/v1/charts/t2mrcd/models/{id}/versions/{n}</div>
+<p class="paso"><b>Propósito:</b> revisar la propuesta antes de decidir. · <b>Rol:</b> lectura. · <b>Respuesta:</b>
+200.</p>
+<pre><code>MODEL_ID=19439d6d-c490-4a9b-857a-919673f3d5da
+curl -s "$C/models/$MODEL_ID/versions" \
+  -H "Authorization: Bearer $APPROVER"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre class="largo"><code>[
+  {
+    <span class="k">"number"</span>: <span class="n">0</span>,
+    <span class="k">"status"</span>: <span class="s">"active"</span>,
+    <span class="k">"decision"</span>: <span class="s">"initial"</span>,
+    <span class="k">"justification"</span>: <span class="s">"initial_fit"</span>,
+    <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:19:26.720950Z"</span>,
+    <span class="k">"effective_from"</span>: <span class="n">null</span>,
+    <span class="k">"approved_at"</span>: <span class="s">"2026-10-20T19:19:26.720950Z"</span>,
+    <span class="k">"rejected_at"</span>: <span class="n">null</span>,
+    <span class="k">"decided_by"</span>: <span class="n">null</span>,
+    <span class="k">"decision_note"</span>: <span class="n">null</span>,
+    <span class="k">"recalibration_id"</span>: <span class="n">null</span>,
+    <span class="k">"structural_event_id"</span>: <span class="n">null</span>,
+    <span class="k">"previous_number"</span>: <span class="n">null</span>,
+    <span class="k">"base_hash"</span>: <span class="s">"sha256:f480f358cb346ab5bc49a477d1efa85693305d44ac8c6f8b7510991ba01c22b8"</span>,
+    <span class="k">"n_base"</span>: <span class="n">59</span>,
+    <span class="k">"n_exclusions"</span>: <span class="n">1</span>
+  },
+  {
+    <span class="k">"number"</span>: <span class="n">1</span>,
+    <span class="k">"status"</span>: <span class="s">"proposed"</span>,
+    <span class="k">"decision"</span>: <span class="s">"extend"</span>,
+    <span class="k">"justification"</span>: <span class="s">"default_extend"</span>,
+    <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:21:07.024259Z"</span>,
+    <span class="k">"effective_from"</span>: <span class="n">null</span>,
+    <span class="k">"approved_at"</span>: <span class="n">null</span>,
+    <span class="k">"rejected_at"</span>: <span class="n">null</span>,
+    <span class="k">"decided_by"</span>: <span class="n">null</span>,
+    <span class="k">"decision_note"</span>: <span class="n">null</span>,
+    <span class="k">"recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+    <span class="k">"structural_event_id"</span>: <span class="n">null</span>,
+    <span class="k">"previous_number"</span>: <span class="n">0</span>,
+    <span class="k">"base_hash"</span>: <span class="s">"sha256:6b61ae6ed629dd52a52aadabc8a5a971181a7f18de967321bf33b315957f9811"</span>,
+    <span class="k">"n_base"</span>: <span class="n">98</span>,
+    <span class="k">"n_exclusions"</span>: <span class="n">1</span>
+  }
+]</code></pre>
+<p>El detalle (<code>…/versions/1</code>) añade el modelo de la versión y el informe antes/después (como en la
+recalibración); con <code>?include=base_refs</code>, el origen y la fecha de cada fila de la base.</p>
+<pre><code>{
+  <span class="k">"number"</span>: <span class="n">1</span>,
+  <span class="k">"status"</span>: <span class="s">"proposed"</span>,
+  <span class="k">"decision"</span>: <span class="s">"extend"</span>,
+  <span class="k">"justification"</span>: <span class="s">"default_extend"</span>,
+  <span class="c">…</span>,
+  <span class="k">"model"</span>: {
+    <span class="k">"n_features"</span>: <span class="n">4</span>,
+    <span class="k">"n_base"</span>: <span class="n">98</span>,
+    <span class="k">"limit_regime"</span>: <span class="s">"phase2"</span>,
+    <span class="k">"operative_limit"</span>: <span class="n">24.91495850852821</span>,
+    <span class="k">"limits"</span>: {
+      <span class="k">"phase1_limit"</span>: <span class="n">22.698059003374087</span>,
+      <span class="k">"phase2_limit"</span>: <span class="n">24.91495850852821</span>,
+      <span class="c">…</span>
+    },
+    <span class="k">"mrcd"</span>: {
+      <span class="k">"alpha"</span>: <span class="n">0.75</span>,
+      <span class="k">"h"</span>: <span class="n">74</span>,
+      <span class="k">"rho"</span>: <span class="n">1e-06</span>,
+      <span class="k">"n_obs"</span>: <span class="n">98</span>,
+      <span class="c">…</span>
+    },
+    <span class="c">…</span>
+  },
+  <span class="k">"report"</span>: {
+    <span class="k">"decision"</span>: <span class="s">"extend"</span>,
+    <span class="c">…</span>
+  },
+  <span class="k">"exclusions"</span>: <span class="n">null</span>,
+  <span class="k">"base_refs"</span>: <span class="n">null</span>,
+  <span class="k">"base_data"</span>: <span class="n">null</span>
+}</code></pre>
+
+<h3 id="version-aprobar">Aprobar</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/versions/{n}/approve</div>
+<p class="paso"><b>Propósito:</b> poner en vigor la versión propuesta. · <b>Rol:</b> decisión (approver o admin). ·
+<b>Respuesta:</b> 200.</p>
+<table class="corta">
+  <caption>Cuerpo de la petición (opcional)</caption>
+  <thead><tr><th style="width:22%">Campo</th><th>Descripción</th><th style="width:14%">Tipo</th><th style="width:13%">Obligatorio</th></tr></thead>
+  <tr><td><code>effective_from</code></td><td>Desde cuándo rige. Por defecto, el instante de la aprobación. Debe ser posterior a la última observación puntuada y al <code>effective_from</code> vigente.</td><td>String</td><td>No</td></tr>
+  <tr><td><code>note</code></td><td>Nota de la decisión.</td><td>String</td><td>No</td></tr>
+</table>
+<p>Quien decide (<code>decided_by</code>) es el <code>sub</code> del token.</p>
+<pre><code>curl -s -X POST "$C/models/$MODEL_ID/versions/1/approve" \
+  -H "Authorization: Bearer $APPROVER" \
+  -H "Content-Type: application/json" \
+  -d '{"note": "Aprobada en el comité de riesgos del 2026-10-20"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre><code>{
+  <span class="k">"number"</span>: <span class="n">1</span>,
+  <span class="k">"status"</span>: <span class="s">"active"</span>,
+  <span class="k">"decision"</span>: <span class="s">"extend"</span>,
+  <span class="k">"justification"</span>: <span class="s">"default_extend"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:21:07.024259Z"</span>,
+  <span class="k">"effective_from"</span>: <span class="s">"2026-10-20T19:21:16.816231Z"</span>,
+  <span class="k">"approved_at"</span>: <span class="s">"2026-10-20T19:21:16.816231Z"</span>,
+  <span class="k">"rejected_at"</span>: <span class="n">null</span>,
+  <span class="k">"decided_by"</span>: <span class="s">"pedro.aprobador"</span>,
+  <span class="k">"decision_note"</span>: <span class="s">"Aprobada en el comité de riesgos del 2026-10-20"</span>,
+  <span class="k">"recalibration_id"</span>: <span class="s">"c659c437-0c1a-49a9-bf2f-a18bd9325bb6"</span>,
+  <span class="k">"structural_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"previous_number"</span>: <span class="n">0</span>,
+  <span class="k">"base_hash"</span>: <span class="s">"sha256:6b61ae6ed629dd52a52aadabc8a5a971181a7f18de967321bf33b315957f9811"</span>,
+  <span class="k">"n_base"</span>: <span class="n">98</span>,
+  <span class="k">"n_exclusions"</span>: <span class="n">1</span>
+}</code></pre>
+<h4><span class="chip ok">OK</span>  Estado de la carta tras aprobar</h4>
+<pre><code>{
+  <span class="k">"status"</span>: <span class="s">"active"</span>,
+  <span class="k">"active_version"</span>: <span class="n">1</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"unresolved_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"revalidation_due"</span>: <span class="n">false</span>,
+  <span class="k">"revalidation_due_at"</span>: <span class="s">"2027-04-20T19:21:16.816231Z"</span>,
+  <span class="k">"observations_since_active"</span>: <span class="n">0</span>,
+  <span class="k">"notices"</span>: []
+}</code></pre>
+<p>Desde <code>effective_from</code>, las observaciones nuevas se puntúan con la versión 1 y su límite de Fase II:</p>
+<pre><code>[
+  {
+    <span class="k">"id"</span>: <span class="s">"721176d4-d157-44f1-9810-408f38872fd5"</span>,
+    <span class="k">"score_id"</span>: <span class="s">"e39a1e21-0f76-4607-86f3-5020b0e562f1"</span>,
+    <span class="k">"batch_label"</span>: <span class="s">"octubre-2026"</span>,
+    <span class="k">"observed_at"</span>: <span class="s">"2026-10-20T19:22:00Z"</span>,
+    <span class="k">"values"</span>: [<span class="n">1.3512</span>, <span class="n">1.1187</span>, <span class="n">0.0241</span>, <span class="n">0.1795</span>],
+    <span class="k">"t2"</span>: <span class="n">0.20701863935589376</span>,
+    <span class="k">"limit"</span>: <span class="n">24.91495850852821</span>,
+    <span class="k">"limit_kind"</span>: <span class="s">"phase2"</span>,
+    <span class="k">"version_number"</span>: <span class="n">1</span>,
+    <span class="k">"signal"</span>: <span class="n">false</span>,
+    <span class="k">"recorded_at"</span>: <span class="s">"2026-10-20T19:22:38.527129Z"</span>,
+    <span class="k">"annotation"</span>: <span class="n">null</span>
+  }
+]</code></pre>
+<h4><span class="chip ko">KO</span>  403 si el token no tiene rol de decisión</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"FORBIDDEN"</span>,
+  <span class="k">"message"</span>: <span class="s">"los roles del token no permiten esta operación"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"required_roles"</span>: [<span class="s">"admin"</span>, <span class="s">"approver"</span>]
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  409 si <code>effective_from</code> no es posterior a la última observación puntuada</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"EFFECTIVE_FROM_NOT_AFTER_SCORED"</span>,
+  <span class="k">"message"</span>: <span class="s">"'effective_from' debe ser posterior a la última observación puntuada"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"effective_from"</span>: <span class="s">"2026-09-05T00:00:00+00:00"</span>,
+    <span class="k">"last_scored"</span>: <span class="s">"2026-09-09T00:00:00+00:00"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  409 si la versión ya no es una propuesta</h4>
+<pre><code>{
+  <span class="k">"code"</span>: <span class="s">"VERSION_NOT_PROPOSED"</span>,
+  <span class="k">"message"</span>: <span class="s">"la versión 1 no es una propuesta"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"version"</span>: <span class="n">1</span>,
+    <span class="k">"status"</span>: <span class="s">"active"</span>
+  }
+}</code></pre>
+
+<h3 id="version-rechazar">Rechazar</h3>
+<div class="endpoint"><span class="metodo post">POST</span>/v1/charts/t2mrcd/models/{id}/versions/{n}/reject</div>
+<p class="paso"><b>Propósito:</b> descartar la propuesta; la versión vigente sigue rigiendo. · <b>Rol:</b> decisión. ·
+<b>Respuesta:</b> 200. El cuerpo es opcional (<code>note</code>).</p>
+<pre><code>MODEL_ID=3f8f1077-4a9f-40c3-8ac0-8fdeca52d683
+curl -s -X POST "$C/models/$MODEL_ID/versions/1/reject" \
+  -H "Authorization: Bearer $APPROVER" \
+  -H "Content-Type: application/json" \
+  -d '{"note":
+  "Base de 30 observaciones insuficiente para el comité; esperar a noviembre"}'</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre><code>{
+  <span class="k">"number"</span>: <span class="n">1</span>,
+  <span class="k">"status"</span>: <span class="s">"rejected"</span>,
+  <span class="k">"decision"</span>: <span class="s">"replace"</span>,
+  <span class="k">"justification"</span>: <span class="s">"structural_event"</span>,
+  <span class="k">"created_at"</span>: <span class="s">"2026-10-20T19:21:58.904428Z"</span>,
+  <span class="k">"effective_from"</span>: <span class="n">null</span>,
+  <span class="k">"approved_at"</span>: <span class="n">null</span>,
+  <span class="k">"rejected_at"</span>: <span class="s">"2026-10-20T19:22:10.880107Z"</span>,
+  <span class="k">"decided_by"</span>: <span class="s">"pedro.aprobador"</span>,
+  <span class="k">"decision_note"</span>: <span class="s">"Base de 30 observaciones insuficiente para el comité; esperar a noviembre"</span>,
+  <span class="k">"recalibration_id"</span>: <span class="s">"ecbc6fb0-a7b6-4344-8da0-ac1ec6b3c5b9"</span>,
+  <span class="k">"structural_event_id"</span>: <span class="s">"33159a46-a875-4c44-9462-8ace1835c221"</span>,
+  <span class="k">"previous_number"</span>: <span class="n">0</span>,
+  <span class="k">"base_hash"</span>: <span class="s">"sha256:9486121ac6c21566eabd2d88ba65c8c0d8538e2c36436db88d1e9dcb96b4213b"</span>,
+  <span class="k">"n_base"</span>: <span class="n">30</span>,
+  <span class="k">"n_exclusions"</span>: <span class="n">0</span>
+}</code></pre>
+<p>Tras un rechazo se puede abrir otra recalibración. En el ejemplo, el reemplazo forzado paso a paso de
+<a class="ref3" href="#recal-reemplazo">Reemplazo forzado o por evento</a> produjo la versión 2, cuya aprobación
+resolvió el evento estructural:</p>
+<pre><code>{
+  <span class="k">"status"</span>: <span class="s">"active"</span>,
+  <span class="k">"active_version"</span>: <span class="n">2</span>,
+  <span class="k">"proposed_version"</span>: <span class="n">null</span>,
+  <span class="k">"unresolved_event_id"</span>: <span class="n">null</span>,
+  <span class="k">"revalidation_due"</span>: <span class="n">false</span>,
+  <span class="k">"revalidation_due_at"</span>: <span class="s">"2027-04-20T19:22:27.363716Z"</span>,
+  <span class="k">"observations_since_active"</span>: <span class="n">0</span>,
+  <span class="k">"notices"</span>: []
+}</code></pre>
+
+<!-- ============ 6 ============ -->
+<h1 id="referencia">Referencia de la API</h1>
+{{REFERENCIA_API}}
+
+<!-- ============ 7 ============ -->
+<h1 id="health">Vida y disponibilidad</h1>
+<p>Dos rutas públicas (sin token) informan de la salud del proceso. Se usan para la supervisión, no para el negocio.</p>
+<h2 id="health-vida">Vida: <code>/health</code></h2>
+<div class="endpoint"><span class="metodo get">GET</span>/health</div>
+<p>Indica que el proceso responde. <strong>No consulta dependencias</strong>, para que un fallo externo no provoque el
+reinicio de un proceso sano. La imagen Docker lo comprueba cada 30 segundos.</p>
+<pre><code>curl -s -i "$BASE/health"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200</h4>
+<pre><code>HTTP/1.1 200 OK
+content-type: application/json
+
+{
+  <span class="k">"status"</span>: <span class="s">"ok"</span>
+}</code></pre>
+<h2 id="health-disponibilidad">Disponibilidad: <code>/ready</code></h2>
+<div class="endpoint"><span class="metodo get">GET</span>/ready</div>
+<p>Indica si el proceso puede recibir tráfico. Comprueba cada dependencia externa configurada: <code>database</code>
+(<code>SELECT 1</code> con un máximo de 2 s) con Postgres y <code>storage</code> (directorio escribible) con
+almacenamiento local. Sin dependencias externas, <code>checks</code> va vacío. La cola de trabajos no tiene
+comprobación (vive en el proceso). El esquema completo está en
+<a class="ref3" href="#ref-get-ready">Disponibilidad</a>.</p>
+<pre><code>curl -s -i "$BASE/ready"</code></pre>
+<h4><span class="chip ok">OK</span>  Respuesta 200 con almacenamiento local y estado en memoria</h4>
+<pre><code>HTTP/1.1 200 OK
+
+{
+  <span class="k">"status"</span>: <span class="s">"ready"</span>,
+  <span class="k">"checks"</span>: {
+    <span class="k">"storage"</span>: <span class="s">"ok"</span>
+  }
+}</code></pre>
+<p>En el despliegue con Postgres, <code>checks</code> trae también <code>database</code>:</p>
+<h4><span class="chip ok">OK</span>  Respuesta 200 con Postgres y almacenamiento local</h4>
+<pre><code>HTTP/1.1 200 OK
+
+{
+  <span class="k">"status"</span>: <span class="s">"ready"</span>,
+  <span class="k">"checks"</span>: {
+    <span class="k">"database"</span>: <span class="s">"ok"</span>,
+    <span class="k">"storage"</span>: <span class="s">"ok"</span>
+  }
+}</code></pre>
+<h4><span class="chip ko">KO</span>  Respuesta 503 (almacenamiento no escribible)</h4>
+<pre><code>HTTP/1.1 503 Service Unavailable
+
+{
+  <span class="k">"status"</span>: <span class="s">"not_ready"</span>,
+  <span class="k">"checks"</span>: {
+    <span class="k">"storage"</span>: <span class="s">"fail"</span>
+  }
+}</code></pre>
+<p>Si falla la base de datos, el formato es el mismo con <code>"database": "fail"</code>. Ante un <code>503</code>, el
+integrador debe esperar y reintentar con retroceso; los trabajos ya encolados no se pierden por un <code>503</code>,
+pero sí por un reinicio (<code>JOB_INTERRUPTED</code>).</p>
+
+<!-- ============ 8 ============ -->
+<h1 id="buenas-practicas">Buenas prácticas y límites</h1>
+<h2 id="tiempos">Tiempos de cálculo orientativos</h2>
+<table class="corta">
+  <thead><tr><th style="width:42%">Caso</th><th>Tiempo</th></tr></thead>
+  <tr><td>Fase I completa, 200 × 300, B = 100, servidor de 2 vCPU</td><td>≈ 6 min (una calibración bootstrap medida: 5,5 min; memoria pico 245 MB)</td></tr>
+  <tr><td>Un ajuste MRCD 200 × 300 (Mac M2 de 8 núcleos)</td><td>≈ 7,8 s con un hilo; ≈ 1,6 s con 8 hilos</td></tr>
+  <tr><td>Fase I, 60 × 4, B = 100 (ejemplos de esta guía)</td><td>≈ 2 s</td></tr>
+  <tr><td>Puntuación de un lote</td><td>Milisegundos</td></tr>
+  <tr><td>Recalibración completa; caso <em>p</em> &gt; <em>n</em></td><td>Sin medir. EXTEND hace una calibración sobre la base ampliada: se puede estimar como una Fase I de ese tamaño.</td></tr>
+</table>
+<p>El coste crece con B, con <em>n</em> y, sobre todo, con <em>p</em>. Los trabajos largos no bloquean las puntuaciones
+(carriles separados), pero dos calibraciones simultáneas se ejecutan una detrás de otra.</p>
+<h2 id="practicas-sondeo">Sondeo y reintentos</h2>
+<ul>
+  <li>Sondear con el intervalo de la tabla de <a class="ref3" href="#sondeo">Sondeo</a> y un tiempo máximo; aumentar el
+    intervalo si el trabajo tarda (retroceso exponencial hasta 60 s).</li>
+  <li>Decidir por <code>code</code>, nunca por <code>message</code>.</li>
+  <li>No reintentar a ciegas un <code>POST</code> de puntuación tras un corte: comprobar antes con
+    <code>…/observations</code> si las observaciones ya se registraron.</li>
+  <li>Reintentar los errores <code>5xx</code> y los trabajos <code>JOB_INTERRUPTED</code>; no reintentar los
+    <code>4xx</code> sin corregir la petición.</li>
+  <li>Fijar y guardar la semilla (<code>seed</code>): con la misma semilla y los mismos datos el resultado es idéntico.</li>
+  <li>Cancelar las recalibraciones paso a paso abandonadas: mientras sigan abiertas, bloquean otras recalibraciones del
+    modelo.</li>
+</ul>
+<h2 id="practicas-datos">Datos</h2>
+<ul>
+  <li>Enviar siempre <code>variables</code> y <code>observed_at</code>: dan trazabilidad y permiten detectar columnas
+    cambiadas de orden (<code>VARIABLES_MISMATCH</code>).</li>
+  <li>Usar fechas con zona horaria y en orden; una recalibración selecciona las observaciones por
+    <code>observed_at</code>.</li>
+  <li>No enviar valores ausentes ni infinitos: se rechazan. Imputar o descartar antes de subir.</li>
+  <li>Anotar todas las señales investigadas; solo las anotadas con causa asignable salen de la base.</li>
+</ul>
+<h2 id="practicas-tokens">Tokens</h2>
+<ul>
+  <li>No exponer tokens: nunca en la URL, en registros, en el historial del shell ni en repositorios. Guardarlos en una
+    variable de entorno o en un gestor de secretos.</li>
+  <li>Pedir tokens con el menor rol y la menor vida necesarios; renovarlos antes de <code>exp</code>.</li>
+  <li>Pedir tokens distintos para quien opera (<code>analyst</code>) y quien aprueba (<code>approver</code>).</li>
+  <li>Ante la sospecha de un token filtrado, avisar al operador: la única revocación es rotar la llave de firma.</li>
+</ul>
+
+<!-- ============ 9 ============ -->
+<h1 id="notas-version">Notas de versión</h1>
+<p>Cambios relevantes para el integrador, del más reciente al más antiguo.</p>
+<div class="caja aviso"><span class="etiqueta">Pre-lanzamiento</span>
+<p>Durante la fase de pre-lanzamiento hubo <strong>cambios que rompen el contrato dentro de la v1</strong> (OpenAPI
+0.1.0): rutas, campos y códigos que se eliminaron o cambiaron sin cambiar de versión. Se marcan abajo con
+<span class="chip ko">Rompe el contrato</span>. A partir de la primera versión publicada, la API se versionará: un
+cambio incompatible llegará con una versión nueva y se anunciará en estas notas.</p></div>
+
+<h4>2026-10-20 · Autenticación con JWT y roles <span class="chip ko">Rompe el contrato</span></h4>
+<ul>
+  <li>JWT obligatorio (<code>Authorization: Bearer</code>, EdDSA) con los roles <code>analyst</code>,
+    <code>approver</code> y <code>admin</code> y su matriz de permisos. Códigos <code>401 UNAUTHENTICATED</code> (12
+    motivos) y <code>403 FORBIDDEN</code>. Vida máxima del token: 7 días.</li>
+  <li>El tenant sale del token: la cabecera <code>X-Tenant-ID</code> desaparece (si llega, se ignora; sin token,
+    <code>401</code>) y <code>TENANT_REQUIRED</code> sale del catálogo.</li>
+  <li><code>actor</code> sale de los cuerpos de anotaciones, eventos estructurales, aprobación, rechazo y recalibración:
+    enviarlo da <code>422</code>. El actor es el <code>sub</code> del token.</li>
+</ul>
+
+<h4>2026-10-14 · Recalibración que amplía la base por defecto <span class="chip ko">Rompe el contrato</span></h4>
+<ul>
+  <li>La recalibración amplía la base por defecto (EXTEND) y solo la reemplaza con <code>force_replace</code> o con un
+    evento estructural sin resolver. Nuevo paso síncrono <code>…/recalibrations/{rid}/extension</code>, obligatorio en
+    EXTEND antes del ajuste; <code>GET …/recalibrations/{rid}</code> expone <code>kept_dataset_id</code> y
+    <code>extension_dataset_id</code>. Justificaciones <code>initial_fit</code>, <code>default_extend</code>,
+    <code>forced_replace</code> y <code>structural_event</code>.</li>
+  <li>Desaparece <code>/comparisons</code>, junto con los códigos <code>RECALIBRATION_DECISION_PENDING</code>,
+    <code>COMPARISON_NOT_FOUND</code> y <code>COMPARISON_NOT_READY</code>. Los informes de recalibración anteriores no
+    son compatibles.</li>
+</ul>
+
+<h4>2026-10-09 · Persistencia en Postgres, nombres de variables y fechas</h4>
+<ul>
+  <li>El estado se guarda en Postgres y sobrevive a los reinicios; un trabajo interrumpido por un reinicio queda
+    <code>failed</code> con <code>JOB_INTERRUPTED</code>.</li>
+  <li>Nombres de variables y fechas en los datasets (JSON <code>variables</code> y <code>observed_at</code>; CSV con
+    cabecera y <code>?date_column=</code>), heredados por el modelo; <code>variables</code> en las puntuaciones y código
+    <code>422 VARIABLES_MISMATCH</code>.</li>
+  <li><code>/ready</code> con comprobaciones reales de las dependencias y respuesta <code>503</code>.</li>
+</ul>
+
+<h4>2026-10-09 · Exclusión humana en lugar de depuración automática <span class="chip ko">Rompe el contrato</span></h4>
+<ul>
+  <li>Desaparece <code>/depurations</code> y queda <code>/exclusions</code> (exclusión humana). Desaparecen
+    <code>DEPURATION_NOT_FINAL</code> y <code>LIMITS_PARAMS_MISMATCH</code>; <code>DEPURATION_NOT_FOUND</code> pasa a
+    <code>EXCLUSION_NOT_FOUND</code>.</li>
+  <li><code>/limits</code> exige <code>params</code> en la Fase I y <code>max_depuration_rounds</code> da
+    <code>422</code>. <code>POST /models</code> recibe solo <code>{fit_id, limits_id}</code>.</li>
+  <li>Los modelos e informes creados antes de este cambio no son compatibles
+    (<code>unknown_format_version</code>). El servicio se distribuye como imagen Docker.</li>
+</ul>
+
+<h4>2026-10-07 · API por pasos encadenables</h4>
+<ul>
+  <li>Pasos encadenables por id: <code>/v1/datasets</code>, <code>/fits</code>, <code>/limits</code>,
+    <code>/models</code>, <code>/pipelines/phase1</code>, <code>…/scores</code>, <code>…/observations</code>,
+    <code>…/annotations</code>, <code>…/structural-events</code>, <code>…/recalibrations</code> y
+    <code>…/versions</code>.</li>
+  <li>Errores uniformes <code>{code, message, details}</code> con su catálogo, <code>?include=</code> para las partes
+    grandes y subida de datasets en JSON, CSV o multipart.</li>
+</ul>
+
+<h4>2026-10-07 · Ajuste MRCD más rápido</h4>
+<ul>
+  <li>Un ajuste MRCD de 200 × 300 pasa de 30,3 s a 7,8 s con un hilo y a 1,6 s con 8 hilos, sin cambiar ningún
+    resultado.</li>
+</ul>
+
+<h4>2026-10-07 · Ciclo de vida de la carta y dos límites</h4>
+<ul>
+  <li>Dos límites (Fase I y Fase II por OOB) con agregación por pool y error Monte Carlo.</li>
+  <li>Versiones inmutables, observaciones registradas, anotaciones, eventos estructurales, recalibración, aprobación y
+    estado de la carta.</li>
+</ul>
+
+<h4>2026-10-07 · Carta T²MRCD con MRCD</h4>
+<ul>
+  <li>Carta T²MRCD con MRCD (<code>pymrcd</code>, port de <code>rrcov::CovMrcd</code>) y límites por bootstrap.
+    Catálogo inicial de códigos de error.</li>
+</ul>
+
+<h4>2026-10-06 · Servicio base</h4>
+<ul>
+  <li><code>/health</code> y <code>/ready</code>, configuración por variables <code>VORACIOUS_*</code> y registros del
+    servidor en JSON.</li>
+</ul>
+
+</body>
+</html>

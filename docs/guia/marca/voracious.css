@@ -120,7 +120,7 @@ th { background: var(--indigo-100); color: var(--indigo-600); font: 600 8.8pt "P
   border-bottom: 1pt solid var(--indigo-200); }
 td { padding: 2mm 2.5mm; border-bottom: 0.5pt solid var(--borde); vertical-align: top; }
 tr:nth-child(even) td { background: var(--indigo-50); }
-td code { white-space: nowrap; }
+
 tr { page-break-inside: avoid; }
 
 /* ---------- Cajas de aviso ---------- */
@@ -138,7 +138,7 @@ tr { page-break-inside: avoid; }
 /* ---------- Endpoint (método + ruta) ---------- */
 .endpoint { display: flex; align-items: center; gap: 2.5mm; background: var(--superficie); border: 0.6pt solid var(--borde);
   border-radius: 1.5mm; padding: 2mm 3mm; margin: 0 0 4mm; font: 500 9.5pt "IBM Plex Mono"; color: var(--indigo-700); }
-.metodo { font: 600 8pt "Poppins"; border-radius: 1mm; padding: 0.6mm 2.2mm; letter-spacing: 0.3pt; }
+.metodo { font: 600 8pt "Poppins"; border-radius: 1mm; padding: 0.6mm 2.2mm; letter-spacing: 0.3pt; white-space: nowrap; flex-shrink: 0; }
 .metodo.get { color: #085C68; background: #DBEAEC; }
 .metodo.post { color: #FFFFFF; background: #2C2492; }
 .metodo.delete { color: #FFFFFF; background: #B42318; }
@@ -171,3 +171,12 @@ figcaption { font: 400 8.5pt "Lato"; color: var(--texto-tenue); margin-top: 1.5m
 .dos-columnas { display: flex; gap: 6mm; }
 .dos-columnas > div { flex: 1; }
 .indice h2::before { content: none; }
+
+/* Páginas apaisadas para diagramas grandes: <div class="apaisada"><figure>…</figure></div> */
+@page apaisada { size: A4 landscape; margin: 18mm 18mm 18mm 18mm; }
+.apaisada { page: apaisada; }
+.apaisada figure { margin: 0; }
+.apaisada figure img { width: auto; max-width: 100%; max-height: 158mm; display: block; margin: 0 auto; border: none; }
+/* Código largo: se permite partir entre páginas y no se fuerza una sola línea en celdas. */
+pre.largo { page-break-inside: auto; }
+td code { white-space: normal; }

@@ -143,6 +143,9 @@ token presentado y rechazado se añade `error="invalid_token"`.
 - **La autorización por rol ocurre después de leer el cuerpo en las rutas con cuerpo Pydantic**: FastAPI resuelve el
   cuerpo y las dependencias juntos, así que con un JSON mal formado y un rol insuficiente la respuesta es `422`
   antes que `403`. La autenticación (401) sí va antes de leer nada. Se acepta (ver «Deuda»).
+  **Corrección (2026-10-20, verificada por el revisor):** la frase anterior es imprecisa. El rol se comprueba
+  después de decodificar el JSON y antes de validarlo contra el esquema: un JSON sintácticamente inválido responde
+  `422` aunque el rol no baste; un JSON válido que no cumple el esquema responde `403` si el rol no basta.
 - **`uvicorn --no-access-log`** en el `CMD` de la imagen. Por qué: el registro de acceso de uvicorn escribe la ruta
   cruda **con la query** (p. ej. `?access_token=…`, que la API ignora pero el cliente podría mandar) y duplicaría el
   propio. El CI comprueba que una marca puesta en la query no llega a los logs.
@@ -223,7 +226,7 @@ de tenants si el IdP es compartido.
 ## Deuda
 
 - Longitud mínima de llaves RSA al cargar el JWKS (hoy la comprueba PyJWT al verificar): nivel B.
-- Autorización después de leer el cuerpo en rutas con cuerpo Pydantic (422 antes que 403).
+- Autorización después de decodificar el cuerpo en rutas con cuerpo Pydantic: un JSON sintácticamente inválido da 422 antes que 403 (ver la corrección del 2026-10-20 más arriba).
 - `docker run` de los scripts sin endurecer del todo: montar solo `scripts/`, `--user`, `no-new-privileges` y
   `--cap-drop ALL` en keygen y emisión de tokens.
 - Tres versiones de shellcheck; digest de shellcheck y SHA-256 de sops (repetido en `ci.yml`) a actualizar a mano.

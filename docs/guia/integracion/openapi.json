@@ -1,0 +1,6648 @@
+{
+  "components": {
+    "schemas": {
+      "AcceptedJob": {
+        "additionalProperties": false,
+        "description": "Respuesta ``202``: el trabajo quedó encolado.\n\nAttributes:\n    id: Identificador del recurso creado.\n    status: Siempre ``queued`` al aceptarse.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "default": "queued",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "AcceptedJob",
+        "type": "object"
+      },
+      "AnnotationOut": {
+        "additionalProperties": false,
+        "description": "Anotación de una señal.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "observation_id": {
+            "title": "Observation Id",
+            "type": "string"
+          },
+          "assignable_cause": {
+            "title": "Assignable Cause",
+            "type": "boolean"
+          },
+          "cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cause"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "observation_id",
+          "assignable_cause",
+          "cause",
+          "action",
+          "actor",
+          "created_at"
+        ],
+        "title": "AnnotationOut",
+        "type": "object"
+      },
+      "AnnotationRequest": {
+        "additionalProperties": false,
+        "description": "Anotación de una señal.\n\nSin ``actor`` (mejora M1): quién anota es el ``sub`` del token; enviarlo da ``422``.\n\nAttributes:\n    assignable_cause: Causa asignable confirmada.\n    cause: Cuál.\n    action: Acción tomada.",
+        "properties": {
+          "assignable_cause": {
+            "title": "Assignable Cause",
+            "type": "boolean"
+          },
+          "cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cause"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          }
+        },
+        "required": [
+          "assignable_cause"
+        ],
+        "title": "AnnotationRequest",
+        "type": "object"
+      },
+      "ApproveRequest": {
+        "additionalProperties": false,
+        "description": "Aprobación de una propuesta.\n\nSin ``actor`` (mejora M1): ``decided_by`` es el ``sub`` del token.\n\nAttributes:\n    effective_from: Desde cuándo rige (por defecto, ahora).\n    note: Nota.",
+        "properties": {
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "ApproveRequest",
+        "type": "object"
+      },
+      "AssignableCauseIn": {
+        "additionalProperties": false,
+        "description": "Fila excluida por una persona.\n\nAttributes:\n    row: Índice de la fila en el dataset del ajuste (base 0).\n    cause: Cuál fue la causa.",
+        "properties": {
+          "row": {
+            "minimum": 0.0,
+            "title": "Row",
+            "type": "integer"
+          },
+          "cause": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cause"
+          }
+        },
+        "required": [
+          "row"
+        ],
+        "title": "AssignableCauseIn",
+        "type": "object"
+      },
+      "AssignableCauseOut": {
+        "additionalProperties": false,
+        "description": "Fila excluida por una persona (con su anotación al recalibrar).",
+        "properties": {
+          "row": {
+            "title": "Row",
+            "type": "integer"
+          },
+          "cause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cause"
+          },
+          "annotation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Id"
+          }
+        },
+        "required": [
+          "row",
+          "cause",
+          "annotation_id"
+        ],
+        "title": "AssignableCauseOut",
+        "type": "object"
+      },
+      "BaseRowOut": {
+        "additionalProperties": false,
+        "description": "Origen de una fila de la base y su fecha, si se conoce (trazabilidad).",
+        "properties": {
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "required": [
+          "source",
+          "ref"
+        ],
+        "title": "BaseRowOut",
+        "type": "object"
+      },
+      "BootstrapIn": {
+        "additionalProperties": false,
+        "description": "Bootstrap de los límites; lo omitido toma el default de la carta.\n\nAttributes:\n    seed: Semilla raíz (obligatoria).\n    n_replicates: Réplicas B.\n    alpha_limit: Nivel del límite de Fase I.\n    phase2_alpha_limit: Nivel del límite de Fase II.",
+        "properties": {
+          "seed": {
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "n_replicates": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Replicates"
+          },
+          "alpha_limit": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Limit"
+          },
+          "phase2_alpha_limit": {
+            "anyOf": [
+              {
+                "exclusiveMaximum": 1.0,
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase2 Alpha Limit"
+          }
+        },
+        "required": [
+          "seed"
+        ],
+        "title": "BootstrapIn",
+        "type": "object"
+      },
+      "ChartStatusOut": {
+        "additionalProperties": false,
+        "description": "Estado de la carta y sus avisos.",
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "active_version": {
+            "title": "Active Version",
+            "type": "integer"
+          },
+          "proposed_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Version"
+          },
+          "unresolved_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unresolved Event Id"
+          },
+          "revalidation_due": {
+            "title": "Revalidation Due",
+            "type": "boolean"
+          },
+          "revalidation_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revalidation Due At"
+          },
+          "observations_since_active": {
+            "title": "Observations Since Active",
+            "type": "integer"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "active_version",
+          "proposed_version",
+          "unresolved_event_id",
+          "revalidation_due",
+          "revalidation_due_at",
+          "observations_since_active",
+          "notices"
+        ],
+        "title": "ChartStatusOut",
+        "type": "object"
+      },
+      "DatasetCreated": {
+        "additionalProperties": false,
+        "description": "Respuesta ``201`` de una subida.",
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "p": {
+            "title": "P",
+            "type": "integer"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables"
+          },
+          "has_observed_at": {
+            "title": "Has Observed At",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "n",
+          "p",
+          "content_hash",
+          "variables",
+          "has_observed_at"
+        ],
+        "title": "DatasetCreated",
+        "type": "object"
+      },
+      "DatasetResponse": {
+        "additionalProperties": false,
+        "description": "Un dataset con su linaje (``data``, ``rows`` y ``observed_at`` solo con ``include``).",
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "p": {
+            "title": "P",
+            "type": "integer"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          },
+          "origin_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Ref"
+          },
+          "lineage": {
+            "items": {
+              "$ref": "#/components/schemas/LineageEntryOut"
+            },
+            "title": "Lineage",
+            "type": "array"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables"
+          },
+          "has_observed_at": {
+            "title": "Has Observed At",
+            "type": "boolean"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "n",
+          "p",
+          "content_hash",
+          "source",
+          "created_at",
+          "parent_id",
+          "origin_ref",
+          "lineage",
+          "variables",
+          "has_observed_at"
+        ],
+        "title": "DatasetResponse",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "description": "Error con el formato uniforme.\n\nAttributes:\n    code: Código estable del catálogo.\n    message: Mensaje legible.\n    details: Datos adicionales.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "description": "Cuerpo de una respuesta de error HTTP ``{code, message, details}``.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "ExclusionOut": {
+        "additionalProperties": false,
+        "description": "Fila candidata que no entró en la base.",
+        "properties": {
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ref": {
+            "title": "Ref",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "annotation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Id"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "required": [
+          "source",
+          "ref",
+          "reason",
+          "annotation_id"
+        ],
+        "title": "ExclusionOut",
+        "type": "object"
+      },
+      "ExclusionRequest": {
+        "additionalProperties": false,
+        "description": "Exclusión humana: ``{dataset_id, assignable_cause}``.\n\nReferencia el dataset (sin ajuste) y en la Fase I solo se admite sobre el dataset subido. En\nlas candidatas de una recalibración se pide con ``{dataset_id}`` solo (las filas salen de las\nanotaciones con causa asignable confirmada). La forma la valida el caso de uso\n(``details.reason``).\n\nAttributes:\n    dataset_id: Dataset.\n    assignable_cause: Filas del dataset con causa asignable.",
+        "properties": {
+          "dataset_id": {
+            "minLength": 1,
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "assignable_cause": {
+            "items": {
+              "$ref": "#/components/schemas/AssignableCauseIn"
+            },
+            "title": "Assignable Cause",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "ExclusionRequest",
+        "type": "object"
+      },
+      "ExclusionResponse": {
+        "additionalProperties": false,
+        "description": "Estado de una exclusión humana y, si terminó bien, su resultado.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "assignable_cause": {
+            "items": {
+              "$ref": "#/components/schemas/AssignableCauseOut"
+            },
+            "title": "Assignable Cause",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "insufficient": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insufficient"
+          },
+          "output_dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Dataset Id"
+          },
+          "n_kept": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Kept"
+          },
+          "n_excluded_assignable_cause": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Excluded Assignable Cause"
+          },
+          "row_disposition": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Disposition"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "dataset_id",
+          "assignable_cause",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "insufficient",
+          "output_dataset_id",
+          "n_kept",
+          "n_excluded_assignable_cause"
+        ],
+        "title": "ExclusionResponse",
+        "type": "object"
+      },
+      "ExtensionOut": {
+        "additionalProperties": false,
+        "description": "Respuesta ``201`` de la extensión: el dataset ``recalibration_extension``.\n\nAttributes:\n    dataset_id: Dataset de extensión (base vigente + nuevas conservadas, en ese orden); se\n        ajusta con ``/fits`` y se calibra con ``/limits`` (``recalibration_id``).\n    n_base: Filas de la base vigente.\n    n_kept_new: Filas nuevas conservadas.",
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          },
+          "n_kept_new": {
+            "title": "N Kept New",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "n_base",
+          "n_kept_new"
+        ],
+        "title": "ExtensionOut",
+        "type": "object"
+      },
+      "ExtensionRequest": {
+        "additionalProperties": false,
+        "description": "Extensión de la base de una recalibración que la amplía (EXTEND, por defecto).\n\nAttributes:\n    dataset_id: Filas nuevas conservadas: el dataset de candidatas (si ninguna tiene causa\n        asignable) o la salida de su exclusión humana.",
+        "properties": {
+          "dataset_id": {
+            "minLength": 1,
+            "title": "Dataset Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "ExtensionRequest",
+        "type": "object"
+      },
+      "FitRequest": {
+        "additionalProperties": false,
+        "description": "Ajuste MRCD bajo la carta.\n\nAttributes:\n    dataset_id: Dataset a ajustar.\n    mrcd: Parámetros de MRCD (omitidos: los de la carta, ``alpha`` 0.75).",
+        "properties": {
+          "dataset_id": {
+            "minLength": 1,
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "mrcd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MRCDIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "dataset_id"
+        ],
+        "title": "FitRequest",
+        "type": "object"
+      },
+      "FitResponse": {
+        "additionalProperties": false,
+        "description": "Estado de un ajuste y, si terminó bien, su resumen.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MRCDFitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "dataset_id",
+          "params",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "FitResponse",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Respuesta de vida del proceso.\n\nAttributes:\n    status: Siempre ``\"ok\"`` si el proceso responde.",
+        "properties": {
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "LifecyclePolicyIn": {
+        "additionalProperties": false,
+        "description": "Política de revalidación; un campo omitido toma el default, ``null`` lo desactiva.\n\nAttributes:\n    revalidate_every_months: Meses.\n    revalidate_every_observations: Observaciones.",
+        "properties": {
+          "revalidate_every_months": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revalidate Every Months"
+          },
+          "revalidate_every_observations": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revalidate Every Observations"
+          }
+        },
+        "title": "LifecyclePolicyIn",
+        "type": "object"
+      },
+      "LifecyclePolicyOut": {
+        "additionalProperties": false,
+        "description": "Política de revalidación.",
+        "properties": {
+          "revalidate_every_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revalidate Every Months"
+          },
+          "revalidate_every_observations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revalidate Every Observations"
+          }
+        },
+        "required": [
+          "revalidate_every_months",
+          "revalidate_every_observations"
+        ],
+        "title": "LifecyclePolicyOut",
+        "type": "object"
+      },
+      "LimitsOut": {
+        "additionalProperties": false,
+        "description": "Límites bootstrap de un modelo.",
+        "properties": {
+          "phase1_limit": {
+            "title": "Phase1 Limit",
+            "type": "number"
+          },
+          "phase2_limit": {
+            "title": "Phase2 Limit",
+            "type": "number"
+          },
+          "n_replicates": {
+            "title": "N Replicates",
+            "type": "integer"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "n_clean": {
+            "title": "N Clean",
+            "type": "integer"
+          },
+          "alpha_limit": {
+            "title": "Alpha Limit",
+            "type": "number"
+          },
+          "phase2_alpha_limit": {
+            "title": "Phase2 Alpha Limit",
+            "type": "number"
+          },
+          "oob_size_min": {
+            "title": "Oob Size Min",
+            "type": "integer"
+          },
+          "oob_size_mean": {
+            "title": "Oob Size Mean",
+            "type": "number"
+          },
+          "phase1_mc_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase1 Mc Error"
+          },
+          "phase2_mc_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase2 Mc Error"
+          },
+          "estimator_name": {
+            "title": "Estimator Name",
+            "type": "string"
+          },
+          "sampler_name": {
+            "title": "Sampler Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase1_limit",
+          "phase2_limit",
+          "n_replicates",
+          "seed",
+          "n_clean",
+          "alpha_limit",
+          "phase2_alpha_limit",
+          "oob_size_min",
+          "oob_size_mean",
+          "phase1_mc_error",
+          "phase2_mc_error",
+          "estimator_name",
+          "sampler_name"
+        ],
+        "title": "LimitsOut",
+        "type": "object"
+      },
+      "LimitsRequest": {
+        "additionalProperties": false,
+        "description": "Límites bootstrap sobre un ajuste: ``{fit_id, params?}`` o ``{fit_id, recalibration_id}``.\n\nAttributes:\n    fit_id: Ajuste ``succeeded``; sus parámetros de MRCD deben ser los que usará la carta.\n    params: Parámetros de la carta (Fase I; obligatorios sin ``recalibration_id``).\n    recalibration_id: Recalibración del dataset del ajuste: los parámetros se heredan de la\n        versión base (Q8) con la semilla de la recalibración.",
+        "properties": {
+          "fit_id": {
+            "minLength": 1,
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/T2MRCDParamsIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recalibration_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recalibration Id"
+          }
+        },
+        "required": [
+          "fit_id"
+        ],
+        "title": "LimitsRequest",
+        "type": "object"
+      },
+      "LimitsResponse": {
+        "additionalProperties": false,
+        "description": "Estado de una calibración y, si terminó bien, sus límites.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "fit_id": {
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "stage_kind": {
+            "title": "Stage Kind",
+            "type": "string"
+          },
+          "spawn_key": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Spawn Key",
+            "type": "array"
+          },
+          "recalibration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recalibration Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LimitsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "clean_rows": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "boolean"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clean Rows"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "fit_id",
+          "params",
+          "seed",
+          "stage_kind",
+          "spawn_key",
+          "recalibration_id",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "LimitsResponse",
+        "type": "object"
+      },
+      "LimitsSnapshotOut": {
+        "additionalProperties": false,
+        "description": "Límites de una versión (antes o después de recalibrar).",
+        "properties": {
+          "phase1_limit": {
+            "title": "Phase1 Limit",
+            "type": "number"
+          },
+          "phase2_limit": {
+            "title": "Phase2 Limit",
+            "type": "number"
+          },
+          "phase1_mc_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase1 Mc Error"
+          },
+          "phase2_mc_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase2 Mc Error"
+          },
+          "regime": {
+            "title": "Regime",
+            "type": "string"
+          },
+          "operative_limit": {
+            "title": "Operative Limit",
+            "type": "number"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "phase1_limit",
+          "phase2_limit",
+          "phase1_mc_error",
+          "phase2_mc_error",
+          "regime",
+          "operative_limit",
+          "n_base"
+        ],
+        "title": "LimitsSnapshotOut",
+        "type": "object"
+      },
+      "LineageEntryOut": {
+        "additionalProperties": false,
+        "description": "Un dataset de la ascendencia.",
+        "properties": {
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "origin_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Ref"
+          }
+        },
+        "required": [
+          "dataset_id",
+          "source",
+          "n",
+          "origin_ref"
+        ],
+        "title": "LineageEntryOut",
+        "type": "object"
+      },
+      "MRCDFitOut": {
+        "additionalProperties": false,
+        "description": "Resumen del ajuste MRCD; ``center`` y ``cov`` solo con ``include=covariance``.",
+        "properties": {
+          "alpha": {
+            "title": "Alpha",
+            "type": "number"
+          },
+          "h": {
+            "title": "H",
+            "type": "integer"
+          },
+          "rho": {
+            "title": "Rho",
+            "type": "number"
+          },
+          "cnp2": {
+            "title": "Cnp2",
+            "type": "number"
+          },
+          "crit": {
+            "title": "Crit",
+            "type": "number"
+          },
+          "n_obs": {
+            "title": "N Obs",
+            "type": "integer"
+          },
+          "center": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Center"
+          },
+          "cov": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cov"
+          }
+        },
+        "required": [
+          "alpha",
+          "h",
+          "rho",
+          "cnp2",
+          "crit",
+          "n_obs"
+        ],
+        "title": "MRCDFitOut",
+        "type": "object"
+      },
+      "MRCDIn": {
+        "additionalProperties": false,
+        "description": "Parámetros de MRCD; lo omitido toma el default de la carta (``alpha`` 0.75).\n\nAttributes:\n    alpha: Proporción del subconjunto.\n    h: Tamaño del subconjunto.\n    maxcsteps: Máximo de C-steps.\n    rho: Regularización fija.\n    target: Matriz objetivo.\n    maxcond: Número de condición objetivo.",
+        "properties": {
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha"
+          },
+          "h": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "H"
+          },
+          "maxcsteps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxcsteps"
+          },
+          "rho": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "enum": [
+                  "identity",
+                  "equicorrelation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "maxcond": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxcond"
+          }
+        },
+        "title": "MRCDIn",
+        "type": "object"
+      },
+      "ModelFromRefsRequest": {
+        "additionalProperties": false,
+        "description": "Modelo a partir de referencias: ``{fit_id, limits_id}``.\n\nAttributes:\n    fit_id: Ajuste (del dataset subido o de su exclusión humana).\n    limits_id: Límites de ese ajuste.\n    lifecycle_policy: Política de revalidación.",
+        "properties": {
+          "fit_id": {
+            "minLength": 1,
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "limits_id": {
+            "minLength": 1,
+            "title": "Limits Id",
+            "type": "string"
+          },
+          "lifecycle_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecyclePolicyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "fit_id",
+          "limits_id"
+        ],
+        "title": "ModelFromRefsRequest",
+        "type": "object"
+      },
+      "ModelResponse": {
+        "additionalProperties": false,
+        "description": "Estado de un modelo y, si terminó bien, el modelo.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "lifecycle_policy": {
+            "$ref": "#/components/schemas/LifecyclePolicyOut"
+          },
+          "n_rows": {
+            "title": "N Rows",
+            "type": "integer"
+          },
+          "n_features": {
+            "title": "N Features",
+            "type": "integer"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables"
+          },
+          "has_observed_at": {
+            "default": false,
+            "title": "Has Observed At",
+            "type": "boolean"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvenanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/T2MRCDModelOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "training_data": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Training Data"
+          },
+          "observed_at": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed At"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "params",
+          "lifecycle_policy",
+          "n_rows",
+          "n_features"
+        ],
+        "title": "ModelResponse",
+        "type": "object"
+      },
+      "ObservationIn": {
+        "additionalProperties": false,
+        "description": "Una observación de Fase II.\n\nAttributes:\n    observed_at: Fecha con zona horaria.\n    values: Valores de las ``p`` variables.",
+        "properties": {
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "observed_at",
+          "values"
+        ],
+        "title": "ObservationIn",
+        "type": "object"
+      },
+      "ObservationOut": {
+        "additionalProperties": false,
+        "description": "Observación registrada con su anotación vigente.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "score_id": {
+            "title": "Score Id",
+            "type": "string"
+          },
+          "batch_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Label"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "t2": {
+            "title": "T2",
+            "type": "number"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "number"
+          },
+          "limit_kind": {
+            "title": "Limit Kind",
+            "type": "string"
+          },
+          "version_number": {
+            "title": "Version Number",
+            "type": "integer"
+          },
+          "signal": {
+            "title": "Signal",
+            "type": "boolean"
+          },
+          "recorded_at": {
+            "format": "date-time",
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "annotation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnotationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "score_id",
+          "batch_label",
+          "observed_at",
+          "values",
+          "t2",
+          "limit",
+          "limit_kind",
+          "version_number",
+          "signal",
+          "recorded_at"
+        ],
+        "title": "ObservationOut",
+        "type": "object"
+      },
+      "Phase1PipelineRequest": {
+        "additionalProperties": false,
+        "description": "Fase I completa por pasos (orquestación).\n\nAttributes:\n    dataset_id: Dataset raíz.\n    params: Parámetros de la carta.\n    assignable_cause: Filas del dataset raíz con causa asignable.\n    lifecycle_policy: Política del modelo resultante.",
+        "properties": {
+          "dataset_id": {
+            "minLength": 1,
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/T2MRCDParamsIn"
+          },
+          "assignable_cause": {
+            "items": {
+              "$ref": "#/components/schemas/AssignableCauseIn"
+            },
+            "title": "Assignable Cause",
+            "type": "array"
+          },
+          "lifecycle_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LifecyclePolicyIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "dataset_id",
+          "params"
+        ],
+        "title": "Phase1PipelineRequest",
+        "type": "object"
+      },
+      "PipelineResponse": {
+        "additionalProperties": false,
+        "description": "Estado de una tubería, sus pasos y, si terminó bien, el modelo.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "recalibration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recalibration Id"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "recalibration_id",
+          "status",
+          "dataset_id",
+          "params",
+          "steps",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "model_id"
+        ],
+        "title": "PipelineResponse",
+        "type": "object"
+      },
+      "PipelineStepOut": {
+        "additionalProperties": false,
+        "description": "Paso de una tubería.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "PipelineStepOut",
+        "type": "object"
+      },
+      "ProposalOut": {
+        "additionalProperties": false,
+        "description": "Pasos con los que se pidió la versión propuesta.",
+        "properties": {
+          "fit_id": {
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "limits_id": {
+            "title": "Limits Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fit_id",
+          "limits_id",
+          "status",
+          "requested_at"
+        ],
+        "title": "ProposalOut",
+        "type": "object"
+      },
+      "ProvenanceOut": {
+        "additionalProperties": false,
+        "description": "De qué recursos se ensambló el modelo.",
+        "properties": {
+          "root_dataset_id": {
+            "title": "Root Dataset Id",
+            "type": "string"
+          },
+          "fit_id": {
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "limits_id": {
+            "title": "Limits Id",
+            "type": "string"
+          },
+          "exclusion_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusion Id"
+          }
+        },
+        "required": [
+          "root_dataset_id",
+          "fit_id",
+          "limits_id",
+          "exclusion_id"
+        ],
+        "title": "ProvenanceOut",
+        "type": "object"
+      },
+      "ReadyResponse": {
+        "description": "Respuesta de disponibilidad para recibir tráfico.\n\nAttributes:\n    status: ``\"ready\"`` cuando todas las dependencias están disponibles; ``\"not_ready\"``\n        (con ``503``) si alguna falla.\n    checks: Resultado por dependencia externa (``database`` con Postgres, ``storage`` con\n        almacenamiento local); vacío si no hay ninguna.",
+        "properties": {
+          "status": {
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "checks": {
+            "additionalProperties": {
+              "enum": [
+                "ok",
+                "fail"
+              ],
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "object"
+          }
+        },
+        "required": [
+          "status",
+          "checks"
+        ],
+        "title": "ReadyResponse",
+        "type": "object"
+      },
+      "RecalibrationParamsIn": {
+        "additionalProperties": false,
+        "description": "Parámetros de la recalibración; lo omitido toma el default de la carta.\n\nAttributes:\n    seed: Semilla raíz (obligatoria).\n    min_observations: Mínimo de filas nuevas conservadas.",
+        "properties": {
+          "seed": {
+            "minimum": 0.0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "min_observations": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Observations"
+          }
+        },
+        "required": [
+          "seed"
+        ],
+        "title": "RecalibrationParamsIn",
+        "type": "object"
+      },
+      "RecalibrationReportOut": {
+        "additionalProperties": false,
+        "description": "Informe antes/después de una recalibración.",
+        "properties": {
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          },
+          "n_new": {
+            "title": "N New",
+            "type": "integer"
+          },
+          "n_excluded_assignable_cause": {
+            "title": "N Excluded Assignable Cause",
+            "type": "integer"
+          },
+          "n_kept_new": {
+            "title": "N Kept New",
+            "type": "integer"
+          },
+          "min_observations": {
+            "title": "Min Observations",
+            "type": "integer"
+          },
+          "before": {
+            "$ref": "#/components/schemas/LimitsSnapshotOut"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LimitsSnapshotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phase2_exceeds_phase1": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase2 Exceeds Phase1"
+          },
+          "row_disposition": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Disposition"
+          }
+        },
+        "required": [
+          "decision",
+          "n_base",
+          "n_new",
+          "n_excluded_assignable_cause",
+          "n_kept_new",
+          "min_observations",
+          "before",
+          "after",
+          "phase2_exceeds_phase1"
+        ],
+        "title": "RecalibrationReportOut",
+        "type": "object"
+      },
+      "RecalibrationRequest": {
+        "additionalProperties": false,
+        "description": "Recalibración: todo junto (``pipeline``, ``202``) o paso a paso (``stepwise``, ``201``).\n\nSin ``actor`` (mejora M1): quién la pide es el ``sub`` del token.\n\nAttributes:\n    range_from: Inicio del rango (inclusivo).\n    range_to: Fin del rango (inclusivo).\n    params: Parámetros.\n    force_replace: Reemplazar la base por las filas nuevas (petición explícita); sin él se\n        amplía la base, salvo evento estructural sin resolver.\n    mode: ``pipeline`` (por defecto) o ``stepwise``.",
+        "properties": {
+          "range_from": {
+            "format": "date-time",
+            "title": "Range From",
+            "type": "string"
+          },
+          "range_to": {
+            "format": "date-time",
+            "title": "Range To",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/RecalibrationParamsIn"
+          },
+          "force_replace": {
+            "default": false,
+            "title": "Force Replace",
+            "type": "boolean"
+          },
+          "mode": {
+            "default": "pipeline",
+            "enum": [
+              "pipeline",
+              "stepwise"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "range_from",
+          "range_to",
+          "params"
+        ],
+        "title": "RecalibrationRequest",
+        "type": "object"
+      },
+      "RecalibrationResponse": {
+        "additionalProperties": false,
+        "description": "Estado de una recalibración y, si terminó bien, su informe y la versión propuesta.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "pipeline",
+              "stepwise"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "range_from": {
+            "format": "date-time",
+            "title": "Range From",
+            "type": "string"
+          },
+          "range_to": {
+            "format": "date-time",
+            "title": "Range To",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "force_replace": {
+            "title": "Force Replace",
+            "type": "boolean"
+          },
+          "base_version_number": {
+            "title": "Base Version Number",
+            "type": "integer"
+          },
+          "structural_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Event Id"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "proposed_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed Version"
+          },
+          "candidates_dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates Dataset Id"
+          },
+          "n_candidates": {
+            "title": "N Candidates",
+            "type": "integer"
+          },
+          "n_already_in_base": {
+            "title": "N Already In Base",
+            "type": "integer"
+          },
+          "inherited_params": {
+            "additionalProperties": true,
+            "title": "Inherited Params",
+            "type": "object"
+          },
+          "pipeline_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Id"
+          },
+          "proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kept_dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kept Dataset Id"
+          },
+          "extension_dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension Dataset Id"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecalibrationReportOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "mode",
+          "status",
+          "range_from",
+          "range_to",
+          "params",
+          "force_replace",
+          "base_version_number",
+          "structural_event_id",
+          "actor",
+          "created_at",
+          "started_at",
+          "finished_at",
+          "outcome",
+          "proposed_version",
+          "candidates_dataset_id",
+          "n_candidates",
+          "n_already_in_base",
+          "inherited_params",
+          "pipeline_id",
+          "proposal",
+          "kept_dataset_id",
+          "extension_dataset_id"
+        ],
+        "title": "RecalibrationResponse",
+        "type": "object"
+      },
+      "RejectRequest": {
+        "additionalProperties": false,
+        "description": "Rechazo de una propuesta.\n\nSin ``actor`` (mejora M1): ``decided_by`` es el ``sub`` del token.\n\nAttributes:\n    note: Motivo.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "title": "RejectRequest",
+        "type": "object"
+      },
+      "ScoreRequest": {
+        "additionalProperties": false,
+        "description": "Lote de observaciones a puntuar.\n\nAttributes:\n    observations: Observaciones.\n    batch_label: Etiqueta del lote.\n    variables: Nombre de cada columna de ``values``, opcional; si el modelo tiene nombres\n        (los de su dataset raíz) deben ser los mismos y en el mismo orden\n        (``422 VARIABLES_MISMATCH``).",
+        "properties": {
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ObservationIn"
+            },
+            "minItems": 1,
+            "title": "Observations",
+            "type": "array"
+          },
+          "batch_label": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Label"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 200,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables"
+          }
+        },
+        "required": [
+          "observations"
+        ],
+        "title": "ScoreRequest",
+        "type": "object"
+      },
+      "ScoreResponse": {
+        "additionalProperties": false,
+        "description": "Estado de una puntuación (Fase II).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "batch_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Label"
+          },
+          "n_observations": {
+            "title": "N Observations",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScoreSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "model_id",
+          "status",
+          "batch_label",
+          "n_observations",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ScoreResponse",
+        "type": "object"
+      },
+      "ScoreSummaryOut": {
+        "additionalProperties": false,
+        "description": "Observaciones registradas por una puntuación.",
+        "properties": {
+          "observation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Observation Ids",
+            "type": "array"
+          },
+          "version_numbers": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Version Numbers",
+            "type": "array"
+          },
+          "n_signals": {
+            "title": "N Signals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "observation_ids",
+          "version_numbers",
+          "n_signals"
+        ],
+        "title": "ScoreSummaryOut",
+        "type": "object"
+      },
+      "StepwiseRecalibrationOut": {
+        "additionalProperties": false,
+        "description": "Respuesta ``201`` de una recalibración paso a paso: la sesión abierta.\n\nAttributes:\n    recalibration_id: Recalibración (``running`` mientras admita pasos).\n    candidates_dataset_id: Dataset ``recalibration_candidates`` (raíz de sus pasos).\n    status: Siempre ``running``.",
+        "properties": {
+          "recalibration_id": {
+            "title": "Recalibration Id",
+            "type": "string"
+          },
+          "candidates_dataset_id": {
+            "title": "Candidates Dataset Id",
+            "type": "string"
+          },
+          "status": {
+            "const": "running",
+            "default": "running",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recalibration_id",
+          "candidates_dataset_id"
+        ],
+        "title": "StepwiseRecalibrationOut",
+        "type": "object"
+      },
+      "StructuralEventOut": {
+        "additionalProperties": false,
+        "description": "Evento estructural.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "registered_at": {
+            "format": "date-time",
+            "title": "Registered At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "description",
+          "actor",
+          "registered_at"
+        ],
+        "title": "StructuralEventOut",
+        "type": "object"
+      },
+      "StructuralEventRequest": {
+        "additionalProperties": false,
+        "description": "Evento estructural.\n\nSin ``actor`` (mejora M1): quién lo registra es el ``sub`` del token.\n\nAttributes:\n    occurred_at: Cuándo ocurrió.\n    description: Descripción.",
+        "properties": {
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "description": {
+            "minLength": 1,
+            "title": "Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "occurred_at",
+          "description"
+        ],
+        "title": "StructuralEventRequest",
+        "type": "object"
+      },
+      "T2MRCDModelOut": {
+        "additionalProperties": false,
+        "description": "Modelo de Fase I de T²MRCD.",
+        "properties": {
+          "n_features": {
+            "title": "N Features",
+            "type": "integer"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          },
+          "limit_regime": {
+            "title": "Limit Regime",
+            "type": "string"
+          },
+          "operative_limit": {
+            "title": "Operative Limit",
+            "type": "number"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitsOut"
+          },
+          "mrcd": {
+            "$ref": "#/components/schemas/MRCDFitOut"
+          },
+          "pymrcd_version": {
+            "title": "Pymrcd Version",
+            "type": "string"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "statistic_reference": {
+            "title": "Statistic Reference",
+            "type": "string"
+          },
+          "historical_t2": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical T2"
+          },
+          "historical_outlier": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "boolean"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Outlier"
+          }
+        },
+        "required": [
+          "n_features",
+          "n_base",
+          "limit_regime",
+          "operative_limit",
+          "limits",
+          "mrcd",
+          "pymrcd_version",
+          "seed",
+          "statistic_reference"
+        ],
+        "title": "T2MRCDModelOut",
+        "type": "object"
+      },
+      "T2MRCDParamsIn": {
+        "additionalProperties": false,
+        "description": "Parámetros de la carta.\n\nAttributes:\n    bootstrap: Bootstrap de los límites.\n    mrcd: Parámetros de MRCD.",
+        "properties": {
+          "bootstrap": {
+            "$ref": "#/components/schemas/BootstrapIn"
+          },
+          "mrcd": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MRCDIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "bootstrap"
+        ],
+        "title": "T2MRCDParamsIn",
+        "type": "object"
+      },
+      "VersionDetail": {
+        "additionalProperties": false,
+        "description": "Versión con su modelo, su informe y (con ``include``) su base.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "active",
+              "superseded",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "justification": {
+            "title": "Justification",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "recalibration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recalibration Id"
+          },
+          "structural_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Event Id"
+          },
+          "previous_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Number"
+          },
+          "base_hash": {
+            "title": "Base Hash",
+            "type": "string"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          },
+          "n_exclusions": {
+            "title": "N Exclusions",
+            "type": "integer"
+          },
+          "model": {
+            "$ref": "#/components/schemas/T2MRCDModelOut"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecalibrationReportOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "exclusions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExclusionOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclusions"
+          },
+          "base_refs": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BaseRowOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Refs"
+          },
+          "base_data": {
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Data"
+          }
+        },
+        "required": [
+          "number",
+          "status",
+          "decision",
+          "justification",
+          "created_at",
+          "effective_from",
+          "approved_at",
+          "rejected_at",
+          "decided_by",
+          "decision_note",
+          "recalibration_id",
+          "structural_event_id",
+          "previous_number",
+          "base_hash",
+          "n_base",
+          "n_exclusions",
+          "model",
+          "report"
+        ],
+        "title": "VersionDetail",
+        "type": "object"
+      },
+      "VersionProposalRequest": {
+        "additionalProperties": false,
+        "description": "Propuesta de versión de una recalibración.\n\nAttributes:\n    recalibration_id: Recalibración en curso.\n    fit_id: Ajuste final: el del dataset de extensión (EXTEND, por defecto) o el de las filas\n        nuevas conservadas (REPLACE: evento estructural o petición explícita).\n    limits_id: Límites de ese ajuste.",
+        "properties": {
+          "recalibration_id": {
+            "minLength": 1,
+            "title": "Recalibration Id",
+            "type": "string"
+          },
+          "fit_id": {
+            "minLength": 1,
+            "title": "Fit Id",
+            "type": "string"
+          },
+          "limits_id": {
+            "minLength": 1,
+            "title": "Limits Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "recalibration_id",
+          "fit_id",
+          "limits_id"
+        ],
+        "title": "VersionProposalRequest",
+        "type": "object"
+      },
+      "VersionSummary": {
+        "additionalProperties": false,
+        "description": "Versión de un modelo, sin el modelo ni la base.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "proposed",
+              "active",
+              "superseded",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "justification": {
+            "title": "Justification",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "rejected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected At"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "recalibration_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recalibration Id"
+          },
+          "structural_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structural Event Id"
+          },
+          "previous_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Number"
+          },
+          "base_hash": {
+            "title": "Base Hash",
+            "type": "string"
+          },
+          "n_base": {
+            "title": "N Base",
+            "type": "integer"
+          },
+          "n_exclusions": {
+            "title": "N Exclusions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "number",
+          "status",
+          "decision",
+          "justification",
+          "created_at",
+          "effective_from",
+          "approved_at",
+          "rejected_at",
+          "decided_by",
+          "decision_note",
+          "recalibration_id",
+          "structural_event_id",
+          "previous_number",
+          "base_hash",
+          "n_base",
+          "n_exclusions"
+        ],
+        "title": "VersionSummary",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "JWT firmado (EdDSA por defecto) con los claims tenant y roles.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "title": "Voracious",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Indica que el proceso está vivo (sin consultar ninguna dependencia).\n\nReturns:\n    Estado ``ok``.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ],
+        "x-voracious-roles": []
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "Indica si el proceso puede recibir tráfico: comprueba cada dependencia externa.\n\nCon ``VORACIOUS_REPOSITORY=postgres``, ``database`` (``SELECT 1`` con tiempo máximo corto);\ncon ``VORACIOUS_STORAGE=local``, ``storage`` (directorio escribible).\n\nArgs:\n    c: Contenedor.\n\nReturns:\n    ``200`` con ``ready``, o ``503`` con ``not_ready`` y qué comprobación falló.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ],
+        "x-voracious-roles": []
+      }
+    },
+    "/v1/charts/t2mrcd/exclusions": {
+      "post": {
+        "description": "Valida y encola una exclusión humana (sin ajuste; carril ``light``).\n\n``{dataset_id, assignable_cause}`` sobre el dataset subido (Fase I). Sobre las candidatas de\nuna recalibración las filas salen de las anotaciones: se pide con ``{dataset_id}`` solo.\n\nArgs:\n    body: Dataset y filas con causa asignable.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` de la exclusión, ``queued``.",
+        "operationId": "request_exclusion_v1_charts_t2mrcd_exclusions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExclusionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Exclusion",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/exclusions/{exclusion_id}": {
+      "get": {
+        "description": "Estado de la exclusión (M3: destino por fila con ``include=row_disposition``).\n\nArgs:\n    exclusion_id: Exclusión.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    La exclusión.",
+        "operationId": "get_exclusion_v1_charts_t2mrcd_exclusions__exclusion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "exclusion_id",
+            "required": true,
+            "schema": {
+              "title": "Exclusion Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "const": "row_disposition",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExclusionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Exclusion",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/fits": {
+      "post": {
+        "description": "Valida el dataset y encola su ajuste MRCD (carril ``estimation``).\n\nArgs:\n    body: Dataset y parámetros de MRCD.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` del ajuste, ``queued``.",
+        "operationId": "request_fit_v1_charts_t2mrcd_fits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Fit",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/fits/{fit_id}": {
+      "get": {
+        "description": "Estado del ajuste (M3: ``center`` y ``cov`` con ``include=covariance``).\n\nArgs:\n    fit_id: Ajuste.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    El ajuste.",
+        "operationId": "get_fit_v1_charts_t2mrcd_fits__fit_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fit_id",
+            "required": true,
+            "schema": {
+              "title": "Fit Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "const": "covariance",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Fit",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/limits": {
+      "post": {
+        "description": "Valida el ajuste y encola la calibración de límites (carril ``calibration``).\n\nCon ``recalibration_id`` (filas nuevas o base ampliada de una recalibración) los parámetros\nse heredan de la versión base y la operación es ``new_rows`` o ``extension``; sin él,\n``params`` es obligatorio. Las decisiones pendientes responden ``422`` aquí, antes de encolar.\n\nArgs:\n    body: Ajuste y parámetros de la carta (o la recalibración).\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` de los límites, ``queued``.",
+        "operationId": "request_limits_v1_charts_t2mrcd_limits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Limits",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/limits/{limits_id}": {
+      "get": {
+        "description": "Estado de la calibración (M3: ``clean_rows`` con ``include``).\n\nArgs:\n    limits_id: Límites.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    Los límites.",
+        "operationId": "get_limits_v1_charts_t2mrcd_limits__limits_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "limits_id",
+            "required": true,
+            "schema": {
+              "title": "Limits Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "const": "clean_rows",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Limits",
+        "tags": [
+          "t2mrcd-phase1"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models": {
+      "post": {
+        "description": "Encola el ensamblado del modelo a partir de referencias (sin datos ni cómputo nuevo).\n\nArgs:\n    body: ``{fit_id, limits_id}`` y política.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` del modelo, ``queued``.",
+        "operationId": "request_model_v1_charts_t2mrcd_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelFromRefsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Model",
+        "tags": [
+          "t2mrcd-models"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}": {
+      "get": {
+        "description": "Estado del modelo y, si terminó bien, el modelo (M3: matrices con ``include``).\n\nArgs:\n    model_id: Modelo.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    El modelo.",
+        "operationId": "get_model_v1_charts_t2mrcd_models__model_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "training_data",
+                      "observed_at",
+                      "covariance",
+                      "historical"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Model",
+        "tags": [
+          "t2mrcd-models"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/observations": {
+      "get": {
+        "description": "Observaciones registradas en un rango (inclusivo) con su anotación vigente.\n\nArgs:\n    model_id: Modelo.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    observed_from: Inicio (con zona horaria).\n    observed_to: Fin (con zona horaria).\n    signals_only: Solo señales.\n\nReturns:\n    Las observaciones.",
+        "operationId": "list_observations_v1_charts_t2mrcd_models__model_id__observations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "signals_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Signals Only",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ObservationOut"
+                  },
+                  "title": "Response List Observations V1 Charts T2Mrcd Models  Model Id  Observations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Observations",
+        "tags": [
+          "t2mrcd-observations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/observations/{observation_id}/annotations": {
+      "post": {
+        "description": "Añade una anotación a una señal (append-only; vale la más reciente).\n\nArgs:\n    model_id: Modelo.\n    observation_id: Observación con señal.\n    body: Anotación.\n    principal: Quien llama (operación: analyst o admin); da el tenant y el\n        actor (``sub``).\n    c: Contenedor.\n\nReturns:\n    La anotación.",
+        "operationId": "annotate_v1_charts_t2mrcd_models__model_id__observations__observation_id__annotations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "observation_id",
+            "required": true,
+            "schema": {
+              "title": "Observation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Annotate",
+        "tags": [
+          "t2mrcd-observations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/recalibrations": {
+      "post": {
+        "description": "Valida y abre una recalibración: tubería (``202``) o paso a paso (``201``).\n\nArgs:\n    model_id: Modelo.\n    body: Rango, parámetros, reemplazo forzado y modo.\n    principal: Quien llama (operación: analyst o admin); da el tenant y el\n        actor (``sub``).\n    c: Contenedor.\n    response: Respuesta (fija ``201`` en modo ``stepwise``).\n\nReturns:\n    ``202 {id}`` (tubería, ``queued``) o ``201 {recalibration_id, candidates_dataset_id}``.",
+        "operationId": "request_recalibration_v1_charts_t2mrcd_models__model_id__recalibrations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecalibrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepwiseRecalibrationOut"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AcceptedJob"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StepwiseRecalibrationOut"
+                    }
+                  ],
+                  "title": "Response Request Recalibration V1 Charts T2Mrcd Models  Model Id  Recalibrations Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Recalibration",
+        "tags": [
+          "t2mrcd-recalibrations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/recalibrations/{recalibration_id}": {
+      "get": {
+        "description": "Estado de una recalibración y, si terminó bien, su informe y la versión propuesta.\n\nArgs:\n    model_id: Modelo.\n    recalibration_id: Recalibración.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    La recalibración.",
+        "operationId": "get_recalibration_v1_charts_t2mrcd_models__model_id__recalibrations__recalibration_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recalibration_id",
+            "required": true,
+            "schema": {
+              "title": "Recalibration Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "const": "row_disposition",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecalibrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Recalibration",
+        "tags": [
+          "t2mrcd-recalibrations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/recalibrations/{recalibration_id}/cancel": {
+      "post": {
+        "description": "Cancela una sesión paso a paso ``running`` sin propuesta pedida (libera D6).\n\nArgs:\n    model_id: Modelo.\n    recalibration_id: Recalibración.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    La recalibración ``cancelled``.",
+        "operationId": "cancel_recalibration_v1_charts_t2mrcd_models__model_id__recalibrations__recalibration_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recalibration_id",
+            "required": true,
+            "schema": {
+              "title": "Recalibration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecalibrationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Cancel Recalibration",
+        "tags": [
+          "t2mrcd-recalibrations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/recalibrations/{recalibration_id}/extension": {
+      "post": {
+        "description": "Construye (síncrono) el dataset de extensión: base vigente + filas nuevas conservadas.\n\nSolo en una recalibración que amplía la base (por defecto); con reemplazo\n(``force_replace`` o evento estructural) responde ``422 INVALID_INPUT``. Repetirla con el mismo\n``dataset_id`` devuelve la misma extensión.\n\nArgs:\n    model_id: Modelo.\n    recalibration_id: Recalibración en curso.\n    body: Filas nuevas conservadas (candidatas o salida de su exclusión humana).\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El dataset de extensión y sus filas.",
+        "operationId": "request_extension_v1_charts_t2mrcd_models__model_id__recalibrations__recalibration_id__extension_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recalibration_id",
+            "required": true,
+            "schema": {
+              "title": "Recalibration Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtensionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Extension",
+        "tags": [
+          "t2mrcd-recalibrations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/scores": {
+      "post": {
+        "description": "Valida y encola la puntuación de un lote (Fase II).\n\nArgs:\n    model_id: Modelo.\n    body: Observaciones con fecha.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` de la puntuación, ``queued``.",
+        "operationId": "score_v1_charts_t2mrcd_models__model_id__scores_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Score",
+        "tags": [
+          "t2mrcd-scores"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/scores/{score_id}": {
+      "get": {
+        "description": "Estado de una puntuación.\n\nArgs:\n    model_id: Modelo.\n    score_id: Puntuación.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    La puntuación.",
+        "operationId": "get_score_v1_charts_t2mrcd_models__model_id__scores__score_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "score_id",
+            "required": true,
+            "schema": {
+              "title": "Score Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Score",
+        "tags": [
+          "t2mrcd-scores"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/status": {
+      "get": {
+        "description": "Estado de la carta por precedencia y sus avisos.\n\nArgs:\n    model_id: Modelo.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El estado.",
+        "operationId": "get_status_v1_charts_t2mrcd_models__model_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Status",
+        "tags": [
+          "t2mrcd-models"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/structural-events": {
+      "get": {
+        "description": "Eventos estructurales del modelo.\n\nArgs:\n    model_id: Modelo.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    Los eventos.",
+        "operationId": "list_events_v1_charts_t2mrcd_models__model_id__structural_events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StructuralEventOut"
+                  },
+                  "title": "Response List Events V1 Charts T2Mrcd Models  Model Id  Structural Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Events",
+        "tags": [
+          "t2mrcd-observations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Registra un evento estructural («requiere nueva base»).\n\nArgs:\n    model_id: Modelo.\n    body: Evento.\n    principal: Quien llama (operación: analyst o admin); da el tenant y el\n        actor (``sub``).\n    c: Contenedor.\n\nReturns:\n    El evento.",
+        "operationId": "register_event_v1_charts_t2mrcd_models__model_id__structural_events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StructuralEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StructuralEventOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Register Event",
+        "tags": [
+          "t2mrcd-observations"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/versions": {
+      "get": {
+        "description": "Versiones del modelo (resumen, sin modelo ni base).\n\nArgs:\n    model_id: Modelo.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    Las versiones.",
+        "operationId": "list_versions_v1_charts_t2mrcd_models__model_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/VersionSummary"
+                  },
+                  "title": "Response List Versions V1 Charts T2Mrcd Models  Model Id  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List Versions",
+        "tags": [
+          "t2mrcd-versions"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      },
+      "post": {
+        "description": "Valida y encola la propuesta de versión de una recalibración (carril ``light``).\n\nEl trabajo es la recalibración: se consulta con ``GET …/recalibrations/{id}`` (al terminar,\n``proposed_version``).\n\nArgs:\n    model_id: Modelo.\n    body: Recalibración, ajuste y límites.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` de la recalibración, ``queued``.",
+        "operationId": "request_version_v1_charts_t2mrcd_models__model_id__versions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionProposalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Version",
+        "tags": [
+          "t2mrcd-versions"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/versions/{number}": {
+      "get": {
+        "description": "Detalle de una versión (M3: base y matrices con ``include``).\n\nArgs:\n    model_id: Modelo.\n    number: Versión.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    La versión.",
+        "operationId": "get_version_v1_charts_t2mrcd_models__model_id__versions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "base_data",
+                      "base_refs",
+                      "covariance",
+                      "historical"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Version",
+        "tags": [
+          "t2mrcd-versions"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/versions/{number}/approve": {
+      "post": {
+        "description": "Aprueba una propuesta (``effective_from`` no retroactivo).\n\nArgs:\n    model_id: Modelo.\n    number: Versión propuesta.\n    principal: Quien llama (decisión: approver o admin); da el tenant y el\n        actor (``sub``).\n    c: Contenedor.\n    body: Datos de la aprobación (opcional).\n\nReturns:\n    La versión aprobada.",
+        "operationId": "approve_v1_charts_t2mrcd_models__model_id__versions__number__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ApproveRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Approve",
+        "tags": [
+          "t2mrcd-versions"
+        ],
+        "x-voracious-roles": [
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/models/{model_id}/versions/{number}/reject": {
+      "post": {
+        "description": "Rechaza una propuesta.\n\nArgs:\n    model_id: Modelo.\n    number: Versión propuesta.\n    principal: Quien llama (decisión: approver o admin); da el tenant y el\n        actor (``sub``).\n    c: Contenedor.\n    body: Datos del rechazo (opcional).\n\nReturns:\n    La versión rechazada.",
+        "operationId": "reject_v1_charts_t2mrcd_models__model_id__versions__number__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RejectRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reject",
+        "tags": [
+          "t2mrcd-versions"
+        ],
+        "x-voracious-roles": [
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/pipelines/phase1": {
+      "post": {
+        "description": "Encola la Fase I completa por pasos (orquestación de ``/fits`` … ``/models``).\n\nArgs:\n    body: Dataset, parámetros, exclusión humana y política.\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    El ``id`` de la tubería, ``queued``.",
+        "operationId": "request_pipeline_v1_charts_t2mrcd_pipelines_phase1_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Phase1PipelineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptedJob"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Request Pipeline",
+        "tags": [
+          "t2mrcd-pipelines"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/pipelines/phase1/{pipeline_id}": {
+      "get": {
+        "description": "Estado de una tubería (Fase I o recalibración), sus pasos y el modelo resultante.\n\n``/pipelines/{id}`` sirve para ambos tipos (``kind``); ``/pipelines/phase1/{id}`` se\nmantiene como alias.\n\nArgs:\n    pipeline_id: Tubería.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    La tubería.",
+        "operationId": "get_pipeline_v1_charts_t2mrcd_pipelines_phase1__pipeline_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pipeline_id",
+            "required": true,
+            "schema": {
+              "title": "Pipeline Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Pipeline",
+        "tags": [
+          "t2mrcd-pipelines"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/charts/t2mrcd/pipelines/{pipeline_id}": {
+      "get": {
+        "description": "Estado de una tubería (Fase I o recalibración), sus pasos y el modelo resultante.\n\n``/pipelines/{id}`` sirve para ambos tipos (``kind``); ``/pipelines/phase1/{id}`` se\nmantiene como alias.\n\nArgs:\n    pipeline_id: Tubería.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n\nReturns:\n    La tubería.",
+        "operationId": "get_pipeline_v1_charts_t2mrcd_pipelines__pipeline_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pipeline_id",
+            "required": true,
+            "schema": {
+              "title": "Pipeline Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Pipeline",
+        "tags": [
+          "t2mrcd-pipelines"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    },
+    "/v1/datasets": {
+      "post": {
+        "description": "Sube un dataset ``n x p`` (JSON, CSV o multipart) y devuelve su id y su huella.\n\nArgs:\n    request: Petición (el cuerpo se lee según su ``Content-Type``).\n    principal: Quien llama (operación: analyst o admin); da el tenant.\n    c: Contenedor.\n    date_column: Columna de fecha de la cabecera de un CSV (se ignora en JSON).\n\nReturns:\n    ``{dataset_id, n, p, content_hash}``.\n\nRaises:\n    ApiError: ``UNSUPPORTED_MEDIA_TYPE``, ``PAYLOAD_TOO_LARGE`` o ``INVALID_INPUT``.\n    RequestValidationError: Si el JSON no cumple el schema.",
+        "operationId": "upload_dataset_v1_datasets_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date_column",
+            "required": false,
+            "schema": {
+              "default": "observed_at",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Date Column",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "Subida JSON de un dataset.\n\nAttributes:\n    data: Matriz ``n x p`` finita, por filas.\n    variables: Nombre de cada columna (``p``, distintos), opcional.\n    observed_at: Fecha de cada fila con zona horaria (``n``), opcional. Solo trazabilidad.",
+                "properties": {
+                  "data": {
+                    "items": {
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "minItems": 1,
+                    "title": "Data",
+                    "type": "array"
+                  },
+                  "variables": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "maxLength": 200,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Variables"
+                  },
+                  "observed_at": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "minItems": 1,
+                        "type": "array"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Observed At"
+                  }
+                },
+                "required": [
+                  "data"
+                ],
+                "title": "DatasetUploadIn",
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Upload Dataset",
+        "tags": [
+          "datasets"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "admin"
+        ]
+      }
+    },
+    "/v1/datasets/{dataset_id}": {
+      "get": {
+        "description": "Dataset con su linaje (M3: ``data``, ``rows`` y ``observed_at`` con ``include``).\n\nArgs:\n    dataset_id: Dataset.\n    principal: Quien llama (lectura: analyst, approver o admin); da el tenant.\n    c: Contenedor.\n    include: Partes grandes opcionales.\n\nReturns:\n    El dataset.",
+        "operationId": "get_dataset_v1_datasets__dataset_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "data",
+                      "rows",
+                      "observed_at"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Get Dataset",
+        "tags": [
+          "datasets"
+        ],
+        "x-voracious-roles": [
+          "analyst",
+          "approver",
+          "admin"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "description": "Vida y disponibilidad del proceso.",
+      "name": "health"
+    },
+    {
+      "description": "Datasets n x p (JSON, CSV o multipart) con su linaje.",
+      "name": "datasets"
+    },
+    {
+      "description": "Pasos encadenables de la Fase I de T²MRCD: exclusión, ajuste y límites.",
+      "name": "t2mrcd-phase1"
+    },
+    {
+      "description": "Fase I completa por pasos (orquestación de los pasos encadenables).",
+      "name": "t2mrcd-pipelines"
+    },
+    {
+      "description": "Modelos de la carta T²MRCD (Fase I) y estado de la carta.",
+      "name": "t2mrcd-models"
+    },
+    {
+      "description": "Puntuación de observaciones (Fase II), asíncrona.",
+      "name": "t2mrcd-scores"
+    },
+    {
+      "description": "Observaciones registradas, anotaciones de señales y eventos estructurales.",
+      "name": "t2mrcd-observations"
+    },
+    {
+      "description": "Versiones inmutables: consulta, aprobación y rechazo.",
+      "name": "t2mrcd-versions"
+    },
+    {
+      "description": "Recalibración a petición (asíncrona); produce una versión propuesta.",
+      "name": "t2mrcd-recalibrations"
+    }
+  ]
+}

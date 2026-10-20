@@ -8,13 +8,21 @@ Uso (macOS necesita ``brew install pango`` y la ruta de Homebrew)::
 Los colores salen de ``marca/tokens.json``; las muestras de la paleta se generan desde ahí para
 que el documento y los tokens no se desincronicen. La salida va a ``docs/guia/salida/`` (no se
 versiona).
+
+La guía de integración (``integracion``) inserta la referencia y el catálogo de errores generados
+desde el código y arma el índice desde los encabezados. Antes hay que regenerar el OpenAPI con el
+entorno del proyecto: ``uv run python docs/guia/integracion/exportar_openapi.py``.
 """
 
 import argparse
+import importlib
 import json
+import sys
 from datetime import UTC, datetime
 from html import escape
+from html.parser import HTMLParser
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from weasyprint import HTML
@@ -22,9 +30,16 @@ from weasyprint import HTML
 GUIA = Path(__file__).resolve().parent
 MARCA = GUIA / "marca"
 SALIDA = GUIA / "salida"
+INTEGRACION = GUIA / "integracion"
 DOCUMENTOS = {
     "plantilla": (GUIA / "plantilla" / "plantilla-marca.html", "Voracious-Plantilla-de-marca.pdf"),
+    "integracion": (
+        INTEGRACION / "guia-integracion.html",
+        "Voracious-Guia-de-integracion-API.pdf",
+    ),
 }
+REVISION = "1"
+"""Revisión de los documentos generados (se sube al cambiar el contenido publicado)."""
 FAMILIAS = (
     ("primario", "Color primario: índigo", "indigo", "Índigo"),
     ("secundarios", "Colores secundarios: morado y turquesa", "morado", "Morado"),
@@ -116,6 +131,116 @@ def muestras_html(tokens: dict[str, Any]) -> str:
     return "\n".join(partes)
 
 
+class _Encabezados(HTMLParser):
+    """Recoge los h1, h2 y h3 del cuerpo en orden, con su ``id``, texto y estilo en línea."""
+
+    def __init__(self) -> None:
+        """Prepara la lista de encabezados."""
+        super().__init__(convert_charrefs=True)
+        self.encabezados: list[tuple[int, str | None, str, str]] = []
+        self._abierto: tuple[int, str | None, str] | None = None
+        self._texto: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """Abre un encabezado h1-h3.
+
+        Args:
+            tag: Etiqueta.
+            attrs: Atributos.
+        """
+        if tag in {"h1", "h2", "h3"}:
+            atributos = dict(attrs)
+            self._abierto = (int(tag[1]), atributos.get("id"), atributos.get("style") or "")
+            self._texto = []
+
+    def handle_endtag(self, tag: str) -> None:
+        """Cierra el encabezado abierto.
+
+        Args:
+            tag: Etiqueta.
+        """
+        if self._abierto is not None and tag == f"h{self._abierto[0]}":
+            nivel, ancla, estilo = self._abierto
+            texto = " ".join("".join(self._texto).split())
+            self.encabezados.append((nivel, ancla, texto, estilo))
+            self._abierto = None
+
+    def handle_data(self, data: str) -> None:
+        """Acumula el texto del encabezado abierto.
+
+        Args:
+            data: Texto.
+        """
+        if self._abierto is not None:
+            self._texto.append(data)
+
+
+def indice_html(html: str, *, nivel_maximo: int = 2, profundo: frozenset[str] = frozenset()) -> str:
+    """Genera el índice numerado a partir de los encabezados, con la misma numeración que el CSS.
+
+    Los encabezados sin ``id`` cuentan para la numeración pero no salen en el índice; los que tienen
+    ``counter-increment:none`` (el título del propio índice) no cuentan.
+
+    Args:
+        html: Documento completo, con las secciones ya insertadas.
+        nivel_maximo: Nivel más profundo que se lista en general.
+        profundo: ``id`` de los h1 cuyos h3 también se listan (p. ej. la referencia).
+
+    Returns:
+        El HTML de la sección del índice (título y lista).
+    """
+    lector = _Encabezados()
+    lector.feed(html)
+    contador = [0, 0, 0]
+    actual: str | None = None
+    filas: list[str] = []
+    for nivel, ancla, texto, estilo in lector.encabezados:
+        if "counter-increment:none" in estilo.replace(" ", ""):
+            continue
+        contador[nivel - 1] += 1
+        for inferior in range(nivel, 3):
+            contador[inferior] = 0
+        if nivel == 1:
+            actual = ancla
+        limite = 3 if actual in profundo else nivel_maximo
+        if ancla is None or nivel > limite:
+            continue
+        numero = ".".join(str(c) for c in contador[:nivel])
+        filas.append(
+            f'<li class="n{nivel}"><a href="#{escape(ancla)}">{numero}  {escape(texto)}</a></li>'
+        )
+    return '<h2 style="counter-increment:none">Contenido</h2><ol>' + "".join(filas) + "</ol>"
+
+
+def _modulo(nombre: str) -> ModuleType:
+    """Importa un módulo de ``docs/guia/integracion``.
+
+    Args:
+        nombre: Nombre del módulo.
+
+    Returns:
+        El módulo.
+    """
+    if str(INTEGRACION) not in sys.path:
+        sys.path.insert(0, str(INTEGRACION))
+    return importlib.import_module(nombre)
+
+
+def _integracion(html: str) -> str:
+    """Inserta la referencia, el catálogo de errores y el índice de la guía de integración.
+
+    Args:
+        html: Plantilla de la guía.
+
+    Returns:
+        El documento completo.
+    """
+    openapi = json.loads((INTEGRACION / "openapi.json").read_text(encoding="utf-8"))
+    html = html.replace("{{REFERENCIA_API}}", _modulo("referencia").referencia_html(openapi))
+    html = html.replace("{{CATALOGO_ERRORES}}", _modulo("catalogo_errores").catalogo_html())
+    return html.replace("{{INDICE}}", indice_html(html, profundo=frozenset({"referencia"})))
+
+
 def construir(nombre: str) -> Path:
     """Genera un PDF a partir de su plantilla HTML.
 
@@ -130,6 +255,9 @@ def construir(nombre: str) -> Path:
     html = origen.read_text(encoding="utf-8")
     html = html.replace("{{MUESTRAS}}", muestras_html(tokens))
     html = html.replace("{{FECHA}}", datetime.now(UTC).strftime("%d/%m/%Y"))
+    html = html.replace("{{REVISION}}", REVISION)
+    if nombre == "integracion":
+        html = _integracion(html)
     SALIDA.mkdir(exist_ok=True)
     salida = SALIDA / destino
     HTML(string=html, base_url=str(origen)).write_pdf(salida)
