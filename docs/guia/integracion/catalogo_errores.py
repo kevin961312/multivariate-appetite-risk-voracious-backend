@@ -17,6 +17,7 @@ descripción, o una descripción de un código que ya no existe, la generación 
 """
 
 import ast
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from html import escape
@@ -51,8 +52,9 @@ CUANDO: Final[Mapping[str, str]] = {
     "LIMITS_NOT_FOUND": "Los límites indicados no existen o son de otro tenant.",
     "EXCLUSION_NOT_FOUND": "La exclusión indicada no existe o es de otro tenant.",
     "PIPELINE_NOT_FOUND": "La tubería indicada no existe o es de otro tenant.",
-    "ROUTE_NOT_FOUND": "La ruta no existe (con un token válido; sin token se responde antes "
-    "`401`).",
+    "ROUTE_NOT_FOUND": "La ruta no existe. Dentro de `/v1`, con un token válido (sin token se "
+    "responde antes `401`). Fuera de `/v1` y de `/health` (p. ej. `/ready`, `/docs`, `/redoc`, "
+    "`/openapi.json`) la responde el borde público, sin token y con `details: {}`.",
     "METHOD_NOT_ALLOWED": "La ruta existe, pero no admite ese método HTTP.",
     "MODEL_NOT_READY": "El modelo existe pero aún no está `succeeded` (o no tiene versión "
     "vigente): no se puede puntuar, recalibrar, registrar eventos ni consultar su estado.",
@@ -70,7 +72,8 @@ CUANDO: Final[Mapping[str, str]] = {
     "RECALIBRATION_NOT_IN_PROGRESS": "La recalibración ya terminó, se canceló o ya pidió su "
     "propuesta: no admite más pasos ni cancelarse.",
     "PAYLOAD_TOO_LARGE": "El cuerpo de `POST /v1/datasets` supera `VORACIOUS_MAX_UPLOAD_MB` "
-    "(en MiB); `details.max_bytes` da el máximo en bytes.",
+    "(en MiB); `details.max_bytes` da el máximo en bytes. El borde público también lo responde "
+    "en cualquier ruta cuando el cuerpo supera 51 MiB, y entonces `details` va vacío.",
     "UNSUPPORTED_MEDIA_TYPE": "`POST /v1/datasets` con un `Content-Type` distinto de "
     "`application/json`, `text/csv` o `multipart/form-data`.",
     "INVALID_INPUT": "La petición no cumple el esquema (falta un campo, tipo erróneo o campo "
@@ -182,6 +185,55 @@ EXTRA: Final = (
     ),
 )
 """Códigos del formato uniforme fuera de la tabla: enrutado, dominio síncrono y trabajos."""
+
+
+CADDYFILE: Final = Path(__file__).resolve().parents[3] / "deploy" / "proxy" / "Caddyfile"
+"""Configuración del borde público: de ahí salen los códigos que da el borde y no la API."""
+
+_ERROR_BORDE: Final = re.compile(
+    r"import json_error\s+([A-Z][A-Z_]+)\s+\"[^\"]*\"\s+(\d{3}|\{err\.status_code\})"
+)
+_MANEJADOR: Final = re.compile(r"handle_errors\s*([\d ]*)\{")
+
+CUANDO_BORDE: Final[Mapping[str, str]] = {
+    "UPSTREAM_UNAVAILABLE": "La API no está disponible (se reinicia, se despliega o está caída). "
+    "Reintentar con espera progresiva.",
+    "UPSTREAM_TIMEOUT": "La API no respondió a tiempo (más de 2 minutos hasta las cabeceras de la "
+    "respuesta).",
+    "EDGE_ERROR": "Cualquier otro fallo del borde que no tiene un código propio; el estado es el "
+    "del fallo.",
+}
+"""Cuándo ocurre cada código del borde que no es ``ROUTE_NOT_FOUND`` ni ``PAYLOAD_TOO_LARGE``."""
+
+
+def codigos_del_borde() -> list[tuple[str, str]]:
+    """Códigos de los manejadores ``handle_errors`` de ``deploy/proxy/Caddyfile``.
+
+    Returns:
+        Pares (código, estado HTTP como texto) en el orden del fichero. Si el estado es
+        ``{err.status_code}`` se muestra el del manejador (p. ej. ``502/503``) o «el del fallo»
+        cuando el manejador cubre cualquier error.
+
+    Raises:
+        ValueError: Si el Caddyfile no tiene ningún manejador de errores.
+    """
+    pares: list[tuple[str, str]] = []
+    estados: str | None = None  # None: fuera de un manejador de errores
+    for linea in CADDYFILE.read_text(encoding="utf-8").splitlines():
+        manejador = _MANEJADOR.search(linea)
+        if manejador:
+            estados = "/".join(manejador.group(1).split())
+        elif linea.rstrip() == "\t}":
+            estados = None
+        elif estados is not None:
+            encontrado = _ERROR_BORDE.search(linea)
+            if encontrado:
+                codigo, estado = encontrado.groups()
+                pares.append((codigo, estado if estado.isdigit() else estados or "el del fallo"))
+    if not pares:
+        msg = f"no se encuentran manejadores de errores en {CADDYFILE}"
+        raise ValueError(msg)
+    return pares
 
 
 # --- lectura del código fuente --------------------------------------------------------------------
@@ -424,6 +476,57 @@ def catalogo_html() -> str:
         f"<p>{introduccion}</p>"
         '<table style="table-layout:fixed">'
         f'<caption style="{SIN_CORTE_DESPUES}">Catálogo de códigos de error</caption>'
+        f'<tr style="{SIN_CORTE_DESPUES}"><th style="width:34%">Código</th>'
+        '<th style="width:15%">HTTP</th><th>Cuándo ocurre</th></tr>'
+        f"{filas}</table>" + _borde_html()
+    )
+
+
+def filas_borde() -> list[tuple[str, str, str]]:
+    """Filas de los códigos que solo da el borde público (además de los de la tabla principal).
+
+    Returns:
+        Las filas (código, estado, cuándo), sin ``ROUTE_NOT_FOUND`` ni ``PAYLOAD_TOO_LARGE``,
+        que ya están en el catálogo principal.
+
+    Raises:
+        ValueError: Si un código del Caddyfile no tiene descripción o una descripción ya no
+            tiene código en el Caddyfile.
+    """
+    propios = [
+        (c, e) for c, e in codigos_del_borde() if c not in {"ROUTE_NOT_FOUND", "PAYLOAD_TOO_LARGE"}
+    ]
+    codigos = {c for c, _ in propios}
+    if codigos != set(CUANDO_BORDE):
+        msg = (
+            "códigos del borde desactualizados: "
+            f"sin descripción {sorted(codigos - set(CUANDO_BORDE))}, "
+            f"descripciones sin código {sorted(set(CUANDO_BORDE) - codigos)}"
+        )
+        raise ValueError(msg)
+    return [(c, e, CUANDO_BORDE[c]) for c, e in propios]
+
+
+def _borde_html() -> str:
+    """Lista aparte de los códigos del borde: texto introductorio y tabla.
+
+    Returns:
+        El fragmento HTML.
+    """
+    filas = "".join(
+        f'<tr><td><code style="white-space:normal">{escape(c).replace("_", "_<wbr>")}</code></td>'
+        f"<td>{escape(e.replace('/', ' / '))}</td><td>{_texto(cuando)}</td></tr>"
+        for c, e, cuando in filas_borde()
+    )
+    intro = _texto(
+        "Además, el borde público (el proxy HTTPS delante de la API) responde con el mismo "
+        "formato, `details` siempre vacío, y **sin las cabeceras CORS**: un navegador los ve "
+        "como un error de red. No llegan de la API, por lo que no están en la tabla anterior."
+    ).replace("**sin las cabeceras CORS**", "<strong>sin las cabeceras CORS</strong>")
+    return (
+        f'<p style="margin-top:4mm">{intro}</p>'
+        '<table class="corta" style="table-layout:fixed">'
+        f'<caption style="{SIN_CORTE_DESPUES}">Códigos que solo da el borde</caption>'
         f'<tr style="{SIN_CORTE_DESPUES}"><th style="width:34%">Código</th>'
         '<th style="width:15%">HTTP</th><th>Cuándo ocurre</th></tr>'
         f"{filas}</table>"

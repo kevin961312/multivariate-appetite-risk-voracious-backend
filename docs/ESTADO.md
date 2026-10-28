@@ -1,25 +1,25 @@
 # Estado del proyecto
 
-Última actualización: 2026-10-20 (paso E, exposición pública por HTTPS: implementado, sin commit ni despliegue; T16 hecho: la demo corre `74aae38` con SOPS + age + JWT). Antes, 2026-10-20 (seguridad mínima hecha y commiteada). Antes, 2026-10-14 (eliminada la comparación de bases de la recalibración: EXTEND por defecto y paso `/extension`; P6 cerrada con la tesis). Antes, 2026-10-09: Paso 4 hecho (4.0, 4.1 y 4.2 — Docker, CI y Postgres; sin depuración automática).
+Última actualización: 2026-10-20 (paso E, exposición pública por HTTPS: **desplegado y verificado** en `https://api.voracious.cloud`; guía de integración y diagramas actualizados, D6). Antes, 2026-10-20 (T16 hecho: la demo corre `74aae38` con SOPS + age + JWT). Antes, 2026-10-20 (seguridad mínima hecha y commiteada). Antes, 2026-10-14 (eliminada la comparación de bases de la recalibración: EXTEND por defecto y paso `/extension`; P6 cerrada con la tesis). Antes, 2026-10-09: Paso 4 hecho (4.0, 4.1 y 4.2 — Docker, CI y Postgres; sin depuración automática).
 
 **Despliegue de la demo (2026-10-20):** en `~/voracious-demo` del servidor (Compose con Postgres, `migrate`,
 `scripts/demo_seed.py`). Hay un modelo sembrado, `1f573da9-554c-42e2-b961-683048c30e3c`, del tenant `demo`. **T16 está
 hecho**: la demo corre `74aae38` con SOPS + age + JWT; `deploy.sh` terminó en verde y las filas de las 16 tablas
 quedaron idénticas. Volcado previo: `pre-sops-20261020T220755Z.dump` (90 802 bytes). Commits `a34bb70` (artefactos
-cifrados, JWKS y `.sops.yaml`) y `addb026` (guía y diagramas), ya en `origin/main`. La API sigue solo en
-`127.0.0.1:8000`.
+cifrados, JWKS y `.sops.yaml`) y `addb026` (guía y diagramas), ya en `origin/main`. **Desde el paso E la API está
+publicada en `https://api.voracious.cloud`** (Caddy 2.11.7 delante; solo 443); `127.0.0.1:8000` queda para el operador
+por SSH.
 
-**Siguiente hito:** commit del paso E (en una rama `paso-e` con PR, para ver el trabajo `image` de CI en verde antes de
-`main`, que no se puede ejecutar en el Mac por falta de sops y age) y **despliegue público** en `api.voracious.cloud`
-([`despliegue.md`](despliegue.md), «Exposición pública»). Después, la actualización de la guía de integración y del
-diagrama (`docs/guia/`, D6), que va en su propio commit **tras** un despliegue en verde.
+**Siguiente hito:** commit de la actualización de la guía de integración y de los diagramas (D6, `docs/guia/`, con
+`docs/ESTADO.md`, `docs/despliegue.md` y `CLAUDE.md`), tras el «sí» del dueño. Después, el **paso de seguridad** (login
+OIDC, RLS, auditoría; ver abajo) antes de datos reales, y el bloque con sudo del servidor cuando el dueño recupere la
+contraseña de `kevin`.
 
 **Siguientes pasos acordados por el dueño (en este orden):**
 
 1. **Paso de seguridad, antes de vender:** login OIDC/SSO del banco, Row-Level Security en Postgres, auditoría
    completa y tablas `users`/`memberships`; decidir **instalación dedicada por banco vs. SaaS compartido**. La parte de
-   JWT propio, roles y secretos cifrados está hecha (ver «Seguridad mínima») y HTTPS entra con el paso E (implementado,
-   sin desplegar). **Para datos del banco sigue sin ser apto**: la exposición del paso E es solo de pruebas, con datos
+   JWT propio, roles y secretos cifrados está hecha (ver «Seguridad mínima») y HTTPS la aportó el paso E (desplegado). **Para datos del banco sigue sin ser apto**: la exposición del paso E es solo de pruebas, con datos
    sintéticos (decisión del dueño, 2026-10-20). La base de datos nunca se expone.
 2. **Cartas nuevas** (MEWMA, CUSUM…) como cartas propias, cada una con su API, reutilizando lo común (ADR 0004). Las
    cartas con memoria necesitan estado y orden temporal: se diseñará con la primera de ellas.
@@ -44,7 +44,7 @@ cada señal. Sin fecha.
 | 3 | Adaptadores, `container.py`, tenant, errores uniformes y API por pasos independientes encadenables por id ([ADR 0009](adr/0009-api-por-pasos-encadenables.md)); 3.1 infraestructura, 3.2 dominio en piezas, 3.3 Fase I por API, 3.4 Fase II y recalibración por API | **hecho** (14 contratos de import-linter). Validador: APROBADO CON OBSERVACIONES en 3.2 y 3.4, ya aplicadas. Ver «Paso 3» abajo |
 | 4 | Docker, CI y Postgres. 4.0 y 4.1 (Dockerfile, compose, CI, validación en Linux; [ADR 0010](adr/0010-empaquetado-docker-y-ci.md)); 4.2 (Postgres 17, migraciones, recuperación tras reinicio, `/ready`, backup, fechas y nombres de variables, demo; [ADR 0011](adr/0011-persistencia-en-postgres.md)) | **hecho** |
 | S | Seguridad mínima: secretos con SOPS + age y Compose secrets; JWT propio (EdDSA, JWKS en fichero) con roles ([ADR 0012](adr/0012-seguridad-minima-sops-jwt.md), propuesto) | **hecho y commiteado** (`b8c0029`, `27f1c6a`, `a34bb70`; LT-QA: LISTO CON DEUDA). T16 (redespliegue) **hecho** el 2026-10-20 |
-| E | Exposición pública de la API en `https://api.voracious.cloud` detrás de Caddy: CORS abierto, límite de peticiones por IP, cupo de trabajos por tenant (M1), documentación apagable (M2), registro CAA (M3) y vigilancia externa (M4) ([ADR 0013](adr/0013-exposicion-publica-https.md), propuesto) | **implementado, pendiente de commit, de CI en GitHub y del despliegue público.** Sin informe de LT-QA en este documento. Ver «Paso E» |
+| E | Exposición pública de la API en `https://api.voracious.cloud` detrás de Caddy: CORS abierto, límite de peticiones por IP, cupo de trabajos por tenant (M1), documentación apagable (M2), registro CAA (M3) y vigilancia externa (M4) ([ADR 0013](adr/0013-exposicion-publica-https.md), propuesto) | **desplegado y verificado el 2026-10-20** (`check_public.sh` desde el Mac: todo OK); LT-QA: LISTO CON DEUDA. Guía de integración y diagramas actualizados (D6). Ver «Paso E» |
 | 5 | Andamiaje golden **por método**: `generate_golden.R`, fixtures, tests `xfail(strict=True)` | pendiente |
 
 ## Paso 4: Docker, CI y validación en Linux (2026-10-09)
@@ -138,7 +138,7 @@ descifrados en tmpfs con unidad systemd), M6 (recargar el JWKS sin reiniciar; re
 (backup cifrado con age y copiado fuera del servidor; cierra la deuda de 4.2) y M10 (firma cosign del binario de sops).
 **M9 (documentación tras autenticación o desactivable): cerrada** en el paso E como `VORACIOUS_API_DOCS` (M2 del ADR 0013).
 
-## Paso E: exposición pública por HTTPS (2026-10-20) — implementado, sin commit ni despliegue
+## Paso E: exposición pública por HTTPS (2026-10-20) — desplegado y verificado
 
 Por qué: el dueño quiere probar contra un front real (otro repositorio, aún sin pensar), así que la API tiene que
 responder por internet. Decisiones, amenazas y alternativas en el [ADR 0013](adr/0013-exposicion-publica-https.md)
@@ -158,7 +158,7 @@ responder por internet. Decisiones, amenazas y alternativas en el [ADR 0013](adr
 - **El front va en otro repositorio y no está pensado:** este repo no lo construye ni decide dónde se aloja. Estado:
   **otro repositorio, sin decidir.**
 
-**Hecho en el árbol de trabajo (sin commit):** Caddy (`deploy/proxy/`) con TLS Let's Encrypt, solo `443/tcp`, cabeceras
+**Hecho (en `main`):** Caddy (`deploy/proxy/`) con TLS Let's Encrypt, solo `443/tcp`, cabeceras
 de seguridad y solo `/health` y `/v1/*`; redes `backend` (interna) y `edge`; límite de peticiones por IP; CORS y
 `ErrorBoundaryMiddleware`; cupo `429 TOO_MANY_JOBS`; `VORACIOUS_API_DOCS`; el campo `client` en el registro de acceso;
 la puerta de `deploy.sh` (`check_auth_surface.py`: no abre el 443 si alguna ruta responde sin token); `check_public.sh`;
@@ -170,12 +170,19 @@ CI con `deploy.sh` real en modo público; `vigilancia.yml`. Hechos fuera del rep
 aísla su configuración en `RUNNER_TEMP`). Ningún test ni paso de CI debe depender del `.sops.yaml` ni de los cifrados
 reales del repo.
 
-**Pendiente, en este orden:** (1) compuerta local y revisión de LT-QA sobre el árbol de trabajo; (2) commit del paso E
-(y push a una rama con PR, con el «sí» del dueño); (3) **CI en verde en GitHub**, en especial el trabajo `image`, que no
-se puede correr en el Mac; (4) despliegue en el servidor y `check_public.sh` desde el Mac; (5) D6, la guía de
-integración (`docs/guia/`, no tocada) con la URL pública, los límites, `Retry-After`, el catálogo con `RATE_LIMITED`,
-`TOO_MANY_JOBS` y los códigos del borde, y una sección «Front en navegador»; (6) bloque con sudo (diagnósticos y SSH
-solo con llave), cuando el dueño recupere la contraseña de `kevin`.
+**Despliegue y verificación (2026-10-20):** `deploy.sh` terminó con «desplegado; público en https://api.voracious.cloud» y `scripts/check_public.sh` desde el Mac dio **todo OK**: TLS válido y HTTP/2, TLS ≤ 1.1 rechazado, DNS A sin AAAA, certificado de Let's Encrypt que caduca el 2027-01-18 y se renueva solo, cabeceras de seguridad sin `Server`, `401 UNAUTHENTICATED` con `WWW-Authenticate: Bearer`, con token `404 DATASET_NOT_FOUND` y `200` en el modelo de demo, `/ready`, `/docs`, `/redoc` y `/openapi.json` con `404 ROUTE_NOT_FOUND` en el borde, CORS (el preflight se admite, una cabecera no admitida da `400` y el `401` lleva `Allow-Origin` y expone `WWW-Authenticate` y `Retry-After`) y los puertos 80, 8000, 5432 y 2019 cerrados, sin certificado sin SNI. La API registra la IP real del cliente (campo `client`).
+
+**Guía de integración (D6, hecha, pendiente de commit):** `docs/guia/integracion/guia-integracion.html` pasa a la URL
+pública, solo HTTPS y sin túnel (el túnel queda solo para el operador); documenta los límites (600 peticiones por minuto
+por IP con ráfaga de 120, `Retry-After`, `TOO_MANY_JOBS`, 50 MiB), añade el capítulo «Front en navegador» (CORS, «error
+de red», tamaño de subida y custodia del token) y declara que es un entorno de pruebas con datos sintéticos. El
+catálogo de errores añade, como lista aparte leída de `deploy/proxy/Caddyfile`, `UPSTREAM_UNAVAILABLE`,
+`UPSTREAM_TIMEOUT` y `EDGE_ERROR`; el OpenAPI exportado lleva `servers` con la URL pública; el diagrama de despliegue
+muestra Internet → cortafuegos de Hetzner → Caddy → API → Postgres. **No se dice dónde se aloja el front.**
+
+**Pendiente:** (1) el commit de D6, con el «sí» del dueño; (2) bloque con sudo (diagnósticos y SSH solo con llave),
+cuando el dueño recupere la contraseña de `kevin`. El trabajo `image` de CI (despliegue real con `tls internal` y las
+comprobaciones del borde, CORS y límite) pasó en verde en el PR #10 antes de llevarlo a `main` (`7dfb0ac`).
 
 **Deuda del paso E:**
 - **Cupo por tenant blando:** contar y luego insertar no es atómico; k peticiones simultáneas pueden pasarse del cupo.
@@ -187,7 +194,7 @@ solo con llave), cuando el dueño recupere la contraseña de `kevin`.
   el 22 abierto, P5).
 - Limpieza del paso 13 de T16 y `DEPLOYED_COMMIT` (arriba).
 - **Veredicto de LT-QA del paso E: LISTO CON DEUDA.** Además de lo anterior:
-  - el trabajo `image` de CI está sin ejecutar: se verifica en un PR desde la rama `paso-e` antes de desplegar;
+  - el trabajo `image` de CI no se puede correr en el Mac (pagada: verde en el PR #10, 2026-10-20);
   - la rama de la trampa `EXIT` de `deploy.sh` (fallo tras arrancar el proxy) no tiene test automático; CI solo prueba un fallo antes de la puerta;
   - `deploy.sh` no admite `VORACIOUS_API_DOCS=false` (`check_auth_surface.py` sin `--openapi` sale con 2 y el despliegue falla cerrado); se acepta porque la demo usa `true` y se pagará en una instalación dedicada;
   - cualquier `POST` con un token válido, de cualquier rol, acepta JSON de hasta 51 MiB (el cuerpo se lee antes de comprobar el rol); con 64 conexiones podría superar los 2 GiB de `api`. Se acepta (tokens solo del dueño, datos sintéticos); se pagará con un `request_body` por ruta en Caddy (51 MiB solo en `/v1/datasets`);

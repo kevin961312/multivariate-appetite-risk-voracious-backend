@@ -3392,6 +3392,25 @@
               }
             },
             "description": "Successful Response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "summary": "Health",
@@ -3415,6 +3434,25 @@
               }
             },
             "description": "Successful Response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           },
           "503": {
             "content": {
@@ -3508,6 +3546,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3620,6 +3677,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3712,6 +3788,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3824,6 +3919,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3916,6 +4030,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4028,6 +4161,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4120,6 +4272,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4237,6 +4408,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4378,6 +4568,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4490,6 +4699,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4610,6 +4838,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4731,6 +4978,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4833,6 +5099,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4944,6 +5229,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5046,6 +5350,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5147,6 +5470,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5240,6 +5582,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5337,6 +5698,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5438,6 +5818,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5534,6 +5933,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5635,6 +6053,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5761,6 +6198,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5880,6 +6336,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5998,6 +6473,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6089,6 +6583,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6181,6 +6694,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6274,6 +6806,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6462,6 +7013,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6588,6 +7158,25 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Demasiadas peticiones desde la IP del cliente (`RATE_LIMITED`, con `Retry-After`) o demasiados trabajos de cómputo en cola o en curso del tenant (`TOO_MANY_JOBS`).",
+            "headers": {
+              "Retry-After": {
+                "description": "Segundos que hay que esperar (solo en `RATE_LIMITED`).",
+                "schema": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6607,6 +7196,11 @@
       }
     }
   },
+  "servers": [
+    {
+      "url": "https://api.voracious.cloud"
+    }
+  ],
   "tags": [
     {
       "description": "Vida y disponibilidad del proceso.",

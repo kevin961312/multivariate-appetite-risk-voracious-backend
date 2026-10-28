@@ -49,6 +49,8 @@ ORDEN_ROLES = tuple(Role)
 ISSUER = "voracious-openapi-export"
 AUDIENCE = "voracious-openapi-export"
 KID = "openapi-export"
+SERVIDOR_PUBLICO = "https://api.voracious.cloud"
+"""URL pública de la demo: la app no la conoce (la pone el proxy), así que se añade al exportar."""
 METODOS_HTTP = frozenset({"get", "post", "put", "patch", "delete"})
 
 Matriz = dict[tuple[str, str], frozenset[Role]]
@@ -240,6 +242,7 @@ def construir_openapi() -> dict[str, Any]:
                 msg = f"operación sin ruta en la app: {metodo.upper()} {plantilla}"
                 raise RuntimeError(msg)
             operacion[EXTENSION_ROLES] = [r.value for r in ORDEN_ROLES if r in matriz[clave]]
+    esquema["servers"] = [{"url": SERVIDOR_PUBLICO}]
     ordenado: dict[str, Any] = _ordenar(esquema)
     return ordenado
 

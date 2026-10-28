@@ -6,11 +6,11 @@ Guía de operación del servidor de demo (`kevin@128.140.75.161`, Ubuntu, 2 vCPU
 (imagen, CI), el [ADR 0011](adr/0011-persistencia-en-postgres.md) (Postgres, backup) y el
 [ADR 0013](adr/0013-exposicion-publica-https.md) (exposición pública por HTTPS).
 
-> **Estado (2026-10-20).** **T16 está hecho:** la demo corre `74aae38` con SOPS + age + JWT (`deploy.sh` terminó en
+> **Estado (2026-10-20).** **T16 está hecho:** la demo corre con SOPS + age + JWT (`deploy.sh` terminó en
 > verde y las filas de las 16 tablas quedaron idénticas); los artefactos cifrados, el JWKS y `.sops.yaml` están en
 > `origin/main` (`a34bb70`, y la guía en `addb026`). La **exposición pública** (sección «Exposición pública») está
-> **implementada en el árbol de trabajo, sin commit, sin CI en GitHub y sin desplegar**: hasta entonces la API
-> sigue solo en `127.0.0.1:8000` y el 443 está cerrado.
+> **desplegada y verificada**: la API responde en `https://api.voracious.cloud` y `127.0.0.1:8000` queda para el
+> operador por SSH.
 
 ## Principios
 
@@ -252,13 +252,14 @@ operador emite el token y se lo entrega por un canal seguro. Por qué: quien lle
 llave age y a la llave de firma JWT, y con ellas puede emitir tokens de cualquier tenant y rol. El túnel SSH es solo
 para el operador.
 
-## Exposición pública (paso E: implementada, sin desplegar)
+## Exposición pública (paso E: desplegada y verificada el 2026-10-20)
 
 Publica la API en `https://api.voracious.cloud` con Caddy delante (servicio `proxy`, perfil `public` de Compose, solo
 443/TCP). Decisiones, amenazas y alternativas en el [ADR 0013](adr/0013-exposicion-publica-https.md). **Solo datos
 sintéticos o de prueba** (decisión del dueño): sin OIDC, Row-Level Security, auditoría completa ni copia fuera del
-servidor. **Estado:** el código está en el árbol de trabajo, sin commit; el trabajo `image` de CI no se ha ejecutado
-en GitHub; el despliegue público no se ha hecho. Lo de abajo es el procedimiento.
+servidor. **Estado:** desplegada el 2026-10-20 (ver «Resultado del despliegue» más abajo). Lo de abajo es el procedimiento,
+que sirve para repetirla o para otra instalación. El trabajo `image` de CI (el mismo `deploy.sh` con `tls internal`)
+pasó en verde en el PR #10 antes de llevar el cambio a `main`.
 
 ### Requisitos
 
@@ -350,6 +351,13 @@ con al menos 14 días de caducidad, TLS ≤ 1.1 rechazado, HTTP/2, `/health` 200
 sirva certificado. Sin `VORACIOUS_API_TOKEN` omite la comprobación con token y lo dice. El token no se pasa nunca como
 argumento. Después, con el token, `GET /v1/charts/t2mrcd/models/1f573da9-554c-42e2-b961-683048c30e3c` debe dar 200, y
 en el servidor `docker compose logs --since 5m api | grep http_request` debe mostrar como `client` la IP pública del Mac.
+
+### Resultado del despliegue (2026-10-20)
+
+`deploy.sh` terminó con «desplegado; público en https://api.voracious.cloud» y `scripts/check_public.sh` desde el Mac dio **todo OK**: TLS válido y HTTP/2, TLS ≤ 1.1 rechazado, DNS A sin AAAA, certificado de Let's Encrypt que caduca el 2027-01-18 y se renueva solo, cabeceras de seguridad sin `Server`, `401 UNAUTHENTICATED` con `WWW-Authenticate: Bearer`, con token `404 DATASET_NOT_FOUND` y `200` en el modelo de demo, `/ready`, `/docs`, `/redoc` y `/openapi.json` con `404 ROUTE_NOT_FOUND` en el borde, CORS (el preflight se admite, una cabecera no admitida da `400` y el `401` lleva `Allow-Origin` y expone `WWW-Authenticate` y `Retry-After`) y los puertos 80, 8000, 5432 y 2019 cerrados, sin certificado sin SNI. La API registra la IP real del cliente (campo `client`).
+
+Este resultado es el estado real, no un objetivo: el procedimiento de arriba se ejecutó así y las comprobaciones se
+hicieron desde fuera de la red del servidor. La guía de integración (`docs/guia/`) describe ya la URL pública.
 
 ### Vuelta atrás
 

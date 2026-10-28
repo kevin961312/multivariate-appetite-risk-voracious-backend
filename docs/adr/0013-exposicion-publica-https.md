@@ -329,7 +329,8 @@ El front es de otro repositorio; estas pautas valen para el que sea.
   en la app ni deja rastro en el registro normal (respuesta trivial). Lo acota el cortafuegos y, en último caso, cerrar
   el 443.
 - **Exención de loopback del limitador:** depende del invariante de Caddy sin `trusted_proxies` (ver decisión 6).
-- **El trabajo `image` de CI está sin ejecutar:** se verifica en un PR desde la rama `paso-e` antes de desplegar.
+- **El trabajo `image` de CI no se puede ejecutar en el Mac:** se verificó en el PR #10 desde la rama `paso-e`, en
+  verde, antes de desplegar (pagada el 2026-10-20).
 - **La rama de la trampa `EXIT` de `deploy.sh`** (fallo después de arrancar el proxy) **no tiene test automático**; CI
   solo prueba un fallo antes de la puerta.
 - **`deploy.sh` no admite `VORACIOUS_API_DOCS=false`:** `check_auth_surface.py` no recibe `--openapi`, sale con 2 y el

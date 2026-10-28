@@ -58,8 +58,8 @@ Flujo de dependencias: `api | workers | cli` → `container` → `infrastructure
 
 Detalle y alternativas en el [ADR 0010](adr/0010-empaquetado-docker-y-ci.md) (imagen, CI), el
 [ADR 0011](adr/0011-persistencia-en-postgres.md) (Postgres, migraciones, backup, recuperación) y el
-[ADR 0013](adr/0013-exposicion-publica-https.md) (exposición pública por HTTPS). **El paso E está implementado pero
-sin desplegar**: hasta entonces la API solo escucha en `127.0.0.1:8000`.
+[ADR 0013](adr/0013-exposicion-publica-https.md) (exposición pública por HTTPS). **El paso E está desplegado y verificado
+(2026-10-20)**: la API es pública en `https://api.voracious.cloud` por Caddy; `127.0.0.1:8000` es del operador.
 
 - **Compose** (`docker-compose.yml`): cinco servicios, el quinto (`proxy`) solo con el perfil `public` (abajo). `postgres` (17, por digest, **sin `ports`**, volumen
   `pgdata`, healthcheck `pg_isready`); `migrate` (ejecuta `python -m voracious.cli migrate` y termina); `api` (un
@@ -363,7 +363,7 @@ del [ADR 0005](adr/0005-api-fase-i-fase-ii.md). `<c>` = `/v1/charts/t2mrcd`:
   `GET` responde `200`; los errores **síncronos** usan el formato `{code, message, details}` y los estados de
   `CODE_TO_STATUS` (`api/errors.py`).
 - Toda ruta de negocio exige `Authorization: Bearer <JWT>` (`401 UNAUTHENTICATED` con `details.reason`; solo `/health`, `/ready` y la documentación son públicas en la app; **en el borde público solo `/health`**) y un rol de la matriz (`403 FORBIDDEN` con `details.required_roles`): lectura = analyst, approver, admin; operación = analyst, admin; decisión (`approve`, `reject`) = approver, admin. El tenant sale del token y un tenant nunca ve recursos de otro; la cabecera de tenant anterior se ignora y `actor` ya no va en los cuerpos (es el `sub`). Ver la enmienda del [ADR 0005](adr/0005-api-fase-i-fase-ii.md).
-- **URL pública (objetivo, paso E sin desplegar):** `https://api.voracious.cloud`, solo HTTPS, solo datos de prueba.
+- **URL pública (paso E, desplegada el 2026-10-20):** `https://api.voracious.cloud`, solo HTTPS, solo datos de prueba.
   Códigos de la app nuevos: `429 RATE_LIMITED` (por IP, con `Retry-After`) y `429 TOO_MANY_JOBS` (cupo por tenant, sin
   `Retry-After`). Códigos del borde, generados por Caddy y sin CORS: `ROUTE_NOT_FOUND` 404, `PAYLOAD_TOO_LARGE` 413,
   `UPSTREAM_UNAVAILABLE` 502/503, `UPSTREAM_TIMEOUT` 504 y `EDGE_ERROR` (otros). Enmienda 2026-10-20 del

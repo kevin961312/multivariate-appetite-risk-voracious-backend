@@ -40,6 +40,7 @@
       Revisión: {{REVISION}}<br>
       Fecha: {{FECHA}}<br>
       Versión de la API: v1 (OpenAPI 0.1.0)<br>
+      URL base: https://api.voracious.cloud (entorno de pruebas)<br>
       Destinatarios: equipos que integran sistemas con Voracious
     </div>
   </div>
@@ -138,12 +139,15 @@ está medido.</p></div>
 <h2 id="arquitectura-despliegue">Despliegue</h2>
 <p>El servicio corre en un único servidor con Docker Compose: <code>api</code> (FastAPI sobre uvicorn, un solo
 proceso), <code>postgres</code> 17 (sin puertos publicados), <code>migrate</code> (aplica las migraciones y termina) y
-<code>backup</code> (volcado diario, siete días). La API solo escucha en <code>127.0.0.1:8000</code>; el integrador
-llega a ella por un túnel SSH. Los secretos viven cifrados (SOPS y age) y se montan como Compose secrets. La cola de
+<code>backup</code> (volcado diario, siete días), más <code>caddy</code>, el proxy HTTPS que es la única puerta pública.
+El tráfico entra por el cortafuegos de Hetzner (solo 443 y el SSH del operador), pasa por Caddy (red <em>edge</em>),
+llega a la API (redes <em>edge</em> y <em>backend</em>) y de ahí a Postgres (red <em>backend</em>, interna y sin
+puertos publicados). El operador llega además a la API por SSH en <code>127.0.0.1:8000</code>. Los secretos viven
+cifrados (SOPS y age) y se montan como Compose secrets. La cola de
 trabajos vive dentro del proceso de la API: <strong>un reinicio interrumpe los trabajos en curso</strong>, que quedan
 <code>failed</code> con el código <code>JOB_INTERRUPTED</code> y deben volver a pedirse.</p>
 
-<div class="apaisada"><figure><img src="../diagramas/arquitectura-despliegue.svg" alt="Arquitectura de despliegue de Voracious"><figcaption>Figura 1. Despliegue en un servidor con Docker Compose: la API escucha solo en 127.0.0.1:8000 y se alcanza por túnel SSH; Postgres no publica ningún puerto.</figcaption></figure>
+<div class="apaisada"><figure><img src="../diagramas/arquitectura-despliegue.svg" alt="Arquitectura de despliegue de Voracious"><figcaption>Figura 1. Despliegue en un servidor con Docker Compose: Internet entra por el cortafuegos de Hetzner (443) a Caddy, que reenvía a la API; Postgres está en una red interna y no publica puertos. El operador entra por SSH a 127.0.0.1:8000.</figcaption></figure>
 </div>
 
 <h2 id="arquitectura-capas">Capas</h2>
@@ -160,28 +164,38 @@ de modo que un bootstrap de minutos no retrasa una puntuación de milisegundos.<
 <!-- ============ 3 ============ -->
 <h1 id="autenticacion">Acceso y autenticación</h1>
 <h2 id="acceso-red">Acceso de red</h2>
-<p>La API <strong>no está expuesta a internet</strong>: escucha en <code>127.0.0.1:8000</code> del servidor, sin
-HTTPS propio. El integrador abre un túnel SSH (cifrado) con la cuenta que le entrega el operador de Voracious y usa la
-API como si fuera local:</p>
-<pre><code><span class="c"># Terminal 1: túnel hacia la API del servidor (se mantiene abierto)</span>
-ssh -N -L 8000:127.0.0.1:8000 &lt;usuario&gt;@&lt;servidor&gt;
+<p>La API está publicada en <strong><code>https://api.voracious.cloud</code></strong>. Las rutas de negocio cuelgan
+de <code>https://api.voracious.cloud/v1</code> y la comprobación de vida está en
+<code>https://api.voracious.cloud/health</code>. Los ejemplos de esta guía usan estas variables:</p>
+<pre><code>export BASE=https://api.voracious.cloud
+export C=$BASE/v1/charts/t2mrcd
 
-<span class="c"># Terminal 2: variables que usan todos los ejemplos de esta guía</span>
-export BASE=http://127.0.0.1:8000
-export C=$BASE/v1/charts/t2mrcd</code></pre>
-<p>Se recomienda que el operador entregue una <strong>cuenta solo de túnel</strong>: sin consola, sin copia de
-ficheros y con el reenvío limitado al puerto de la API. Para ello antepone estas opciones a la llave pública del
-integrador en el <code>authorized_keys</code> de esa cuenta y le asigna como shell de inicio
-<code>/usr/sbin/nologin</code>, que no permite entrar:</p>
-<pre><code>restrict,port-forwarding,permitopen="127.0.0.1:8000" ssh-ed25519 AAAA… integrador</code></pre>
-<p>Con esa cuenta funciona el túnel de arriba (<code>ssh -N</code>) y se rechaza cualquier otro uso de SSH: una
-consola, un comando remoto o un reenvío hacia otro destino.</p>
+<span class="c"># Comprobación rápida: debe responder 200 con {"status": "ok"}</span>
+curl -s -i "$BASE/health"</code></pre>
+<ul>
+  <li><strong>Solo HTTPS.</strong> El puerto 80 está cerrado: una petición con <code>http://</code> no recibe respuesta
+    y la conexión falla (no hay redirección, a propósito: así un token nunca viaja en claro). El servidor acepta
+    TLS 1.2 o superior con HTTP/2.</li>
+  <li><strong>Sin túnel ni VPN.</strong> El integrador no necesita cuenta SSH ni acceso al servidor: llega a la API
+    directamente desde internet con su token.</li>
+  <li><strong>Fuera de <code>/v1</code> y <code>/health</code> no hay nada público.</strong> <code>/ready</code>,
+    <code>/docs</code>, <code>/redoc</code> y <code>/openapi.json</code> responden <code>404 ROUTE_NOT_FOUND</code>
+    en el borde, incluso con token. La especificación OpenAPI se entrega aparte, con esta guía.</li>
+  <li><strong>La IP del cliente</strong> es la que se usa para el límite de peticiones (ver
+    <a class="ref2" href="#limites-api">Límites</a>).</li>
+</ul>
+<div class="caja aviso"><span class="etiqueta">Entorno de pruebas</span>
+<p>Este servicio es un <strong>entorno de pruebas</strong>: úsese solo con <strong>datos sintéticos o de
+prueba</strong>. No debe recibir datos reales de una entidad. Puede reiniciarse o desplegarse de nuevo sin aviso
+(un reinicio interrumpe los trabajos en curso) y no ofrece todavía acuerdo de servicio.</p></div>
 
 <h2 id="token">Obtención de un token</h2>
 <p>Toda ruta de negocio exige la cabecera <code>Authorization: Bearer &lt;token&gt;</code>. El token es un JWT
-firmado. <strong>El operador de Voracious emite el token en el servidor y lo entrega al integrador por un canal
-seguro; el integrador no necesita ni debe tener acceso a la llave de firma ni al servidor</strong> (la cuenta de túnel
-de <a class="ref2" href="#acceso-red">Acceso de red</a> solo reenvía el puerto de la API).</p>
+firmado. <strong>El operador de Voracious emite el token en el servidor (con <code>scripts/issue_token.sh</code>) y lo entrega
+al integrador por un canal seguro; el integrador no necesita ni debe tener acceso a la llave de firma ni al
+servidor.</strong> Todavía <strong>no hay pantalla de inicio de sesión ni <em>login</em></strong>: el token se pide al
+operador y se pega en el cliente o en el front. Es una solución provisional hasta que exista un proveedor de
+identidad.</p>
 <p>Para cada persona o sistema que vaya a llamar a la API, el integrador pide al operador un token con estos
 datos:</p>
 <table class="corta">
@@ -260,8 +274,8 @@ llave; no se admiten las extensiones <code>crit</code> ni <code>b64</code>. El t
     ajustes, límites, exclusiones, modelos y tuberías, puntuar, anotar, registrar eventos, recalibrar, extender, cancelar
     y <strong>proponer</strong> una versión.</td><td>Sí</td><td>No</td><td>Sí</td></tr>
   <tr><td><strong>Decisión</strong></td><td><code>POST …/versions/{n}/approve</code> y <code>…/reject</code>.</td><td>No</td><td>Sí</td><td>Sí</td></tr>
-  <tr><td><strong>Público</strong></td><td><code>/health</code>, <code>/ready</code>, <code>/docs</code>,
-    <code>/redoc</code> y <code>/openapi.json</code>, sin token.</td><td>—</td><td>—</td><td>—</td></tr>
+  <tr><td><strong>Público</strong></td><td><code>/health</code>, sin token. (<code>/ready</code>, <code>/docs</code>,
+    <code>/redoc</code> y <code>/openapi.json</code> existen en la API, pero el borde público no los deja pasar.)</td><td>—</td><td>—</td><td>—</td></tr>
 </table>
 <ul>
   <li>Un token puede llevar varios roles. <code>admin</code> lo es <strong>de su tenant</strong>: no existe un
@@ -329,8 +343,9 @@ www-authenticate: Bearer realm="voracious", error="invalid_token"
 }</code></pre>
 <div class="caja aviso"><span class="etiqueta">Aviso</span>
 <p>La cabecera <code>X-Tenant-ID</code> de versiones anteriores <strong>ya no existe</strong>: si llega, se ignora.
-Una petición que solo la envíe recibe <code>401</code> con <code>missing_token</code>. Una ruta inexistente responde
-<code>401</code> sin token y <code>404 ROUTE_NOT_FOUND</code> con él.</p></div>
+Una petición que solo la envíe recibe <code>401</code> con <code>missing_token</code>. Una ruta inexistente <strong>dentro de <code>/v1</code></strong> responde
+<code>401</code> sin token y <code>404 ROUTE_NOT_FOUND</code> con él; fuera de <code>/v1</code> y de
+<code>/health</code> el borde responde <code>404 ROUTE_NOT_FOUND</code> siempre, sin pedir token.</p></div>
 
 <h2 id="error-403">Errores 403</h2>
 <p>Con un token válido cuyos roles no permiten la operación, la API responde <code>403 FORBIDDEN</code> con los roles
@@ -367,10 +382,11 @@ existe. Ejemplo real: el token de <code>banco-b</code> consulta un dataset de <c
 <!-- ============ 4 ============ -->
 <h1 id="convenciones">Convenciones de la API</h1>
 <h2 id="url-base">URL base y versionado</h2>
-<p>Con el túnel abierto, la URL base es <code>http://127.0.0.1:8000</code>. Las rutas de negocio llevan el prefijo de
-versión <code>/v1</code>; las de la carta cuelgan de <code>/v1/charts/t2mrcd</code> (en los ejemplos,
-<code>$C</code>). Los datasets no pertenecen a ninguna carta y viven en <code>/v1/datasets</code>. La especificación
-OpenAPI está en <code>/openapi.json</code> y la documentación interactiva en <code>/docs</code> y
+<p>La URL base es <code>https://api.voracious.cloud</code> (en los ejemplos, <code>$BASE</code>). Las rutas de negocio
+llevan el prefijo de versión <code>/v1</code>; las de la carta cuelgan de <code>/v1/charts/t2mrcd</code> (en los
+ejemplos, <code>$C</code>). Los datasets no pertenecen a ninguna carta y viven en <code>/v1/datasets</code>. La
+especificación OpenAPI (<code>openapi.json</code>, con <code>servers</code> apuntando a esta URL) se entrega junto con
+esta guía; el servicio público <strong>no</strong> sirve <code>/openapi.json</code>, <code>/docs</code> ni
 <code>/redoc</code>.</p>
 
 <h2 id="formato">Formato, identificadores y fechas</h2>
@@ -518,11 +534,12 @@ decidir (el <code>message</code> es solo informativo y puede cambiar):</p>
   <tr><td>404</td><td>Recurso inexistente o de otro tenant (<code>*_NOT_FOUND</code>) o ruta inexistente (<code>ROUTE_NOT_FOUND</code>).</td></tr>
   <tr><td>405</td><td><code>METHOD_NOT_ALLOWED</code>.</td></tr>
   <tr><td>409</td><td>El recurso existe pero su estado no permite la operación (p. ej. <code>LIMITS_NOT_READY</code>, <code>NOT_A_SIGNAL</code>).</td></tr>
-  <tr><td>413</td><td><code>PAYLOAD_TOO_LARGE</code>: el cuerpo de la subida supera el máximo.</td></tr>
+  <tr><td>413</td><td><code>PAYLOAD_TOO_LARGE</code>: el cuerpo supera el máximo (el de la subida, de la API; o 51 MiB en cualquier ruta, del borde).</td></tr>
   <tr><td>415</td><td><code>UNSUPPORTED_MEDIA_TYPE</code>.</td></tr>
   <tr><td>422</td><td>Entrada no válida: <code>INVALID_INPUT</code> (con <code>details.reason</code> o <code>details.errors</code>) y validaciones del ciclo de vida.</td></tr>
+  <tr><td>429</td><td><code>RATE_LIMITED</code> (demasiadas peticiones, con <code>Retry-After</code>) o <code>TOO_MANY_JOBS</code> (demasiados trabajos activos del tenant).</td></tr>
   <tr><td>500</td><td><code>INTERNAL_ERROR</code>: fallo inesperado (el detalle queda en el registro del servidor).</td></tr>
-  <tr><td>503</td><td><code>/ready</code> no disponible; <code>JOB_INTERRUPTED</code> solo aparece dentro de un trabajo <code>failed</code>.</td></tr>
+  <tr><td>502, 503, 504</td><td>Del borde: <code>UPSTREAM_UNAVAILABLE</code> (la API se reinicia o no está disponible) o <code>UPSTREAM_TIMEOUT</code>. Reintentar con espera. <code>JOB_INTERRUPTED</code> solo aparece dentro de un trabajo <code>failed</code>.</td></tr>
 </table>
 
 <h2 id="include">Partes grandes con <code>?include=</code></h2>
@@ -558,7 +575,14 @@ reintento es:</p>
 <h2 id="limites-api">Límites</h2>
 <table class="corta">
   <thead><tr><th style="width:40%">Límite</th><th>Valor</th></tr></thead>
-  <tr><td>Cuerpo de <code>POST /v1/datasets</code></td><td>Lo configura el operador (<code>VORACIOUS_MAX_UPLOAD_MB</code>, en MiB); por defecto 50 MiB (52 428 800 bytes). Por encima, <code>413 PAYLOAD_TOO_LARGE</code>.</td></tr>
+  <tr><td>Peticiones por minuto</td><td>600 por IP de cliente, con ráfaga de 120 (cuenta también las peticiones sin token y las
+    rechazadas). Al pasarse, <code>429 RATE_LIMITED</code> con la cabecera <code>Retry-After</code> y
+    <code>details.retry_after_seconds</code>; el <code>/health</code> también cuenta.</td></tr>
+  <tr><td>Trabajos activos por tenant</td><td>4 trabajos de cómputo en cola o en curso (ajustes, límites, tuberías y
+    recalibraciones). Para el quinto, <code>429 TOO_MANY_JOBS</code> <strong>sin</strong> <code>Retry-After</code>:
+    se vuelve a pedir cuando termine alguno. El cupo es blando: peticiones simultáneas pueden pasarlo.</td></tr>
+  <tr><td>Subida de <code>POST /v1/datasets</code></td><td>50 MiB (52 428 800 bytes; <code>VORACIOUS_MAX_UPLOAD_MB</code>). Por encima, <code>413 PAYLOAD_TOO_LARGE</code> de la API con <code>details.max_bytes</code>.</td></tr>
+  <tr><td>Cuerpo de cualquier petición</td><td>51 MiB (el borde corta antes de la API). Por encima, <code>413 PAYLOAD_TOO_LARGE</code> con <code>details</code> vacío.</td></tr>
   <tr><td>Tamaño del token</td><td>8192 bytes.</td></tr>
   <tr><td>Nombre de variable, <code>batch_label</code></td><td>200 caracteres.</td></tr>
   <tr><td>Causa de una exclusión</td><td>500 caracteres.</td></tr>
@@ -569,6 +593,8 @@ reintento es:</p>
 <code>details</code> trae <code>max_bytes</code> y <code>declared_bytes</code>; si el cuerpo no declara su tamaño (envío
 por trozos) y supera el máximo al leerse, <code>details</code> trae solo <code>max_bytes</code>. Ejemplo real: una
 subida que declara 53 000 000 bytes con el máximo por defecto de 50 MiB.</p>
+<p>Entre 50 y 51 MiB responde la API (con <code>details</code>); por encima de 51 MiB responde el borde, sin
+<code>details</code>. En los dos casos el cliente debe comprobar el tamaño <strong>antes</strong> de subir.</p>
 <h4><span class="chip ko">KO</span>  413 por un cuerpo mayor que el máximo de subida</h4>
 <pre><code>{
   <span class="k">"code"</span>: <span class="s">"PAYLOAD_TOO_LARGE"</span>,
@@ -579,8 +605,97 @@ subida que declara 53 000 000 bytes con el máximo por defecto de 50 MiB.</p>
   }
 }</code></pre>
 
+<p>Un <code>429 RATE_LIMITED</code> tiene este aspecto (el <code>Retry-After</code> va también como cabecera):</p>
+<h4><span class="chip ko">KO</span>  429 por superar el límite de peticiones</h4>
+<pre><code>HTTP/2 429
+retry-after: 7
+
+{
+  <span class="k">"code"</span>: <span class="s">"RATE_LIMITED"</span>,
+  <span class="k">"message"</span>: <span class="s">"demasiadas peticiones; espera antes de reintentar"</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"retry_after_seconds"</span>: <span class="n">7</span>
+  }
+}</code></pre>
+<p>El valor de <code>retry_after_seconds</code> es ilustrativo; el cliente debe fiarse de la
+cabecera y de <code>code</code>, no del texto. Al reintentar, conviene <strong>esperar de forma progresiva</strong>
+(retroceso exponencial con algo de aleatoriedad, empezando en <code>Retry-After</code>) en lugar de repetir a ritmo
+fijo.</p>
+
 <h2 id="catalogo-errores">Catálogo de códigos de error</h2>
 {{CATALOGO_ERRORES}}
+
+<!-- ============ FRONT ============ -->
+<h1 id="front-navegador">Front en navegador</h1>
+<p>Un front que corre en el navegador puede llamar directamente a la API. Este capítulo recoge lo que cambia respecto
+a un cliente de servidor (<code>curl</code>, Python…). La API <strong>no</strong> se aloja junto al front: son
+servicios distintos y el front vive en otro repositorio.</p>
+
+<h2 id="front-cors">CORS</h2>
+<p>La API admite peticiones de <strong>cualquier origen</strong> y <strong>sin credenciales</strong>: no hay cookies ni
+sesión, solo el token en la cabecera <code>Authorization</code>, que el navegador nunca manda por sí mismo. Por eso
+abrir el origen no abre el acceso: sin token válido toda ruta de negocio responde <code>401</code>.</p>
+<table class="corta">
+  <caption>Política CORS de la API</caption>
+  <thead><tr><th style="width:36%">Aspecto</th><th>Valor</th></tr></thead>
+  <tr><td>Orígenes</td><td>Cualquiera (<code>Access-Control-Allow-Origin: *</code>); sin <code>Allow-Credentials</code>.</td></tr>
+  <tr><td>Métodos</td><td><code>GET</code> y <code>POST</code> (los únicos que tiene la API).</td></tr>
+  <tr><td>Cabeceras permitidas en la petición</td><td><code>Authorization</code> y <code>Content-Type</code> (JSON, <code>text/csv</code> y multipart). Cualquier otra cabecera hace fallar el preflight con <code>400</code>.</td></tr>
+  <tr><td>Cabeceras expuestas al código del front</td><td><code>Retry-After</code> y <code>WWW-Authenticate</code>.</td></tr>
+  <tr><td>Preflight (<code>OPTIONS</code>)</td><td>Lo responde la API sin pedir token ni gastar cupo del límite de peticiones; el navegador puede guardarlo 600 s (<code>Access-Control-Max-Age: 600</code>).</td></tr>
+</table>
+<p>Como toda petición del front lleva <code>Authorization</code>, el navegador hace <strong>siempre</strong> un
+preflight antes de la petición real. Los errores <code>401</code>, <code>429</code> y los de la propia API sí llevan
+las cabeceras CORS, de modo que el código del front puede leerlos.</p>
+
+<h2 id="front-error-red">El «error de red»</h2>
+<p>Los errores que genera el <strong>borde</strong> (<code>502</code>, <code>503</code> y <code>504</code>, el
+<code>413</code> de más de 51 MiB y el <code>404</code> fuera de <code>/v1</code>) <strong>no llevan cabeceras
+CORS</strong>. Además, si la API está caída o reiniciándose, ni siquiera el preflight puede tener éxito. En ambos
+casos el navegador no entrega al código la respuesta, solo un fallo genérico (<code>TypeError: Failed to fetch</code>
+o «error de red»). Un «error de red» significa, por tanto, <strong>servicio no disponible</strong> (caído,
+desplegándose o reiniciándose): el front debe <strong>reintentar con espera progresiva</strong> y mostrar un aviso
+de «servicio no disponible», no un error de credenciales.</p>
+<pre><code><span class="c">// Esquema de reintento con espera progresiva (JavaScript)</span>
+async function llamar(url, opciones, intentos = 5) {
+  for (let i = 0; i &lt; intentos; i++) {
+    try {
+      const r = await fetch(url, opciones);
+      if (r.status !== 429) return r;
+      const espera = Number(r.headers.get("Retry-After") ?? 1);
+      await new Promise((ok) =&gt; setTimeout(ok, 1000 * Math.max(espera, 2 ** i)));
+    } catch (e) {                       <span class="c">// «error de red»: servicio no disponible</span>
+      await new Promise((ok) =&gt; setTimeout(ok, 1000 * 2 ** i));
+    }
+  }
+  throw new Error("servicio no disponible");
+}</code></pre>
+
+<h2 id="front-subidas">Subidas y tamaños</h2>
+<p>El máximo de una subida es 50 MiB. El front debe <strong>comprobar el tamaño del fichero en el cliente antes de
+subirlo</strong> (<code>file.size &gt; 50 * 1024 * 1024</code>): una subida demasiado grande consume tiempo y ancho de banda y,
+por encima de 51 MiB, el borde la corta con un <code>413</code> sin cabeceras CORS, que el navegador ve como un
+«error de red». Con los datos sintéticos de prueba, el tamaño típico es de kilobytes.</p>
+<p>Respete también el límite de <strong>4 trabajos activos por tenant</strong> (<code>429 TOO_MANY_JOBS</code>, sin
+<code>Retry-After</code>): el front debe deshabilitar el botón o encolar en el cliente en lugar de reintentar.</p>
+
+<h2 id="front-token">Dónde guardar el token</h2>
+<ul>
+  <li><strong>En memoria</strong> (una variable del módulo) o, si debe sobrevivir a una recarga,
+    <strong><code>sessionStorage</code></strong> (se borra al cerrar la pestaña).</li>
+  <li><strong>Nunca en <code>localStorage</code></strong>: persiste tras cerrar el navegador y lo lee cualquier script
+    de la página.</li>
+  <li><strong>Vida del token de 8 horas como máximo</strong> para los tokens que se peguen en un front (la API admite
+    hasta 7 días, pero un token de un navegador debe durar una jornada). Al caducar, <code>401</code> con
+    <code>expired</code>: el front pide al usuario un token nuevo.</li>
+  <li>El token pegado en el front queda expuesto a un fallo de seguridad del propio front (XSS). Por eso conviene una
+    <strong>política CSP</strong> estricta en el front, con
+    <code>connect-src https://api.voracious.cloud</code>, y no cargar scripts de terceros.</li>
+  <li>No poner el token en la URL ni en la consola del navegador; no enviarlo a ningún otro host.</li>
+</ul>
+<p>Todavía <strong>no hay login</strong>: el token lo emite el operador con <code>scripts/issue_token.sh</code> y se
+entrega por un canal seguro. Sigue valiendo la advertencia de <a class="ref2" href="#acceso-red">Acceso de red</a>:
+esto es un entorno de pruebas, solo con datos sintéticos.</p>
 
 <!-- ============ 5 ============ -->
 <h1 id="flujos">Flujos de integración paso a paso</h1>
@@ -589,7 +704,7 @@ con <strong>datos simulados</strong> (60 observaciones de cuatro indicadores: <c
 <code>var_99</code> y <code>concentracion</code>) y se han acortado con «…» donde las listas son largas. Los
 identificadores son los de esa ejecución; el integrador obtendrá otros.</p>
 <div class="caja"><span class="etiqueta">Preparación</span>
-<p>Todos los ejemplos suponen el túnel abierto y las variables <code>BASE</code>, <code>C</code> y
+<p>Todos los ejemplos suponen las variables <code>BASE</code> (<code>https://api.voracious.cloud</code>), <code>C</code> y
 <code>TOKEN</code> definidas (ver <a class="ref2" href="#acceso-red">Acceso de red</a> y
 <a class="ref2" href="#token">Obtención de un token</a>). El rol necesario se indica en cada paso;
 <code>$APPROVER</code> es un token con el rol <code>approver</code>.</p></div>
@@ -2234,7 +2349,9 @@ resolvió el evento estructural:</p>
 
 <!-- ============ 7 ============ -->
 <h1 id="health">Vida y disponibilidad</h1>
-<p>Dos rutas públicas (sin token) informan de la salud del proceso. Se usan para la supervisión, no para el negocio.</p>
+<p>Dos rutas sin token informan de la salud del proceso. Se usan para la supervisión, no para el negocio. En el
+servicio público solo está disponible <code>/health</code>; <code>/ready</code> existe en la API, pero el borde no la
+publica (<code>404 ROUTE_NOT_FOUND</code>) y solo la usa el operador desde el propio servidor.</p>
 <h2 id="health-vida">Vida: <code>/health</code></h2>
 <div class="endpoint"><span class="metodo get">GET</span>/health</div>
 <p>Indica que el proceso responde. <strong>No consulta dependencias</strong>, para que un fallo externo no provoque el
@@ -2249,7 +2366,7 @@ content-type: application/json
 }</code></pre>
 <h2 id="health-disponibilidad">Disponibilidad: <code>/ready</code></h2>
 <div class="endpoint"><span class="metodo get">GET</span>/ready</div>
-<p>Indica si el proceso puede recibir tráfico. Comprueba cada dependencia externa configurada: <code>database</code>
+<p><strong>No accesible desde internet</strong> (ver arriba). Indica si el proceso puede recibir tráfico. Comprueba cada dependencia externa configurada: <code>database</code>
 (<code>SELECT 1</code> con un máximo de 2 s) con Postgres y <code>storage</code> (directorio escribible) con
 almacenamiento local. Sin dependencias externas, <code>checks</code> va vacío. La cola de trabajos no tiene
 comprobación (vive en el proceso). El esquema completo está en
@@ -2306,6 +2423,11 @@ pero sí por un reinicio (<code>JOB_INTERRUPTED</code>).</p>
   <li>Sondear con el intervalo de la tabla de <a class="ref3" href="#sondeo">Sondeo</a> y un tiempo máximo; aumentar el
     intervalo si el trabajo tarda (retroceso exponencial hasta 60 s).</li>
   <li>Decidir por <code>code</code>, nunca por <code>message</code>.</li>
+  <li>Ante un <code>429 RATE_LIMITED</code>, esperar al menos <code>Retry-After</code> y reintentar con espera
+    progresiva; ante un <code>429 TOO_MANY_JOBS</code>, no reintentar hasta que termine algún trabajo del tenant. El
+    sondeo de un trabajo cuenta en el límite de 600 peticiones por minuto: con muchos trabajos, sondear a 2 s o más.</li>
+  <li>Ante un <code>502</code>, <code>503</code> o <code>504</code> del borde (o un «error de red» en el navegador),
+    el servicio no está disponible: esperar y reintentar.</li>
   <li>No reintentar a ciegas un <code>POST</code> de puntuación tras un corte: comprobar antes con
     <code>…/observations</code> si las observaciones ya se registraron.</li>
   <li>Reintentar los errores <code>5xx</code> y los trabajos <code>JOB_INTERRUPTED</code>; no reintentar los
@@ -2340,6 +2462,20 @@ pero sí por un reinicio (<code>JOB_INTERRUPTED</code>).</p>
 0.1.0): rutas, campos y códigos que se eliminaron o cambiaron sin cambiar de versión. Se marcan abajo con
 <span class="chip ko">Rompe el contrato</span>. A partir de la primera versión publicada, la API se versionará: un
 cambio incompatible llegará con una versión nueva y se anunciará en estas notas.</p></div>
+
+<h4>2026-10-20 · API publicada por HTTPS</h4>
+<ul>
+  <li>La API se publica en <code>https://api.voracious.cloud</code> detrás de un proxy (Caddy) con certificado de
+    Let&rsquo;s Encrypt, solo HTTPS (el 80 está cerrado). Ya no hace falta el túnel SSH.</li>
+  <li><code>/ready</code>, <code>/docs</code>, <code>/redoc</code> y <code>/openapi.json</code> no se publican
+    (<code>404 ROUTE_NOT_FOUND</code> en el borde); la especificación se entrega con la guía.</li>
+  <li>Nuevos límites: 600 peticiones por minuto por IP con ráfaga de 120 (<code>429 RATE_LIMITED</code>, con
+    <code>Retry-After</code>) y 4 trabajos activos por tenant (<code>429 TOO_MANY_JOBS</code>). Nuevos códigos del
+    borde: <code>UPSTREAM_UNAVAILABLE</code>, <code>UPSTREAM_TIMEOUT</code> y <code>EDGE_ERROR</code>;
+    <code>PAYLOAD_TOO_LARGE</code> también por encima de 51 MiB en cualquier ruta.</li>
+  <li>CORS abierto a cualquier origen, sin credenciales, para que un front en el navegador llame a la API.</li>
+  <li>Entorno de pruebas: solo datos sintéticos.</li>
+</ul>
 
 <h4>2026-10-20 · Autenticación con JWT y roles <span class="chip ko">Rompe el contrato</span></h4>
 <ul>
