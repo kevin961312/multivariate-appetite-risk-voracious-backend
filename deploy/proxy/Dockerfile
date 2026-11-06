@@ -6,7 +6,7 @@
 # Variables obligatorias en el arranque (deploy/demo/proxy.env): PROXY_PUBLIC_HOST y PROXY_TLS_MODE.
 
 # Base fijada por versión y digest; Dependabot propone las subidas (.github/dependabot.yml, /deploy/proxy).
-FROM caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+FROM caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
 
 # La base marca /usr/bin/caddy con la capacidad de fichero cap_net_bind_service: con cap_drop ALL el
 # kernel se niega a ejecutarlo («operation not permitted»). Se quita, porque Docker (>= 20.10) ya
